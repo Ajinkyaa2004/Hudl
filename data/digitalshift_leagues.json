@@ -1,0 +1,54 @@
+{
+ "_about": "HockeyShift / DigitalShift league and tournament sites. client_service_id is in each site's window.config; the API (web.api.digitalshift.ca) needs a ticket from POST /login and the site's Origin. league: the stats league id. comp: header competition words (lower case). names: site spelling -> header spelling. context: words added to the league name for the scorer (age group when the league has one). strip: regex removed from site team names (sponsors).",
+ "leagues": [
+  {
+   "site": "https://www.hselitehockey.com",
+   "client_service_id": "fae46091-ee8c-4640-a264-bb282cf57a94",
+   "league": 163,
+   "name": "Upper Midwest High School Elite League",
+   "context": "18U",
+   "tz": "America/Chicago",
+   "comp": [
+    "upper midwest high school",
+    "hs elite",
+    "high school elite"
+   ],
+   "names": {
+    "Team ND": "Team North Dakota"
+   }
+  },
+  {
+   "site": "https://www.girlshselitehockey.com",
+   "client_service_id": "a45a8e1a-ed6c-4651-8a4d-127d5587e199",
+   "league": 164,
+   "name": "Midwest Girls HS Elite League",
+   "context": "",
+   "tz": "America/Chicago",
+   "comp": [
+    "upper midwest high school",
+    "girls hs elite",
+    "girls high school elite",
+    "(g)",
+    "girls",
+    "women"
+   ],
+   "names": {
+    "MN ELITE SKY": "MN Elite Sky Blue"
+   },
+   "strip": "\\s+-\\s+.*$"
+  },
+  {
+   "site": "https://www.dallasstarstournaments.com",
+   "client_service_id": "dc2ccd50-98a8-4656-a96f-107e0a41ae2c",
+   "league": 32,
+   "name": "Dallas Stars Tournaments",
+   "context": "",
+   "tz": "America/Chicago",
+   "comp": [
+    "dallas stars tournament",
+    "texas hockey tournament"
+   ],
+   "names": {}
+  }
+ ]
+}

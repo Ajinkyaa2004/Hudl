@@ -1,0 +1,742 @@
+[
+ {
+  "host": "asec",
+  "league": 1,
+  "season": null,
+  "season_name": "",
+  "games": 87,
+  "name": "Adult",
+  "first": "2026-09-08",
+  "last": "2026-09-29"
+ },
+ {
+  "host": "asec",
+  "league": 4,
+  "season": null,
+  "season_name": "",
+  "games": 35,
+  "name": "Adult",
+  "first": "2026-09-13",
+  "last": "2026-09-29"
+ },
+ {
+  "host": "asec",
+  "league": 7,
+  "season": null,
+  "season_name": "",
+  "games": 134,
+  "name": "TINSELTOWN",
+  "first": "2026-09-03",
+  "last": "2026-09-07"
+ },
+ {
+  "host": "asec",
+  "league": 11,
+  "season": null,
+  "season_name": "",
+  "games": 261,
+  "name": "Ice",
+  "first": "2026-08-31",
+  "last": "2027-01-28"
+ },
+ {
+  "host": "asec",
+  "league": 12,
+  "season": null,
+  "season_name": "",
+  "games": 37,
+  "name": "Ice",
+  "first": "2026-09-03",
+  "last": "2026-09-07"
+ },
+ {
+  "host": "asec",
+  "league": 15,
+  "season": null,
+  "season_name": "",
+  "games": 1,
+  "name": "PV",
+  "first": "2026-09-15",
+  "last": "2026-09-15"
+ },
+ {
+  "host": "asec",
+  "league": 29,
+  "season": null,
+  "season_name": "",
+  "games": 24,
+  "name": "TINSELTOWN",
+  "first": "2026-09-04",
+  "last": "2026-09-07"
+ },
+ {
+  "host": "blackbear",
+  "league": 1,
+  "season": null,
+  "season_name": "",
+  "games": 114,
+  "name": "Foundry",
+  "first": "2026-09-12",
+  "last": "2026-10-11"
+ },
+ {
+  "host": "blackbear",
+  "league": 3,
+  "season": null,
+  "season_name": "",
+  "games": 921,
+  "name": "AGHF",
+  "first": "2026-08-16",
+  "last": "2027-02-26"
+ },
+ {
+  "host": "blackbear",
+  "league": 4,
+  "season": null,
+  "season_name": "",
+  "games": 8060,
+  "name": "AHF",
+  "first": "2026-08-16",
+  "last": "2027-02-27"
+ },
+ {
+  "host": "blackbear",
+  "league": 5,
+  "season": null,
+  "season_name": "",
+  "games": 2249,
+  "name": "THF",
+  "first": "2026-08-22",
+  "last": "2027-02-27"
+ },
+ {
+  "host": "blackbear",
+  "league": 7,
+  "season": 185,
+  "season_name": "Defender - Jersey Shore Summer Sizzler - July 10-12, 2026",
+  "games": 101,
+  "name": "Defender",
+  "first": "2026-07-10",
+  "last": "2026-07-12"
+ },
+ {
+  "host": "blackbear",
+  "league": 7,
+  "season": 186,
+  "season_name": "Defender - Hershey Summer Sizzler - July 17-19, 2026",
+  "games": 60,
+  "name": "Defender",
+  "first": "2026-07-17",
+  "last": "2026-07-19"
+ },
+ {
+  "host": "blackbear",
+  "league": 7,
+  "season": 187,
+  "season_name": "Defender - Music City TNT - July 24-26, 2026",
+  "games": 37,
+  "name": "Defender",
+  "first": "2026-07-24",
+  "last": "2026-07-26"
+ },
+ {
+  "host": "blackbear",
+  "league": 7,
+  "season": 191,
+  "season_name": "Defender - Lights Out Midnight Madness (PA) - July 18, 2026",
+  "games": 93,
+  "name": "Defender",
+  "first": "2026-07-18",
+  "last": "2026-07-18"
+ },
+ {
+  "host": "blackbear",
+  "league": 7,
+  "season": 193,
+  "season_name": "Defender - Rust Buster - August 15-16, 2026",
+  "games": 12,
+  "name": "Defender",
+  "first": "2026-08-15",
+  "last": "2026-08-16"
+ },
+ {
+  "host": "blackbear",
+  "league": 9,
+  "season": null,
+  "season_name": "",
+  "games": 310,
+  "name": "Foundry",
+  "first": "2026-08-25",
+  "last": "2026-12-11"
+ },
+ {
+  "host": "blackbear",
+  "league": 11,
+  "season": null,
+  "season_name": "",
+  "games": 116,
+  "name": "Foundry",
+  "first": "2026-09-14",
+  "last": "2026-11-30"
+ },
+ {
+  "host": "blackbear",
+  "league": 12,
+  "season": null,
+  "season_name": "",
+  "games": 138,
+  "name": "Foundry",
+  "first": "2026-09-13",
+  "last": "2026-12-17"
+ },
+ {
+  "host": "blackbear",
+  "league": 14,
+  "season": null,
+  "season_name": "",
+  "games": 155,
+  "name": "Foundry",
+  "first": "2026-09-09",
+  "last": "2026-12-20"
+ },
+ {
+  "host": "blackbear",
+  "league": 15,
+  "season": null,
+  "season_name": "",
+  "games": 60,
+  "name": "Foundry",
+  "first": "2026-09-20",
+  "last": "2026-10-22"
+ },
+ {
+  "host": "blackbear",
+  "league": 16,
+  "season": null,
+  "season_name": "",
+  "games": 49,
+  "name": "Foundry",
+  "first": "2026-09-08",
+  "last": "2026-12-18"
+ },
+ {
+  "host": "blackbear",
+  "league": 17,
+  "season": null,
+  "season_name": "",
+  "games": 223,
+  "name": "Foundry",
+  "first": "2026-08-31",
+  "last": "2026-12-30"
+ },
+ {
+  "host": "blackbear",
+  "league": 18,
+  "season": null,
+  "season_name": "",
+  "games": 553,
+  "name": "Foundry",
+  "first": "2026-09-08",
+  "last": "2026-12-14"
+ },
+ {
+  "host": "blackbear",
+  "league": 19,
+  "season": null,
+  "season_name": "",
+  "games": 325,
+  "name": "Foundry",
+  "first": "2026-09-14",
+  "last": "2027-02-18"
+ },
+ {
+  "host": "blackbear",
+  "league": 21,
+  "season": null,
+  "season_name": "",
+  "games": 118,
+  "name": "Foundry",
+  "first": "2026-09-13",
+  "last": "2026-12-12"
+ },
+ {
+  "host": "blackbear",
+  "league": 22,
+  "season": null,
+  "season_name": "",
+  "games": 233,
+  "name": "Foundry",
+  "first": "2026-09-03",
+  "last": "2027-01-03"
+ },
+ {
+  "host": "blackbear",
+  "league": 23,
+  "season": null,
+  "season_name": "",
+  "games": 28,
+  "name": "Foundry",
+  "first": "2026-08-14",
+  "last": "2026-10-30"
+ },
+ {
+  "host": "blackbear",
+  "league": 24,
+  "season": null,
+  "season_name": "",
+  "games": 119,
+  "name": "Foundry",
+  "first": "2026-09-18",
+  "last": "2027-04-05"
+ },
+ {
+  "host": "blackbear",
+  "league": 25,
+  "season": null,
+  "season_name": "",
+  "games": 97,
+  "name": "Foundry",
+  "first": "2026-09-02",
+  "last": "2026-10-13"
+ },
+ {
+  "host": "blackbear",
+  "league": 27,
+  "season": null,
+  "season_name": "",
+  "games": 22,
+  "name": "Foundry",
+  "first": "2026-10-05",
+  "last": "2027-02-01"
+ },
+ {
+  "host": "blackbear",
+  "league": 28,
+  "season": null,
+  "season_name": "",
+  "games": 11,
+  "name": "Foundry",
+  "first": "2026-09-21",
+  "last": "2026-09-30"
+ },
+ {
+  "host": "blackbear",
+  "league": 30,
+  "season": null,
+  "season_name": "",
+  "games": 40,
+  "name": "Foundry",
+  "first": "2026-09-22",
+  "last": "2027-01-13"
+ },
+ {
+  "host": "blackbear",
+  "league": 31,
+  "season": null,
+  "season_name": "",
+  "games": 46,
+  "name": "Foundry",
+  "first": "2026-09-20",
+  "last": "2026-10-08"
+ },
+ {
+  "host": "blackbear",
+  "league": 32,
+  "season": null,
+  "season_name": "",
+  "games": 231,
+  "name": "Foundry",
+  "first": "2026-09-11",
+  "last": "2026-10-30"
+ },
+ {
+  "host": "blackbear",
+  "league": 33,
+  "season": null,
+  "season_name": "",
+  "games": 27,
+  "name": "Foundry",
+  "first": "2026-09-21",
+  "last": "2026-10-15"
+ },
+ {
+  "host": "blackbear",
+  "league": 35,
+  "season": null,
+  "season_name": "",
+  "games": 24,
+  "name": "Foundry",
+  "first": "2026-08-30",
+  "last": "2026-11-15"
+ },
+ {
+  "host": "blackbear",
+  "league": 36,
+  "season": null,
+  "season_name": "",
+  "games": 40,
+  "name": "SYHL",
+  "first": "2026-09-25",
+  "last": "2027-02-07"
+ },
+ {
+  "host": "blackbear",
+  "league": 40,
+  "season": 198,
+  "season_name": "NGHL Dawg Daze, August 28-30, 2026",
+  "games": 171,
+  "name": "NGHL",
+  "first": "2026-08-28",
+  "last": "2026-08-30"
+ },
+ {
+  "host": "blackbear",
+  "league": 41,
+  "season": 203,
+  "season_name": "NGHL Labor Day Challenge, Sept 4-6, 2026",
+  "games": 186,
+  "name": "NGHL",
+  "first": "2026-09-04",
+  "last": "2026-09-06"
+ },
+ {
+  "host": "blackbear",
+  "league": 42,
+  "season": null,
+  "season_name": "",
+  "games": 71,
+  "name": "Travel",
+  "first": "2026-09-04",
+  "last": "2026-09-06"
+ },
+ {
+  "host": "blackbear",
+  "league": 42,
+  "season": 196,
+  "season_name": "TC Summer Shootout 2026",
+  "games": 79,
+  "name": "Travel",
+  "first": "2026-08-07",
+  "last": "2026-08-09"
+ },
+ {
+  "host": "blackbear",
+  "league": 48,
+  "season": null,
+  "season_name": "",
+  "games": 38,
+  "name": "Foundry",
+  "first": "2026-09-08",
+  "last": "2026-09-29"
+ },
+ {
+  "host": "blackbear",
+  "league": 49,
+  "season": null,
+  "season_name": "",
+  "games": 2,
+  "name": "Foundry",
+  "first": "2026-09-20",
+  "last": "2026-09-20"
+ },
+ {
+  "host": "caha",
+  "league": 3,
+  "season": null,
+  "season_name": "",
+  "games": 245,
+  "name": "Norcal",
+  "first": "2026-08-22",
+  "last": "2026-10-04"
+ },
+ {
+  "host": "caha",
+  "league": 4,
+  "season": null,
+  "season_name": "",
+  "games": 137,
+  "name": "SCAHA",
+  "first": "2026-08-23",
+  "last": "2026-09-27"
+ },
+ {
+  "host": "caha",
+  "league": 5,
+  "season": null,
+  "season_name": "",
+  "games": 1125,
+  "name": "CAHA",
+  "first": "2026-08-09",
+  "last": "2027-02-21"
+ },
+ {
+  "host": "caha",
+  "league": 16,
+  "season": null,
+  "season_name": "",
+  "games": 21,
+  "name": "CAHA",
+  "first": "2026-09-12",
+  "last": "2026-10-04"
+ },
+ {
+  "host": "caha",
+  "league": 23,
+  "season": null,
+  "season_name": "",
+  "games": 33,
+  "name": "ACHA",
+  "first": "2026-09-25",
+  "last": "2027-02-27"
+ },
+ {
+  "host": "caha",
+  "league": 26,
+  "season": null,
+  "season_name": "",
+  "games": 144,
+  "name": "LA",
+  "first": "2026-09-11",
+  "last": "2027-02-06"
+ },
+ {
+  "host": "caha",
+  "league": 27,
+  "season": null,
+  "season_name": "",
+  "games": 216,
+  "name": "SHSHL",
+  "first": "2026-08-09",
+  "last": "2027-02-07"
+ },
+ {
+  "host": "caha",
+  "league": 41,
+  "season": null,
+  "season_name": "",
+  "games": 154,
+  "name": "California",
+  "first": "2026-09-04",
+  "last": "2026-09-07"
+ },
+ {
+  "host": "cna",
+  "league": 3,
+  "season": null,
+  "season_name": "",
+  "games": 120,
+  "name": "NGIN",
+  "first": "2026-08-17",
+  "last": "2026-10-08"
+ },
+ {
+  "host": "cna",
+  "league": 32,
+  "season": null,
+  "season_name": "",
+  "games": 293,
+  "name": "House",
+  "first": "2026-08-15",
+  "last": "2026-10-24"
+ },
+ {
+  "host": "cna",
+  "league": 35,
+  "season": null,
+  "season_name": "",
+  "games": 13,
+  "name": "ADHSH",
+  "first": "2026-11-17",
+  "last": "2027-01-31"
+ },
+ {
+  "host": "cna",
+  "league": 42,
+  "season": null,
+  "season_name": "",
+  "games": 25,
+  "name": "911",
+  "first": "2026-10-01",
+  "last": "2026-10-03"
+ },
+ {
+  "host": "cna",
+  "league": 59,
+  "season": null,
+  "season_name": "",
+  "games": 186,
+  "name": "TCS",
+  "first": "2026-07-16",
+  "last": "2026-07-20"
+ },
+ {
+  "host": "cna",
+  "league": 60,
+  "season": null,
+  "season_name": "",
+  "games": 10,
+  "name": "Faith",
+  "first": "2026-08-12",
+  "last": "2026-09-16"
+ },
+ {
+  "host": "cna",
+  "league": 65,
+  "season": null,
+  "season_name": "",
+  "games": 71,
+  "name": "Kings",
+  "first": "2026-07-07",
+  "last": "2026-07-10"
+ },
+ {
+  "host": "cna",
+  "league": 67,
+  "season": null,
+  "season_name": "",
+  "games": 194,
+  "name": "AFC",
+  "first": "2026-08-11",
+  "last": "2027-03-23"
+ },
+ {
+  "host": "cna",
+  "league": 68,
+  "season": null,
+  "season_name": "",
+  "games": 3,
+  "name": "Jr",
+  "first": "2026-09-20",
+  "last": "2026-09-25"
+ },
+ {
+  "host": "cna",
+  "league": 69,
+  "season": null,
+  "season_name": "",
+  "games": 83,
+  "name": "My",
+  "first": "2026-10-09",
+  "last": "2026-10-11"
+ },
+ {
+  "host": "cna",
+  "league": 70,
+  "season": null,
+  "season_name": "",
+  "games": 2,
+  "name": "Jr",
+  "first": "2026-09-11",
+  "last": "2026-09-13"
+ },
+ {
+  "host": "cna",
+  "league": 71,
+  "season": null,
+  "season_name": "",
+  "games": 1,
+  "name": "Jr",
+  "first": "2026-10-02",
+  "last": "2026-10-02"
+ },
+ {
+  "host": "cna",
+  "league": 86,
+  "season": null,
+  "season_name": "",
+  "games": 1,
+  "name": "Jr",
+  "first": "2026-10-03",
+  "last": "2026-10-03"
+ },
+ {
+  "host": "cna",
+  "league": 88,
+  "season": null,
+  "season_name": "",
+  "games": 10,
+  "name": "Jr",
+  "first": "2026-10-15",
+  "last": "2026-10-18"
+ },
+ {
+  "host": "cna",
+  "league": 91,
+  "season": null,
+  "season_name": "",
+  "games": 8,
+  "name": "Jr",
+  "first": "2026-08-14",
+  "last": "2026-08-16"
+ },
+ {
+  "host": "cna",
+  "league": 105,
+  "season": null,
+  "season_name": "",
+  "games": 8,
+  "name": "Jr",
+  "first": "2026-08-21",
+  "last": "2026-08-23"
+ },
+ {
+  "host": "cna",
+  "league": 107,
+  "season": null,
+  "season_name": "",
+  "games": 3,
+  "name": "Jr",
+  "first": "2026-08-29",
+  "last": "2026-09-28"
+ },
+ {
+  "host": "cna",
+  "league": 109,
+  "season": null,
+  "season_name": "",
+  "games": 70,
+  "name": "CA",
+  "first": "2026-09-24",
+  "last": "2026-09-27"
+ },
+ {
+  "host": "cna",
+  "league": 118,
+  "season": null,
+  "season_name": "",
+  "games": 1,
+  "name": "Jr",
+  "first": "2026-10-04",
+  "last": "2026-10-04"
+ },
+ {
+  "host": "cna",
+  "league": 120,
+  "season": null,
+  "season_name": "",
+  "games": 84,
+  "name": "Weekend",
+  "first": "2026-09-04",
+  "last": "2026-09-07"
+ },
+ {
+  "host": "usphl",
+  "league": 1,
+  "season": null,
+  "season_name": "",
+  "games": 1585,
+  "name": "NCDC",
+  "first": "2026-09-25",
+  "last": "2027-04-29"
+ },
+ {
+  "host": "usphl",
+  "league": 2,
+  "season": null,
+  "season_name": "",
+  "games": 1623,
+  "name": "Premier",
+  "first": "2026-09-11",
+  "last": "2027-04-29"
+ }
+]

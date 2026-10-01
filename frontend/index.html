@@ -1,0 +1,539 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script>try{const t=localStorage.getItem("pt-theme");document.documentElement.dataset.theme=t||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light")}catch(e){document.documentElement.dataset.theme="light"}</script>
+<title>PuckTrace</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Cellipse cx=%2716%27 cy=%2720%27 rx=%2712%27 ry=%275%27 fill=%27%23f2610d%27/%3E%3Cellipse cx=%2716%27 cy=%2715%27 rx=%2712%27 ry=%275%27 fill=%27%23ff8a3d%27/%3E%3Crect x=%274%27 y=%2715%27 width=%2724%27 height=%275%27 fill=%27%23f2610d%27/%3E%3C/svg%3E">
+<style>
+:root{
+  /* PuckTrace light: white and orange */
+  --bg:#f6f6f7;--s1:#ffffff;--s2:#f3f3f5;--s3:#e9e9ec;--line:#e6e6ea;--line2:#d6d6dc;
+  --tx:#17181c;--mu:#5b616c;--mu2:#8c919b;
+  --ac:#f2610d;--ac-hi:#d9530a;--ac-bg:rgba(242,97,13,.09);--ac-ring:rgba(242,97,13,.18);--on-ac:#ffffff;
+  --top:rgba(255,255,255,.88);--shade:0 1px 2px rgba(16,18,24,.04),0 4px 14px rgba(16,18,24,.05);
+  --ok:#14853f;--ok-bg:rgba(20,133,63,.10);--wa:#b26a00;--wa-bg:rgba(178,106,0,.11);--no:#cc3b33;--no-bg:rgba(204,59,51,.09);--vi:#6b4fd1;--vi-bg:rgba(107,79,209,.10);
+  --r:12px;--mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;--sans:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --ease:cubic-bezier(.2,.7,.2,1)}
+/* dark: black and orange */
+:root[data-theme="dark"]{
+  --bg:#09090a;--s1:#111113;--s2:#18181b;--s3:#222226;--line:#232327;--line2:#313137;
+  --tx:#f4f4f5;--mu:#a1a1aa;--mu2:#71717a;
+  --ac:#ff7417;--ac-hi:#ff8a3d;--ac-bg:rgba(255,116,23,.12);--ac-ring:rgba(255,116,23,.22);--on-ac:#0b0b0c;
+  --top:rgba(9,9,10,.86);--shade:none;
+  --ok:#3fb950;--ok-bg:rgba(63,185,80,.13);--wa:#e3a23b;--wa-bg:rgba(227,162,59,.13);--no:#f0625a;--no-bg:rgba(240,98,90,.13);--vi:#b394ff;--vi-bg:rgba(179,148,255,.13)}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.5 var(--sans);-webkit-font-smoothing:antialiased}
+a{color:var(--ac);text-decoration:none}
+button{font:inherit;color:inherit}
+::selection{background:var(--ac-ring)}
+.mono{font-family:var(--mono)}
+.mu{color:var(--mu)}.small{font-size:12px}
+
+/* top bar */
+.top{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:18px;padding:0 24px;height:56px;background:var(--top);backdrop-filter:saturate(1.4) blur(12px);border-bottom:1px solid var(--line)}
+.top:before{content:"";position:absolute;left:0;right:0;top:0;height:3px;background:linear-gradient(90deg,var(--ac),var(--ac-hi))}
+.logo{font:700 16px var(--sans);letter-spacing:-.02em;display:flex;align-items:center;gap:9px;white-space:nowrap}
+.logo b{color:var(--ac);font-weight:700}
+.logo svg{flex:none}
+
+.tabs{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none}
+.tabs button{background:none;border:0;padding:0 12px;height:56px;color:var(--mu);cursor:pointer;white-space:nowrap;transition:color .15s,box-shadow .15s;font-weight:500}
+.tabs button:hover{color:var(--tx)}
+.tabs button.on{color:var(--ac);box-shadow:inset 0 -2px 0 var(--ac)}
+.stats{margin-left:auto;color:var(--mu2);font-size:12px;white-space:nowrap}
+.theme{background:var(--s2);border:1px solid var(--line);border-radius:999px;width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;color:var(--mu);transition:color .15s,border-color .15s;flex:none}
+.theme:hover{color:var(--ac);border-color:var(--ac)}
+.theme .sun{display:none}:root[data-theme="dark"] .theme .sun{display:block}:root[data-theme="dark"] .theme .moon{display:none}
+@media(max-width:720px){.stats{display:none}.top{padding:10px 16px}}
+
+main{max-width:1180px;margin:0 auto;padding:22px 20px 80px}
+@media(max-width:720px){main{padding:16px 16px 80px}}
+.view{display:none;animation:fade .2s var(--ease)}.view.on{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+/* search */
+.sbox{display:flex;gap:8px;background:var(--s1);border:1px solid var(--line2);border-radius:14px;padding:6px;transition:border-color .15s,box-shadow .15s;box-shadow:var(--shade)}
+.sbox:focus-within{border-color:var(--ac);box-shadow:0 0 0 4px var(--ac-ring)}
+.sbox input{flex:1;min-width:0;background:none;border:0;outline:0;color:var(--tx);font:14px var(--mono);padding:10px 10px}
+.sbox input::placeholder{color:var(--mu2)}
+.btn{background:var(--ac);color:var(--on-ac);border:0;border-radius:10px;padding:0 20px;font-weight:600;cursor:pointer;transition:background .15s,transform .1s}
+.btn:hover{background:var(--ac-hi)}
+.btn:active{transform:scale(.97)}.btn:disabled{opacity:.4;cursor:default}
+.btn2{background:var(--s2);border:1px solid var(--line2);border-radius:9px;padding:7px 12px;cursor:pointer;font-size:13px;transition:background .15s;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.btn2:hover{background:var(--s3)}
+a.btn2{color:var(--tx)}
+.btn2.pri{background:var(--ac);color:var(--on-ac);border-color:var(--ac);font-weight:600}
+.btn2.pri:hover{background:var(--ac-hi);border-color:var(--ac-hi)}
+.btn2.danger{color:var(--no);border-color:rgba(240,98,90,.4)}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin:10px 2px 0;min-height:24px}
+.chip{background:var(--s1);border:1px solid var(--line);border-radius:999px;padding:2px 10px;font:12px var(--mono);color:var(--mu)}
+.chip b{color:var(--tx);font-weight:600}
+.empty{margin:70px auto;text-align:center;color:var(--mu2);max-width:420px}
+.empty h3{color:var(--mu);font-weight:500;margin:0 0 6px}
+
+/* status */
+.status{display:flex;gap:14px;align-items:flex-start;margin:22px 0 18px}
+.pill{font:600 11px var(--mono);letter-spacing:.06em;text-transform:uppercase;padding:4px 10px;border-radius:999px;white-space:nowrap;margin-top:3px}
+.pill.found{color:var(--ok);background:var(--ok-bg)}.pill.check{color:var(--wa);background:var(--wa-bg)}.pill.none{color:var(--no);background:var(--no-bg)}.pill.wait{color:var(--mu);background:var(--s2)}
+.status h2{margin:0;font-size:18px;font-weight:600;letter-spacing:-.01em;word-break:break-word}
+.status .sub{color:var(--mu);font-size:13px;margin-top:2px}
+@media(max-width:600px){.status{flex-direction:column;gap:8px;margin:18px 0 14px}.status h2{font-size:16px}}
+
+/* sections */
+.sec{background:var(--s1);border:1px solid var(--line);border-radius:var(--r);margin-bottom:14px;overflow:hidden;box-shadow:var(--shade)}
+.sec>.hd{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line)}
+.sec>.hd h3{margin:0;font-size:13px;font-weight:600;letter-spacing:.01em}
+.sec>.hd .cnt{color:var(--mu2);font-size:12px}
+.sec>.hd .r{margin-left:auto;display:flex;gap:6px;align-items:center}
+.sec>.bd{padding:14px 16px}
+.sec.fold>.hd{cursor:pointer;border-bottom:0}
+.sec.fold>.hd:after{content:"";width:7px;height:7px;border-right:1.5px solid var(--mu);border-bottom:1.5px solid var(--mu);transform:rotate(45deg);margin:-3px 4px 0 auto;transition:transform .2s}
+.sec.fold.open>.hd{border-bottom:1px solid var(--line)}
+.sec.fold.open>.hd:after{transform:rotate(-135deg);margin-top:3px}
+.sec.fold>.bd{display:none}.sec.fold.open>.bd{display:block}
+.dot{width:8px;height:8px;border-radius:50%;flex:none}
+.dot.ok{background:var(--ok)}.dot.wa{background:var(--wa)}.dot.no{background:var(--no)}.dot.mu{background:var(--mu2)}
+
+/* report card */
+.rep{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:16px}
+@media(max-width:860px){.rep{grid-template-columns:1fr}}
+.shot{position:relative;background:var(--s2);border:1px solid var(--line);border-radius:10px;overflow:hidden;cursor:zoom-in;aspect-ratio:1280/820}
+.shot img{width:100%;height:100%;object-fit:cover;object-position:top;display:block;opacity:0;transition:opacity .35s var(--ease)}
+.shot img.in{opacity:1}
+.shot .ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px;color:var(--mu2);font-size:12px;text-align:center;padding:12px}
+.shot.loaded .ph{display:none}
+.shot:not(.loaded):not(.failed){background:linear-gradient(100deg,var(--s2) 30%,var(--s3) 50%,var(--s2) 70%);background-size:300% 100%;animation:shim 1.3s linear infinite}
+@keyframes shim{from{background-position:100% 0}to{background-position:0 0}}
+.shot.failed{cursor:default}
+.shot .zoom{position:absolute;right:8px;bottom:8px;background:var(--s1);border:1px solid var(--line2);border-radius:7px;padding:3px 8px;font-size:11px;color:var(--mu);opacity:0;transition:opacity .15s}
+.shot:hover .zoom{opacity:1}
+.facts{display:flex;flex-direction:column;gap:10px;min-width:0}
+.teams{font-size:15px;font-weight:600;line-height:1.35}
+.teams .vs{color:var(--mu2);font-weight:400;margin:0 4px}
+.kv{display:grid;grid-template-columns:86px minmax(0,1fr);gap:4px 10px;font-size:13px}
+.kv dt{color:var(--mu)}.kv dd{margin:0;word-break:break-word}
+.conf{height:4px;background:var(--s3);border-radius:4px;overflow:hidden;margin-top:2px}
+.conf i{display:block;height:100%;border-radius:4px}
+.acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:auto}
+.why{font-size:12px;color:var(--mu);border-top:1px solid var(--line);padding-top:8px}
+.why li{margin:1px 0}.why ul{margin:0;padding-left:16px}
+
+/* candidates */
+.cands{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.cand{background:var(--s2);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:flex;flex-direction:column;transition:border-color .15s,transform .15s}
+.cand:hover{border-color:var(--line2)}
+.cand.sel{border-color:var(--ac);box-shadow:0 0 0 3px var(--ac-ring)}
+.cand .shot{border:0;border-radius:0;border-bottom:1px solid var(--line);aspect-ratio:16/10}
+.cand .c{padding:10px 12px;display:flex;flex-direction:column;gap:6px;flex:1}
+.cand .t{font-weight:600;font-size:13px}
+.cand .m{font-size:12px;color:var(--mu)}
+
+/* rosters */
+.ros{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:860px){.ros{grid-template-columns:1fr}}
+.team{background:var(--s2);border:1px solid var(--line);border-radius:10px;padding:12px;min-width:0}
+.team h4{margin:0 0 10px;font-size:13px;font-weight:600;display:flex;gap:8px;align-items:center}
+.team h4 span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.badge{font:600 10px var(--mono);letter-spacing:.05em;text-transform:uppercase;padding:2px 7px;border-radius:999px;white-space:nowrap}
+.badge.ok{color:var(--ok);background:var(--ok-bg)}.badge.wa{color:var(--wa);background:var(--wa-bg)}.badge.no{color:var(--no);background:var(--no-bg)}.badge.mu{color:var(--mu);background:var(--s3)}.badge.vi{color:var(--vi);background:var(--vi-bg)}
+.plist{max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:8px;margin:8px 0;background:var(--s1)}
+.plist table{width:100%;border-collapse:collapse;font-size:12.5px}
+.plist td{padding:4px 8px;border-bottom:1px solid var(--line)}
+.plist tr:last-child td{border:0}
+.plist td.n{color:var(--mu);font-family:var(--mono);width:40px;text-align:right}
+.plist td.b{color:var(--mu);font-family:var(--mono);width:52px}
+
+/* link rows */
+.rows{display:flex;flex-direction:column}
+.row{display:flex;align-items:center;gap:10px;padding:8px 10px;margin:0 -10px;border-radius:8px;cursor:pointer;transition:background .12s;min-width:0}
+.row:hover{background:var(--s2)}
+.row.act{background:var(--ac-bg)}
+.row .l{flex:1;min-width:0}
+.row .l .a{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13px}
+.row .l .d{font-size:11.5px;color:var(--mu2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .open{flex:none;color:var(--mu);border:1px solid var(--line2);border-radius:7px;padding:2px 8px;font-size:12px;transition:color .12s,border-color .12s}
+.row .open:hover{color:var(--tx);border-color:var(--mu)}
+.grp{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--mu2);margin:12px 0 2px}
+.grp:first-child{margin-top:0}
+
+/* progress */
+.prog{height:2px;background:var(--s2);border-radius:2px;overflow:hidden;margin:14px 0 4px}
+.prog i{display:block;height:100%;width:0;background:var(--ac);transition:width .4s linear}
+.loadmsg{color:var(--mu);font-size:13px;display:flex;gap:8px;align-items:center}
+.spin{width:12px;height:12px;border:2px solid var(--line2);border-top-color:var(--ac);border-radius:50%;animation:rot .8s linear infinite}
+@keyframes rot{to{transform:rotate(360deg)}}
+.skel{height:14px;border-radius:6px;background:linear-gradient(100deg,var(--s2) 30%,var(--s3) 50%,var(--s2) 70%);background-size:300% 100%;animation:shim 1.3s linear infinite;margin:8px 0}
+
+/* forms */
+.fgrid{display:grid;grid-template-columns:130px minmax(0,1fr);gap:8px 12px;align-items:center}
+@media(max-width:600px){.fgrid{grid-template-columns:1fr}.fgrid label{margin-top:4px}}
+.fgrid label{color:var(--mu);font-size:12px}
+input.f,select.f,textarea.f{width:100%;background:var(--bg);border:1px solid var(--line2);border-radius:8px;color:var(--tx);font:13px var(--mono);padding:8px 10px;outline:0;transition:border-color .15s}
+input.f:focus,select.f:focus,textarea.f:focus{border-color:var(--ac)}
+textarea.f{min-height:120px}
+.msg{font-size:12px}.msg.ok{color:var(--ok)}.msg.err{color:var(--no)}
+
+/* tables (saved, sources) */
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{text-align:left;color:var(--mu2);font-weight:500;font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;padding:8px 10px;border-bottom:1px solid var(--line)}
+.tbl td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top;word-break:break-word}
+.tbl tr.click{cursor:pointer;transition:background .12s}.tbl tr.click:hover{background:var(--s2)}
+.tbar{display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
+.tbar input.f{max-width:320px}
+.scroll{overflow-x:auto}
+@media(max-width:720px){.tbl.cards thead{display:none}.tbl.cards tr{display:block;border-bottom:1px solid var(--line);padding:8px 0}.tbl.cards td{display:block;border:0;padding:2px 4px}}
+
+/* preview drawer */
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.45);opacity:0;pointer-events:none;transition:opacity .2s;z-index:40}
+.scrim.on{opacity:1;pointer-events:auto}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(760px,56vw);background:var(--s1);border-left:1px solid var(--line);z-index:50;transform:translateX(102%);transition:transform .28s var(--ease);display:flex;flex-direction:column;will-change:transform}
+.drawer.on{transform:none}
+@media(max-width:860px){.drawer{width:100%;top:auto;height:92vh;border-left:0;border-top:1px solid var(--line);border-radius:16px 16px 0 0;transform:translateY(102%)}}
+.drawer .dh{display:flex;gap:10px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line)}
+.drawer .dh .tt{flex:1;min-width:0}
+.drawer .dh .tt b{display:block;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.drawer .dh .tt span{font-size:12px;color:var(--mu);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.x{background:none;border:0;color:var(--mu);font-size:20px;line-height:1;cursor:pointer;padding:4px 8px;border-radius:6px}.x:hover{color:var(--tx);background:var(--s2)}
+.drawer .db{flex:1;overflow:auto;padding:16px;overscroll-behavior:contain}
+.drawer .shot{aspect-ratio:1280/1300;cursor:default}
+.drawer .shot img{object-fit:contain}
+.toast{position:fixed;bottom:22px;left:50%;transform:translate(-50%,20px);background:var(--tx);color:var(--bg);padding:8px 14px;border-radius:9px;font-size:13px;font-weight:500;opacity:0;transition:all .2s var(--ease);z-index:60;pointer-events:none}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+kbd{font:11px var(--mono);border:1px solid var(--line2);border-bottom-width:2px;border-radius:4px;padding:0 5px;color:var(--mu)}
+</style>
+</head>
+<body>
+<div class="top">
+  <div class="logo"><svg width="24" height="24" viewBox="0 0 32 32" aria-hidden="true"><ellipse cx="16" cy="20" rx="12" ry="5" fill="var(--ac)"/><rect x="4" y="15" width="24" height="5" fill="var(--ac)"/><ellipse cx="16" cy="15" rx="12" ry="5" fill="var(--ac-hi)"/><path d="M11 15h10" stroke="var(--on-ac)" stroke-width="1.6" stroke-linecap="round" opacity=".7"/></svg><span>Puck<b>Trace</b></span></div>
+  <nav class="tabs">
+    <button data-v="find" class="on">Find</button>
+    <button data-v="saved">Saved</button>
+    <button data-v="sources">Sources</button>
+    <button data-v="vpn">VPN sites</button>
+    <button data-v="status">Status</button>
+  </nav>
+  <div class="stats" id="stats"></div>
+  <button class="theme" id="theme" title="Switch light / dark" aria-label="Switch light or dark mode"><svg class="moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg><svg class="sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button>
+</div>
+
+<main>
+  <section class="view on" id="v-find">
+    <form class="sbox" id="sform">
+      <input id="q" placeholder="Paste a HokReg header, or Team 1 vs Team 2 | Competition | YYYY-MM-DD" autocomplete="off" spellcheck="false" autofocus>
+      <button class="btn" type="submit" id="go">Find</button>
+    </form>
+    <div class="chips" id="chips"></div>
+    <div id="out"><div class="empty"><h3>Paste a match header</h3>The tool looks for the match report first. If there isn't one, it checks both teams' rosters. Click any result to preview it; open the site only when it looks right.<div style="margin-top:14px"><kbd>/</kbd> search &nbsp; <kbd>Esc</kbd> close preview &nbsp; <kbd>S</kbd> save</div></div></div>
+  </section>
+
+  <section class="view" id="v-saved">
+    <div class="tbar"><span class="mu small">Games you saved. Click one to search it again.</span></div>
+    <div class="sec"><div class="scroll"><table class="tbl cards" id="htable"><thead><tr><th>Game</th><th>Report</th><th>Rosters</th><th>Saved</th></tr></thead><tbody></tbody></table></div></div>
+  </section>
+
+  <section class="view" id="v-sources">
+    <div class="tbar">
+      <select class="f" id="skind" style="width:auto"><option value="teams">Teams</option><option value="tournaments">Tournaments</option></select>
+      <input class="f" id="sq" placeholder="Search by name">
+      <button class="btn2" id="sadd">Add new</button>
+      <span class="mu small" id="scount"></span>
+    </div>
+    <div class="sec" id="sedit" style="display:none"><div class="bd" id="sform2"></div></div>
+    <div class="sec"><div class="scroll"><table class="tbl cards" id="stable"><thead></thead><tbody></tbody></table></div></div>
+  </section>
+
+  <section class="view" id="v-status">
+    <div class="tbar"><span class="mu small" id="stwhen">Loading…</span><button class="btn2" id="strun" style="margin-left:auto">Check sources now</button></div>
+    <div class="sec"><div class="hd"><h3>What the tool knows</h3></div><div class="bd" id="stknow"></div></div>
+    <div class="sec"><div class="hd"><h3>Source checks</h3><span class="cnt" id="stcnt"></span></div><div class="bd"><div class="mu small" style="margin-bottom:8px">Each source is asked for one known game every day. A failed check means the site changed or is down, so its games may be missed until it is fixed.</div><div class="scroll"><table class="tbl" id="sttable"><thead><tr><th>Source</th><th>Result</th><th>How</th><th>Time</th></tr></thead><tbody></tbody></table></div></div></div>
+  </section>
+
+  <section class="view" id="v-vpn">
+    <div class="sec"><div class="hd"><h3>Sites that need the Chrome VPN extension</h3></div><div class="bd">
+      <div class="mu small" style="margin-bottom:8px">One domain per line. Links on these sites get a VPN tag.</div>
+      <textarea class="f" id="vpnta" placeholder="online.khl.ru&#10;text.mhl.khl.ru"></textarea>
+      <div style="display:flex;gap:10px;align-items:center;margin-top:10px"><button class="btn2 pri" id="vpnsave">Save</button><span class="msg" id="vpnmsg"></span></div>
+    </div></div>
+  </section>
+</main>
+
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-hidden="true">
+  <div class="dh"><div class="tt"><b id="dtitle"></b><span id="dsub"></span></div>
+    <button class="btn2" id="dcopy">Copy link</button><a class="btn2 pri" id="dopen" target="_blank" rel="noopener">Open ↗</a><button class="x" id="dclose" aria-label="Close">×</button></div>
+  <div class="db" id="dbody"></div>
+</aside>
+<div class="toast" id="toast"></div>
+
+<script>
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const api=async(p,o={})=>{const r=await fetch('/api'+p,{headers:{'content-type':'application/json'},...o});if(!r.ok){let m=r.statusText;try{m=(await r.json()).detail||m}catch(e){}throw new Error(m)}return r.json()};
+const post=(p,b,o)=>api(p,{method:'POST',body:JSON.stringify(b),...o});
+const host=u=>{try{return new URL(u).hostname.replace(/^www\./,'')}catch(e){return ''}};
+const shotUrl=u=>'/api/shot?url='+encodeURIComponent(u);
+function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('on');clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove('on'),1600)}
+async function copy(t){try{await navigator.clipboard.writeText(t);toast('Link copied')}catch(e){toast('Copy failed')}}
+
+/* ---------- theme ---------- */
+$('#theme').onclick=()=>{const d=document.documentElement,t=d.dataset.theme==='dark'?'light':'dark';d.dataset.theme=t;try{localStorage.setItem('pt-theme',t)}catch(e){}};
+
+/* ---------- nav ---------- */
+$$('.tabs button').forEach(b=>b.onclick=()=>show(b.dataset.v));
+function show(v){$$('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));$$('.view').forEach(s=>s.classList.toggle('on',s.id==='v-'+v));
+  if(v==='saved')loadSaved();if(v==='sources')loadSources();if(v==='vpn')loadVpn();if(v==='status')loadStatus();if(v==='find')$('#q').focus()}
+/* ---------- status ---------- */
+async function loadStatus(){
+  try{
+    const [h,l]=await Promise.all([api('/health'),api('/learning')]);
+    const ix=l.index||{},le=l.learning||{},hv=l.harvest||{};
+    const src=Object.entries(ix.by_source||{}).sort((a,b)=>b[1]-a[1]);
+    $('#stknow').innerHTML=`<div style="display:flex;gap:28px;flex-wrap:wrap;margin-bottom:10px">
+      <div><div style="font-size:22px;font-weight:600">${(ix.total||0).toLocaleString()}</div><div class="mu small">games this season in the game list</div></div>
+      <div><div style="font-size:22px;font-weight:600">${(le.confirmed||0).toLocaleString()}</div><div class="mu small">games you saved (answered at once)</div></div>
+      <div><div style="font-size:22px;font-weight:600">${(le.results||0).toLocaleString()}</div><div class="mu small">answers remembered</div></div>
+      <div><div style="font-size:22px;font-weight:600">${(le.aliases||0).toLocaleString()}</div><div class="mu small">team spellings learned</div></div></div>
+      <div class="mu small">Game list refreshed ${hv.at?esc(hv.at.replace('T',' ')):'never'} (every day while the app runs). By source: ${src.slice(0,12).map(([k,v])=>`${esc(k)} ${v.toLocaleString()}`).join(' · ')}${src.length>12?' · …':''}</div>`;
+    const cs=h.checks||[],ok=cs.filter(c=>c.ok).length;
+    $('#stwhen').textContent=h.at?`Last source check ${h.at.replace('T',' ')}`:'No source check yet';
+    $('#stcnt').textContent=cs.length?`${ok} of ${cs.length} working`:'';
+    $('#sttable tbody').innerHTML=cs.map(c=>`<tr><td>${esc(c.source)}</td><td><span class="badge ${c.ok?'ok':'no'}">${c.ok?'Working':'Failing'}</span>${c.ok?'':` <span class="mu small">${esc(c.error||'')}</span>`}</td><td class="mu small">${c.how==='live'?'site read live':c.how==='game list'?'from the daily game list':''}</td><td class="mu small">${c.seconds}s</td></tr>`).join('');
+  }catch(e){$('#stwhen').textContent='Could not load status: '+e.message}
+}
+$('#strun').onclick=async()=>{const b=$('#strun');b.disabled=true;b.textContent='Checking… (about a minute)';try{await post('/health/run',{})}catch(e){}b.disabled=false;b.textContent='Check sources now';loadStatus()};
+
+async function stats(){try{const c=await api('/config');$('#stats').textContent=`${c.teams.toLocaleString()} teams · ${c.tournaments} competitions · ${c.saved} saved`}catch(e){}}
+stats();
+
+/* ---------- preview items ---------- */
+let ITEMS=[];
+const item=o=>(ITEMS.push(o),ITEMS.length-1);
+function shotHtml(url,cls=''){
+  return `<div class="shot ${cls}" data-shot="${esc(url)}"><img alt="" decoding="async" loading="lazy"><div class="ph">Loading preview…</div><span class="zoom">Click to enlarge</span></div>`}
+function wireShots(root){
+  root.querySelectorAll('.shot[data-shot]').forEach(el=>{
+    if(el._w)return;el._w=1;const img=el.querySelector('img'),u=el.dataset.shot;
+    img.onload=()=>{el.classList.add('loaded');img.classList.add('in')};
+    img.onerror=async()=>{el.classList.add('failed');let m='Preview not available';try{const r=await fetch(shotUrl(u));m=(await r.json()).detail||m}catch(e){}
+      el.querySelector('.ph').innerHTML=`<div>${esc(m)}</div><a href="${esc(u)}" target="_blank" rel="noopener" class="btn2" style="margin-top:4px">Open ${esc(host(u))} ↗</a>`};
+    img.src=shotUrl(u);
+  })}
+function rowHtml(it,sub){const i=item(it);
+  return `<div class="row" data-p="${i}"><div class="l"><div class="a">${esc(it.title)}</div><div class="d">${sub||esc(host(it.url))}</div></div>${it.badge||''}<a class="open" href="${esc(it.url)}" target="_blank" rel="noopener" title="Open site">↗</a></div>`}
+
+/* ---------- drawer ---------- */
+function openPreview(i){
+  const it=ITEMS[i];if(!it)return;
+  $$('.row.act').forEach(r=>r.classList.remove('act'));$$(`.row[data-p="${i}"]`).forEach(r=>r.classList.add('act'));
+  $('#dtitle').textContent=it.title;$('#dsub').textContent=host(it.url)+(it.sub?' · '+it.sub:'');
+  $('#dopen').href=it.url;$('#dcopy').onclick=()=>copy(it.url);
+  let h='';
+  if(it.facts)h+=it.facts;
+  if(it.players&&it.players.length>=5)h+=playersHtml(it.players);
+  h+=shotHtml(it.url);
+  $('#dbody').innerHTML=h;$('#dbody').scrollTop=0;wireShots($('#dbody'));
+  $('#drawer').classList.add('on');$('#scrim').classList.add('on');$('#drawer').setAttribute('aria-hidden','false');
+}
+function closePreview(){$('#drawer').classList.remove('on');$('#scrim').classList.remove('on');$('#drawer').setAttribute('aria-hidden','true');$$('.row.act').forEach(r=>r.classList.remove('act'))}
+$('#scrim').onclick=closePreview;$('#dclose').onclick=closePreview;
+document.addEventListener('click',e=>{
+  if(e.target.closest('a'))return;
+  const r=e.target.closest('[data-p]');if(r){openPreview(+r.dataset.p);return}
+  const f=e.target.closest('.fold>.hd');if(f)f.parentElement.classList.toggle('open');
+});
+/* warm the preview while the pointer rests on a row */
+const warmed=new Set();
+document.addEventListener('pointerover',e=>{const r=e.target.closest('.row[data-p]');if(!r)return;const it=ITEMS[+r.dataset.p];if(!it||warmed.has(it.url))return;
+  clearTimeout(r._w);r._w=setTimeout(()=>{warmed.add(it.url);fetch(shotUrl(it.url)).catch(()=>{})},150)});
+const playersHtml=ps=>`<div class="plist"><table>${ps.map(p=>`<tr><td class="n">#${esc(p.n)}</td><td>${esc(p.name)}</td><td class="b">${esc(p.born||'')}</td></tr>`).join('')}</table></div>`;
+
+/* ---------- find ---------- */
+const q=$('#q');
+q.addEventListener('input',()=>chips(q.value));
+const tok=n=>esc(n).replace(/\b((?:U|J)\s?\d{1,2}|\d{1,2}\s?U|20[01]\d|AAA|AA)\b/gi,'<b>$1</b>');
+const HRE=/^\s*(?:\[(\d+)\]\s*)?(.+?)\s+(?:\d+\s*-\s*\d+|vs\.?|v\.?|-|–)\s+(.+?)\s*\|\s*([^|]+?)\s*\|\s*(\d{4}-\d{2}-\d{2})/i;
+function chips(t){const m=t.match(HRE),c=$('#chips');
+  if(!m){c.innerHTML=t.trim()?'<span class="mu small">Format: Team 1 vs Team 2 | Competition | YYYY-MM-DD</span>':'';return}
+  c.innerHTML=`<span class="chip">${tok(m[2])}</span><span class="chip">${tok(m[3])}</span><span class="chip">${esc(m[4])}</span><span class="chip">${m[5]}</span>${m[1]?`<span class="chip">#${m[1]}</span>`:''}`}
+$('#sform').addEventListener('submit',e=>{e.preventDefault();find()});
+
+let CUR=null,RUN=0,TIMER=null;
+async function find(){
+  const h=q.value.trim();if(!h)return;const run=++RUN;closePreview();
+  $('#go').disabled=true;
+  let quick=null;
+  try{quick=await post('/search?auto=false',{header:h})}catch(e){$('#out').innerHTML=`<div class="empty"><h3 style="color:var(--no)">${esc(e.message)}</h3></div>`;$('#go').disabled=false;return}
+  renderLoading(quick);
+  const t0=Date.now();clearInterval(TIMER);
+  TIMER=setInterval(()=>{const s=(Date.now()-t0)/1000;const p=$('#prog');if(p)p.style.width=Math.min(94,100*(1-Math.exp(-s/14)))+'%';const e=$('#elapsed');if(e)e.textContent=Math.round(s)+'s'},250);
+  // rosters are checked at the same time as the report search, shown when the report is missing
+  const rosP=post('/rosters',{header:h}).catch(()=>({t1:[],t2:[]}));
+  try{const r=await post('/search?rosters=false',{header:h});if(run!==RUN)return;CUR=r;
+    const found=(r.auto&&r.auto.verdict==='found')||r.outcome==='found';
+    const st=found?'found':r.auto&&r.auto.verdict==='check'?'check':'none';
+    r._rosLoading=true;render(r,h);clearInterval(TIMER);$('#go').disabled=false;
+    r.roster_check=await rosP;if(run!==RUN)return;r._rosLoading=false;
+    const old=$('#ros-sec');if(old){const t=document.createElement('div');t.innerHTML=rosterSection(r,st);const n=t.firstElementChild;n.style.animation='fade .25s';if(old.classList.contains('open'))n.classList.add('open');old.replaceWith(n);wireShots(n)}
+    const pk=l=>((l||[]).find(x=>x.status==='verified'||x.status==='probable')||{}).url||'';
+    if($('#sv_1')&&!$('#sv_1').value)$('#sv_1').value=pk(r.roster_check.t1);if($('#sv_2')&&!$('#sv_2').value)$('#sv_2').value=pk(r.roster_check.t2);
+  }
+  catch(e){if(run===RUN)$('#out').innerHTML=`<div class="empty"><h3 style="color:var(--no)">${esc(e.message)}</h3></div>`}
+  finally{if(run===RUN){clearInterval(TIMER);$('#go').disabled=false}}
+}
+function statusHtml(p,cls,label,why){
+  return `<div class="status"><span class="pill ${cls}">${label}</span><div><h2>${esc(p.t1)} <span class="mu" style="font-weight:400">vs</span> ${esc(p.t2)}</h2><div class="sub">${esc(p.comp)} · ${p.date}${p.time?' '+p.time+' MSK':''}${p.match_id?' · #'+p.match_id:''}${why?' — '+esc(why):''}</div></div></div>`}
+function renderLoading(r){
+  ITEMS=[];const p=r.parsed;
+  $('#out').innerHTML=statusHtml(p,'wait','Searching','')+
+   `<div class="sec"><div class="hd"><span class="dot mu"></span><h3>Match report</h3></div><div class="bd">
+     <div class="loadmsg"><span class="spin"></span>Checking league, federation and stats sites… <span class="mu" id="elapsed">0s</span></div>
+     <div class="prog"><i id="prog"></i></div><div class="mu small">Usually a few seconds. GameSheet games can take up to a minute.</div></div></div>
+   <div class="sec"><div class="hd"><span class="dot mu"></span><h3>Rosters</h3></div><div class="bd"><div class="skel" style="width:60%"></div><div class="skel" style="width:40%"></div></div></div>`}
+
+const RC={'wrong age group':['vi','Wrong age group'],'few players':['wa','Few players'],'old season':['mu','Old season'],verified:['ok','This season'],probable:['wa','Probably current'],check:['wa','Check it'],blocked:['vi','Open in Chrome'],unreachable:['mu','Did not load'],'not a roster':['mu','Not a roster'],'no roster':['mu','No roster posted'],'not found':['mu','Page gone']};
+function confBar(c){const v=Math.round(c*100),col=v>=85?'var(--ok)':v>=60?'var(--wa)':'var(--no)';return `<div class="conf"><i style="width:${v}%;background:${col}"></i></div>`}
+function reportFacts(c){
+  return `${c.via==='index'?'<div><span class="badge ok">Remembered</span> <span class="mu small">seen before, no site search needed</span></div>':''}<div class="teams">${esc(c.home)}<span class="vs">vs</span>${esc(c.away)}</div>
+   <dl class="kv"><dt>Date</dt><dd>${esc(c.date||'')}</dd>${c.score?`<dt>Score</dt><dd class="mono">${esc(c.score)}</dd>`:''}${c.league?`<dt>League</dt><dd>${esc(c.league)}</dd>`:''}<dt>Site</dt><dd>${esc(c.site)}</dd>
+   <dt>Match</dt><dd>${Math.round(c.confidence*100)}%${confBar(c.confidence)}</dd></dl>`}
+function whyHtml(c){return `<div class="why"><ul>${(c.reasons||[]).map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>`}
+
+function rosterSection(r,state){
+  const p=r.parsed;
+  const rc=r.roster_check;
+  if(!rc&&r._rosLoading)return `<div class="sec ${state==='found'?'fold':''}" id="ros-sec"><div class="hd"><span class="dot mu"></span><h3>Rosters</h3><span class="cnt">checking both teams…</span></div><div class="bd"><div class="loadmsg" style="margin-bottom:8px"><span class="spin"></span>Opening each team's roster pages, checking season and age group</div><div class="skel" style="width:60%"></div><div class="skel" style="width:40%"></div></div></div>`;
+  const rosterLinks=(r.steps.find(s=>s.step==='Rosters')||{links:[]}).links.filter(l=>l.kind==='roster');
+  const teamCol=(name,list,key)=>{
+    let body='';
+    if(list&&list.length){
+      const b=list[0],[bc,bl]=RC[b.status]||['mu',b.status];
+      const meta=[b.players>=5?`${b.players} players`:'',b.season&&b.season!=='not stated'?`season ${b.season}`:'',b.age_fit&&b.age_fit!=='unknown'?b.age_fit:''].filter(Boolean).join(' · ');
+      body+=`<div class="rows">${rowHtml({title:`${name}: ${b.label}`,url:b.url,sub:meta,players:b.listed,badge:`<span class="badge ${bc}">${bl}</span>`},esc(host(b.url))+(meta?' · '+esc(meta):''))}</div>`;
+      const bi=ITEMS.length-1;
+      if(b.listed&&b.listed.length>=5)body+=playersHtml(b.listed);
+      else if(!['blocked','unreachable','not found'].includes(b.status))body+=`<div style="margin-top:8px" data-p="${bi}">${shotHtml(b.url)}</div>`;
+      if(list.length>1)body+=`<div class="grp">Other links</div><div class="rows">${list.slice(1).map(x=>{const[c,l]=RC[x.status]||['mu',x.status];const m=[x.players>=5?`${x.players} players`:'',x.season&&x.season!=='not stated'?x.season:''].filter(Boolean).join(' · ');
+        return rowHtml({title:x.label,url:x.url,sub:m,players:x.listed,badge:`<span class="badge ${c}">${l}</span>`},esc(host(x.url))+(m?' · '+esc(m):''))}).join('')}</div>`;
+    }else{
+      const own=rosterLinks.filter(l=>l.label.startsWith(key));
+      body=own.length?`<div class="rows">${own.map(l=>rowHtml({title:l.label.replace(/^Team \d (roster|EliteProspects): /,''),url:l.url})).join('')}</div>`:'<div class="mu small">No roster link on file. Add one under Sources when you find it.</div>';
+    }
+    return `<div class="team"><h4><span>${esc(name)}</span></h4>${body}</div>`};
+  let ros;
+  if(rc){ros=`<div class="ros">${teamCol(p.t1,rc.t1,'Team 1')}${teamCol(p.t2,rc.t2,'Team 2')}</div>`}
+  else ros=(state==='found'?'<div class="mu small" style="margin-bottom:10px">Report found, so the rosters are usually inside it. Team roster links on file:</div>':'')+`<div class="ros">${teamCol(p.t1,null,'Team 1')}${teamCol(p.t2,null,'Team 2')}</div>`;
+  const rosOk=rc&&[rc.t1,rc.t2].filter(l=>l&&l[0]&&['verified','probable'].includes(l[0].status)).length;
+  return `<div class="sec ${state==='found'?'fold':''}" id="ros-sec"><div class="hd"><span class="dot ${state==='found'?'mu':rosOk===2?'ok':rosOk?'wa':'no'}"></span><h3>Rosters</h3><span class="cnt">${rc?`${rosOk} of 2 current`:state==='found'?'not needed':'links on file'}</span></div><div class="bd">${ros}</div></div>`;
+
+}
+
+function render(r,header){
+  ITEMS=[];const p=r.parsed,auto=r.auto||{verdict:'none',candidates:[],adapters:[]};
+  const savedLink=r.steps.flatMap(s=>s.links).find(l=>l.kind==='protocol');
+  const found=auto.verdict==='found'?auto.best:null;
+  let state,label,why;
+  if(found||savedLink){state='found';label='Report found'}
+  else if(auto.verdict==='check'){state='check';label='Pick one'}
+  else{state='none';label='No report'}
+  why=state==='found'?(found?`on ${found.site}${auto.fast?' · instant, from memory':''}`:'saved before'):state==='check'?`${auto.candidates.length} possible game${auto.candidates.length>1?'s':''}`:'rosters below';
+  let h=statusHtml(p,state,label,why);
+
+  /* report section */
+  let rep='';
+  if(found){
+    const i=item({title:`${found.home} vs ${found.away}`,url:found.url,sub:found.date,facts:''});
+    rep=`<div class="rep"><div data-p="${i}">${shotHtml(found.url)}</div><div class="facts">${reportFacts(found)}
+      <div class="acts"><a class="btn2 pri" href="${esc(found.url)}" target="_blank" rel="noopener">Open report ↗</a><button class="btn2" data-copy="${esc(found.url)}">Copy link</button></div>${whyHtml(found)}</div></div>`;
+    if(auto.candidates.length>1)rep+=`<div class="mu small" style="margin-top:12px">${auto.candidates.length-1} other game${auto.candidates.length>2?'s':''} seen that day, not this one.</div>`;
+  }else if(savedLink){
+    const i=item({title:'Saved report',url:savedLink.url,sub:savedLink.note});
+    rep=`<div class="rep"><div data-p="${i}">${shotHtml(savedLink.url)}</div><div class="facts"><div class="teams">Saved earlier</div><div class="mu small">${esc(savedLink.note||'')}</div>
+      <div class="acts"><a class="btn2 pri" href="${esc(savedLink.url)}" target="_blank" rel="noopener">Open report ↗</a><button class="btn2" data-copy="${esc(savedLink.url)}">Copy link</button></div></div></div>`;
+  }else if(auto.verdict==='check'){
+    rep=`<div class="mu small" style="margin-bottom:10px">These games are close to the header. Preview each one, then pick the right game.</div><div class="cands">${auto.candidates.map((c,k)=>{
+      const i=item({title:`${c.home} vs ${c.away}`,url:c.url,sub:`${c.date} · ${c.site}`,facts:`<div style="margin-bottom:14px">${reportFacts(c)}</div>`});
+      return `<div class="cand" data-k="${k}"><div data-p="${i}">${shotHtml(c.url)}</div><div class="c"><div class="t">${esc(c.home)} <span class="mu" style="font-weight:400">vs</span> ${esc(c.away)}</div>
+        <div class="m">${esc(c.date)}${c.score?' · '+esc(c.score):''} · ${esc(c.site)}${c.league?' · '+esc(c.league):''}</div><div class="m">${Math.round(c.confidence*100)}% match${c.via==='index'?' · <span class="badge ok">Remembered</span>':''}${confBar(c.confidence)}</div>
+        <div class="acts" style="margin-top:6px"><button class="btn2 pick" data-url="${esc(c.url)}" data-k="${k}">This one</button><a class="btn2" href="${esc(c.url)}" target="_blank" rel="noopener">Open ↗</a></div></div></div>`}).join('')}</div>`;
+  }else{
+    const srcs=auto.adapters.filter(a=>a.name!=='index'),ok=srcs.filter(a=>a.ok).map(a=>a.site),bad=srcs.filter(a=>!a.ok);
+    rep=`<div style="font-size:14px;margin-bottom:6px">No report found automatically.</div>
+      <div class="mu small">${srcs.length?`Checked memory and ${srcs.length} site${srcs.length>1?'s':''} in ${auto.seconds}s: ${esc(ok.join(', '))}${bad.length?` · did not respond: ${esc(bad.map(a=>a.site).join(', '))}`:''}.`:'No automatic source covers these teams yet.'} Check the rosters below, or search by hand from the links further down.</div>`;
+  }
+  const rdot=state==='found'?'ok':state==='check'?'wa':'no';
+  h+=`<div class="sec"><div class="hd"><span class="dot ${rdot}"></span><h3>Match report</h3><span class="cnt">${state==='found'?'found':state==='check'?'pick one':'not found'}</span></div><div class="bd">${rep}</div></div>`;
+
+  h+=rosterSection(r,state);
+
+  /* manual search section */
+  const groups=r.steps.filter(s=>!['Saved before','Rosters'].includes(s.step)&&s.links.length);
+  h+=`<div class="sec fold ${state==='none'?'open':''}"><div class="hd"><span class="dot mu"></span><h3>Search by hand</h3><span class="cnt">${groups.reduce((a,s)=>a+s.links.length,0)} links, in search order</span></div><div class="bd">${groups.map(s=>
+    `<div class="grp">${esc(s.step)}${s.manual?' · manual':''}</div><div class="rows">${s.links.map(l=>rowHtml({title:l.label,url:l.url,sub:l.note,badge:(l.vpn?'<span class="badge vi">VPN</span>':'')},esc(l.domain)+(l.note?' · '+esc(l.note):''))).join('')}</div>`).join('')}</div></div>`;
+
+  /* save section */
+  const rc=r.roster_check;
+  const pick=l=>((l||[]).find(x=>x.status==='verified'||x.status==='probable')||{}).url||'';
+  h+=`<div class="sec fold"><div class="hd"><span class="dot mu"></span><h3>Save for next time</h3><span class="cnt">optional, makes the next search for these teams faster</span></div><div class="bd">
+    <div class="fgrid"><label>Report link</label><input class="f" id="sv_p" value="${esc(found?found.url:savedLink?savedLink.url:'')}" placeholder="https://…">
+    <label>${esc(p.t1)} roster</label><input class="f" id="sv_1" value="${esc(pick(rc&&rc.t1)||(r.teams.t1n.best||{}).roster||'')}" placeholder="https://…">
+    <label>${esc(p.t2)} roster</label><input class="f" id="sv_2" value="${esc(pick(rc&&rc.t2)||(r.teams.t2n.best||{}).roster||'')}" placeholder="https://…">
+    <label>Competition site</label><input class="f" id="sv_c" placeholder="schedule page, if new"></div>
+    <div style="display:flex;gap:10px;align-items:center;margin-top:12px"><button class="btn2 pri" id="savebtn">Save</button><span class="msg" id="savemsg"></span></div></div></div>`;
+
+  $('#out').innerHTML=h;
+  wireShots($('#out'));
+  $$('[data-copy]').forEach(b=>b.onclick=()=>copy(b.dataset.copy));
+  $$('.pick').forEach(b=>b.onclick=()=>{$$('.cand').forEach(c=>c.classList.toggle('sel',c.dataset.k===b.dataset.k));$('#sv_p').value=b.dataset.url;const s=$('#savebtn').closest('.sec');s.classList.add('open');toast('Selected. Save it below to remember.')});
+  $('#savebtn').onclick=async()=>{try{const s=await post('/save',{header,protocol:$('#sv_p').value,t1link:$('#sv_1').value,t2link:$('#sv_2').value,comp_site:$('#sv_c').value});$('#savemsg').className='msg ok';$('#savemsg').textContent=`Saved · next time this game is answered at once`+(s.learned&&s.learned.length?` · learned: ${s.learned.join('; ')}`:'');stats()}
+    catch(e){$('#savemsg').className='msg err';$('#savemsg').textContent=e.message}};
+}
+
+/* ---------- saved ---------- */
+async function loadSaved(){
+  const h=await api('/history?limit=150');const short=u=>esc(u.replace(/^https?:\/\/(www\.)?/,'').slice(0,54));
+  $('#htable tbody').innerHTML=h.map(x=>`<tr class="click" data-h="${esc(`${x.t1} vs ${x.t2} | ${x.comp} | ${x.date}`)}"><td><b style="font-weight:600">${esc(x.t1)}</b> <span class="mu">vs</span> <b style="font-weight:600">${esc(x.t2)}</b><div class="mu small">${esc(x.comp)} · ${x.date}</div></td>
+    <td>${x.protocol?`<a href="${esc(x.protocol)}" target="_blank" rel="noopener">${short(x.protocol)}</a>`:'<span class="mu small">rosters only</span>'}</td>
+    <td>${[x.t1link,x.t2link].filter(Boolean).map(u=>`<a href="${esc(u)}" target="_blank" rel="noopener">${short(u)}</a>`).join('<br>')}</td><td class="mu small">${esc(x.saved_at.replace('T',' '))}</td></tr>`).join('')||'<tr><td colspan=4 class="mu">Nothing saved yet.</td></tr>';
+  $$('#htable tr.click').forEach(tr=>tr.onclick=e=>{if(e.target.closest('a'))return;q.value=tr.dataset.h;chips(q.value);show('find');find()});
+}
+
+/* ---------- sources ---------- */
+const TEAM_F=[['name','Name'],['schedule','Schedule'],['site','Official site'],['roster','Roster'],['ep','EliteProspects'],['mhr','MyHockeyRankings'],['country','Country']];
+const TOUR_F=[['name','Name'],['schedule','Schedule'],['site','Official site'],['ep','EliteProspects'],['mhr','MyHockeyRankings']];
+let st;$('#sq').oninput=()=>{clearTimeout(st);st=setTimeout(loadSources,150)};$('#skind').onchange=loadSources;$('#sadd').onclick=()=>editSource({});
+async function loadSources(){
+  const kind=$('#skind').value,d=await api(`/sources?kind=${kind}&q=${encodeURIComponent($('#sq').value)}`),F=kind==='teams'?TEAM_F:TOUR_F;
+  $('#stable thead').innerHTML=`<tr>${F.map(f=>`<th>${f[1]}</th>`).join('')}<th></th></tr>`;
+  $('#stable tbody').innerHTML=d.rows.map(r=>`<tr>${F.map(([k])=>`<td>${r[k]&&String(r[k]).startsWith('http')?`<a href="${esc(r[k])}" target="_blank" rel="noopener">${esc(host(r[k]))}</a>`:k==='name'?`<b style="font-weight:600">${esc(r[k]||'')}</b>`:`<span class="mu">${esc(r[k]||'')}</span>`}</td>`).join('')}<td><button class="btn2" data-k="${esc(r.key)}">Edit</button></td></tr>`).join('');
+  $('#scount').textContent=`${d.rows.length} of ${d.total.toLocaleString()}`;
+  $$('#stable button').forEach(b=>b.onclick=()=>editSource(d.rows.find(r=>r.key===b.dataset.k)));
+}
+function editSource(r){
+  const kind=$('#skind').value,F=kind==='teams'?TEAM_F:TOUR_F;$('#sedit').style.display='block';
+  $('#sform2').innerHTML=`<div class="fgrid">${F.map(([k,l])=>`<label>${l}</label><input class="f" data-f="${k}" value="${esc(r[k]||'')}" ${k==='name'&&r.key?'readonly':''}>`).join('')}</div>
+    <div style="display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap"><button class="btn2 pri" id="ssave">Save</button><button class="btn2" id="scancel">Cancel</button>${r.key?'<button class="btn2 danger" id="sdel">Delete</button>':''}<span class="msg" id="smsg"></span></div>`;
+  $('#scancel').onclick=()=>$('#sedit').style.display='none';
+  $('#ssave').onclick=async()=>{const body=Object.fromEntries($$('#sform2 input').map(i=>[i.dataset.f,i.value.trim()]));
+    try{await post(kind==='teams'?'/sources/team':'/sources/tournament',body);$('#sedit').style.display='none';loadSources();stats();toast('Saved')}catch(e){$('#smsg').className='msg err';$('#smsg').textContent=e.message}};
+  if(r.key)$('#sdel').onclick=async()=>{if(!confirm(`Delete ${r.name}?`))return;await fetch(`/api/sources/${kind==='teams'?'team':'tournament'}/${encodeURIComponent(r.key)}`,{method:'DELETE'});$('#sedit').style.display='none';loadSources();stats()};
+  $('#sform2 input').focus();window.scrollTo({top:0,behavior:'smooth'});
+}
+
+/* ---------- vpn ---------- */
+async function loadVpn(){const d=await api('/vpn');$('#vpnta').value=d.sites.join('\n')}
+$('#vpnsave').onclick=async()=>{const d=await post('/vpn',{sites:$('#vpnta').value.split('\n')});$('#vpnmsg').className='msg ok';$('#vpnmsg').textContent=`${d.sites.length} sites saved`};
+
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){closePreview();return}
+  if(e.target.matches('input,textarea,select'))return;
+  if(e.key==='/'){e.preventDefault();show('find');q.focus();q.select()}
+  if(e.key.toLowerCase()==='s'&&CUR&&$('#savebtn')){$('#savebtn').closest('.sec').classList.add('open');$('#savebtn').click()}
+});
+</script>
+</body>
+</html>

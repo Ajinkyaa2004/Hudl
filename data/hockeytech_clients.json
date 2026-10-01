@@ -1,0 +1,548 @@
+{
+ "bchl": {
+  "key": "ca4e9e599d4dae55",
+  "name": "BCHL League Site",
+  "sites": [
+   "albernivalleybulldogs.ca",
+   "bchl.ca",
+   "blackfaldsbulldogs.com",
+   "brooksbandits.net",
+   "chilliwackchiefs.net",
+   "cowichancapitals.com",
+   "cranbrookbucks.ca",
+   "langleyrivermen.com",
+   "nanaimoclippers.com",
+   "okotoksoilers.com",
+   "powellriverkings.com",
+   "sasilverbacks.com",
+   "sgsaints.ca",
+   "sprucekings.bc.ca",
+   "surreyeagles.net",
+   "trailsmokeeaters.com",
+   "vernonvipers.com",
+   "victoriagrizzlies.com",
+   "westkelownawarriors.ca"
+  ],
+  "latest": "2026-27 Regular Season",
+  "league_ids": {}
+ },
+ "hockeyalberta": {
+  "key": "c5f7fc2efb35ab14",
+  "name": "Alberta Elite Hockey League U13 AA",
+  "sites": [
+   "abchallenge.ca",
+   "aehlu13aa.ca",
+   "aehlu13aaa.ca",
+   "aehlu15aa.ca",
+   "aehlu16aa.ca",
+   "aehlu18aa.ca",
+   "firestartertournament.ca",
+   "prospectscup.ca",
+   "u11aa.ca",
+   "u13femaleaa.ca",
+   "u15aaa.ca",
+   "u15femaleaa.ca",
+   "u17aaa.ca",
+   "u18aaa.ca",
+   "u18femaleaa.ca",
+   "u18femaleaaa.ca"
+  ],
+  "latest": "AEHL U18AAA 2026-27 Regular Season",
+  "league_ids": {
+   "10": "abchallenge.ca",
+   "20": "aehlu13aaa.ca",
+   "17": "aehlu15aa.ca",
+   "16": "aehlu16aa.ca",
+   "15": "aehlu18aa.ca",
+   "14": "firestartertournament.ca",
+   "11": "prospectscup.ca",
+   "19": "u11aa.ca",
+   "12": "u13femaleaa.ca",
+   "3": "u18aaa.ca",
+   "4": "u17aaa.ca",
+   "5": "u15aaa.ca",
+   "6": "u18femaleaaa.ca",
+   "7": "u18femaleaa.ca",
+   "8": "u15femaleaa.ca",
+   "18": "aehlu13aa.ca"
+  }
+ },
+ "bchc": {
+  "key": "80a5db2bdb2439da",
+  "name": "BCHC Demo",
+  "sites": [
+   "bchchockey.ca",
+   "borderbruins.ca",
+   "burnabysteelers.ca",
+   "bvnitehawks.ca",
+   "chilliwackjets.com",
+   "coastalhockey.ca",
+   "deltaicehawks.com",
+   "fernieghostriders.com",
+   "kamloopsstormhockey.com",
+   "kimberleydynamiters.ca",
+   "langleytrappers.com",
+   "merrittcentennials.ca",
+   "nelsonleafs.ca",
+   "osoyooscoyotes.com",
+   "pocohockey.ca",
+   "princetonposse.org",
+   "quesnelriverrush.com",
+   "richmondsockeyes.com",
+   "ridgemeadowsflames.com",
+   "rockieshockey.ca",
+   "wlmustangs.ca"
+  ],
+  "latest": "2026-27 Regular Season",
+  "league_ids": {}
+ },
+ "ojhl": {
+  "key": "77a0bd73d9d363d3",
+  "name": "Buffalo Jr. Sabres",
+  "sites": [
+   "admiralsjra.com",
+   "auroratigersjra.ca",
+   "buffalojrsabres.ojhl.ca",
+   "burlingtoncougars.ca",
+   "cobourgcougars.com",
+   "cwoodblues.com",
+   "georgetownraiders.ojhl.ca",
+   "haliburtoncountyhuskies.ojhl.ca",
+   "leamingtonflyers.com",
+   "lindsaymuskies.ojhl.ca",
+   "markhamroyals.com",
+   "miltonmenace.com",
+   "mississaugachargers.ojhl.ca",
+   "newmarkethurricanes.ojhl.ca",
+   "niagarafallscanucks.com",
+   "oakvilleblades.ca",
+   "ojhl.ca",
+   "pickeringpanthers.ojhl.ca",
+   "stmichaelsbuzzers.ojhl.ca",
+   "stouffvillespirit.ojhl.ca",
+   "torontopatriots.ojhl.ca",
+   "trentongoldenhawks.ojhl.ca",
+   "wellingtondukes.com"
+  ],
+  "latest": "26-27 Regular Season",
+  "league_ids": {}
+ },
+ "proam": {
+  "key": "2be528d6d3ca2632",
+  "name": "Chowder Cup",
+  "sites": [
+   "chowdercup.proamhockey.com",
+   "minicc.proamhockey.com",
+   "predraft.proamhockey.com",
+   "womenscc.proamhockey.com"
+  ],
+  "latest": "2026 Playoffs - Jr. Chowder Cup",
+  "league_ids": {
+   "6": "chowdercup.proamhockey.com",
+   "5": "minicc.proamhockey.com",
+   "2": "predraft.proamhockey.com",
+   "4": "womenscc.proamhockey.com"
+  }
+ },
+ "ajhl": {
+  "key": "cbe60a1d91c44ade",
+  "name": "Calgary Canucks - Over 50 Years of Junior Hockey Excellence",
+  "sites": [
+   "ajhl.ca",
+   "bonnyvillepontiacs.ca",
+   "calgarycanucks.ca",
+   "camrosekodiaks.ca",
+   "canmoreeagles.ca",
+   "devonxtreme.ca",
+   "draytonvalleythunder.ca",
+   "drumhellerdragons.ca",
+   "fortmcmurrayoilbarons.ca",
+   "grandeprairiestorm.ca",
+   "lloydminsterbobcats.ca",
+   "oldsgrizzlys.ca",
+   "whitecourtwolverines.ca"
+  ],
+  "latest": "2026-2027 Regular Season",
+  "league_ids": {}
+ },
+ "nojhl": {
+  "key": "c1375ff55168bd71",
+  "name": "Blind River Beavers",
+  "sites": [
+   "blindriverbeavers.com",
+   "elliotlakevikings.com",
+   "espanolapaperkings.com",
+   "hearstlumberjacks.com",
+   "klgoldminers.com",
+   "nojhl.com",
+   "soothunderbirds.com",
+   "sudburycubs.ca",
+   "timminsrock.com",
+   "voodooshockey.com"
+  ],
+  "latest": "2026-27 Regular Season",
+  "league_ids": {}
+ },
+ "gojhl": {
+  "key": "34b10d4d34d7b59a",
+  "name": "Ayr Centennials",
+  "sites": [
+   "brantfordtitans.gohl.ca",
+   "centennials.gohl.ca",
+   "chathammaroons.com",
+   "cyclones.gohl.ca",
+   "falcons.gohl.ca",
+   "gohl.ca",
+   "kings.gohl.ca",
+   "lasallevipers.com",
+   "lincs.ca",
+   "meteors.gohl.ca",
+   "nationals.gohl.ca",
+   "panthers.gohl.ca",
+   "pcsailors.com",
+   "profitcorvairs.gohl.ca",
+   "redhawksjrhc.ca",
+   "rockets.gohl.ca",
+   "sarnialegionnaires.com",
+   "siskinshockey.ca",
+   "stars.gohl.ca",
+   "stratfordwarriors.hockey",
+   "sugarkings.gohl.ca",
+   "wellandjrcanadians.com"
+  ],
+  "latest": "2026-2027 Special Events",
+  "league_ids": {}
+ },
+ "manu18aaa": {
+  "key": "efb126cfa395f4dd",
+  "name": "Parkland Rangers",
+  "sites": [
+   "mbu18aaahockey.ca",
+   "parklandrangers.ca"
+  ],
+  "latest": "2026-27 Regular Season",
+  "league_ids": {}
+ },
+ "ahl": {
+  "key": "ccb91f29d6744675",
+  "name": "TheAHL.com | The American Hockey League",
+  "sites": [
+   "theahl.com"
+  ],
+  "latest": "2026-27 Regular Season",
+  "league_ids": {}
+ },
+ "smaaahl": {
+  "key": "3839009f16688a0d",
+  "name": "Battlefords Stars",
+  "sites": [
+   "aaastars.ca",
+   "estevanbears.com",
+   "maulers.ca",
+   "smaaahl.com"
+  ],
+  "latest": "2026-27 Regular Season",
+  "league_ids": {}
+ },
+ "wijhl": {
+  "key": "44808f115c1b5263",
+  "name": "100 Mile House Wranglers",
+  "sites": [
+   "100milewranglers.com",
+   "castlegarrebels.ca",
+   "chaseheat.com",
+   "crestonvalleythunder.com",
+   "goldenrockets.com",
+   "kelownachiefs.com",
+   "sicamouseagles.com",
+   "spokanebraves.com",
+   "wijhl.com"
+  ],
+  "latest": "2026-2027 WIJHL Regular Season",
+  "league_ids": {}
+ },
+ "acha": {
+  "key": "333f159b7bfd73f4",
+  "name": "American Collegiate Hockey Association (ACHA)",
+  "sites": [
+   "achahockey.org",
+   "msuclubhockey.com",
+   "ucohockey.com"
+  ],
+  "latest": "2026-2027 Men's Divisions",
+  "league_ids": {}
+ },
+ "pjhlbc": {
+  "key": "5e5fc2923094641d",
+  "name": "The Abbotsford Pilots",
+  "sites": [
+   "abbotsfordpilots.com",
+   "cloverdalejuniorhockey.ca",
+   "missioncityoutlaws.com",
+   "northvanwolfpack.com",
+   "pjhl.net",
+   "portmoodypanthers.com",
+   "surreyknights.ca"
+  ],
+  "latest": "2026-27 Regular Season",
+  "league_ids": {}
+ },
+ "mhl": {
+  "key": "4a948e7faf5ee58d",
+  "name": "Amherst Jr. A Ramblers",
+  "sites": [
+   "amherstramblers.ca",
+   "blizzardedmundston.ca",
+   "campbelltontigershockey.ca",
+   "chaleurlightning.ca",
+   "rapidshockey.ca",
+   "themhl.ca",
+   "trurojrabearcats.ca",
+   "weekscrushershockey.com",
+   "westkentsteamers.com",
+   "yarmouthmariners.com"
+  ],
+  "latest": "2026-27 MHL Regular Season",
+  "league_ids": {}
+ },
+ "hjhl": {
+  "key": "ade318ef99f34e2e",
+  "name": "Airdrie Techmation Thunder",
+  "sites": [
+   "airdriethunder.ca",
+   "coaldalecopperheads.com",
+   "cochranegenerals.com",
+   "highriverflyers.com",
+   "hjhl.ca",
+   "medicinehatcubs.ca",
+   "mvcolts.ca",
+   "okotoksbisons.com",
+   "sylvanlakewranglers.com",
+   "wheatlandkings.com"
+  ],
+  "latest": "2026-2027 Regular Season",
+  "league_ids": {}
+ },
+ "eojhl": {
+  "key": "1defb601c9b37c24",
+  "name": "Athens Aeros",
+  "sites": [
+   "athensaeros.ca",
+   "casselmanvikingsjrb.com",
+   "embrunpanthers.ca",
+   "glengarrybrigade.com",
+   "ottawajuniorcanadians.ca",
+   "owgk.ca",
+   "renfrewtimberwolves.com",
+   "richmondroyals.ca",
+   "theeojhl.ca",
+   "winchesterhawks.com"
+  ],
+  "latest": "EOJHL 2026-27",
+  "league_ids": {}
+ },
+ "sjhl": {
+  "key": "2fb5c2e84bf3e4a8",
+  "name": "Flin Flon Bombers",
+  "sites": [
+   "bombers.ca",
+   "estevanbruins.com",
+   "humboldtbroncos.com",
+   "icewolves.ca",
+   "klippershockey.com",
+   "melfortmustangs.com",
+   "melvillemillionaires.ca",
+   "nipawinhawks.sk.ca",
+   "northstars.ca",
+   "sjhl.ca",
+   "warmanwolverines.com",
+   "weyburnredwings.ca",
+   "yorktonterriers.com"
+  ],
+  "latest": "2026-27 Regular Season",
+  "league_ids": {}
+ },
+ "pjhlon": {
+  "key": "54ad32ee30e379ad",
+  "name": "Blenheim Blades",
+  "sites": [
+   "blenheimblades.com",
+   "ferguswhalers.ca",
+   "kincardinebulldogs.ca",
+   "lakeshorecanadiens.com",
+   "mitchellhawks.com",
+   "shamrocksjrc.ca",
+   "tavistockbraves.ca",
+   "thepjhl.ca"
+  ],
+  "latest": "2025-26 PJHL Schmalz Cup Playoffs",
+  "league_ids": {}
+ },
+ "macsaaa": {
+  "key": "cccf8bc78802f62c",
+  "name": "Home Page - Circle K Classic - U18AAA Hockey Tournament",
+  "sites": [
+   "circlekclassic.ca"
+  ],
+  "latest": "Circle K Classic 2025-26 Finals",
+  "league_ids": {}
+ },
+ "vijhl": {
+  "key": "4f1a61df18906b61",
+  "name": "Comox Valley Glacier Kings",
+  "sites": [
+   "comoxvalleyglacierkings.ca",
+   "kpislanders.com",
+   "krakenhockey.ca",
+   "oceansidegenerals.com",
+   "panthers-hockey.com",
+   "victoriacougars.com",
+   "vijhl.com",
+   "westshorewolves.ca"
+  ],
+  "latest": "2026-2027 Regular Season",
+  "league_ids": {}
+ },
+ "cchl": {
+  "key": "b370f3e6c805baf3",
+  "name": "Cornwall Colts",
+  "sites": [
+   "cornwallcolts.com",
+   "cpcanadians.com",
+   "hawkesburyhawks.com",
+   "kemptville73s.com",
+   "navangrads.com",
+   "nepeanraiders.com",
+   "pembrokelumberkings.ca",
+   "renfrewwolves.com",
+   "rocklandnationalsjuniora.com",
+   "smithsfallsbearshockey.com",
+   "thecchl.ca"
+  ],
+  "latest": "CCHL 2026-27",
+  "league_ids": {}
+ },
+ "csshl": {
+  "key": "dbb3085c9c2968c6",
+  "name": "Canadian Sport School Hockey League",
+  "sites": [
+   "csshl.ca",
+   "ohaedmonton.com",
+   "ohapenticton.com",
+   "okanaganhockeyontario.com",
+   "u15.csshl.hockeytech.com",
+   "u15prep.csshl.hockeytech.com",
+   "u17.csshl.hockeytech.com",
+   "u17prep.csshl.hockeytech.com",
+   "u18prep.csshl.hockeytech.com",
+   "femaleu18prep.csshl.hockeytech.com",
+   "ewchallenge.csshl.hockeytech.com"
+  ],
+  "latest": "2020-21 Regional Series",
+  "league_ids": {
+   "2": "u15.csshl.hockeytech.com",
+   "3": "u15prep.csshl.hockeytech.com",
+   "4": "u17.csshl.hockeytech.com",
+   "5": "u17prep.csshl.hockeytech.com",
+   "6": "u18prep.csshl.hockeytech.com",
+   "7": "femaleu18prep.csshl.hockeytech.com",
+   "10": "ewchallenge.csshl.hockeytech.com"
+  }
+ },
+ "mjhl": {
+  "key": "f894c324fe5fd8f0",
+  "name": "Dauphin Kings",
+  "sites": [
+   "dauphinkings.com",
+   "mjhlhockey.ca",
+   "mjhlnighthawks.ca",
+   "neepawatitans.com",
+   "oilcapshockey.com",
+   "portageterriers.com",
+   "selkirksteelers.com",
+   "stampedershockey.com",
+   "steinbachpistons.ca",
+   "winklerflyers.com",
+   "winnipegblues.ca",
+   "winnipegmonarchs.ca"
+  ],
+  "latest": "2026-27 Regular Season",
+  "league_ids": {}
+ },
+ "sijhl": {
+  "key": "80099326014ed837",
+  "name": "Fort Frances Lakers",
+  "sites": [
+   "fightingwalleye.com",
+   "fortfranceslakers.com"
+  ],
+  "latest": "2026-2027 Regular Season",
+  "league_ids": {}
+ },
+ "gnu18l": {
+  "key": "8974301309da0ffe",
+  "name": "Great North U18 AAA League",
+  "sites": [
+   "gnu18l.org"
+  ],
+  "latest": "2026 - 2027 Sept 18, 2026 to Mar 21 2027",
+  "league_ids": {}
+ },
+ "sphl": {
+  "key": "8fa10d218c49ec96",
+  "name": "Huntsville Havoc",
+  "sites": [
+   "huntsvillehavoc.com",
+   "railyarddawgs.com",
+   "thesphl.com"
+  ],
+  "latest": "2026-2027 Regular Season",
+  "league_ids": {}
+ },
+ "kijhl": {
+  "key": "2589e0f644b1bb71",
+  "name": "KIJHL - Kootenay International Junior Hockey League",
+  "sites": [
+   "kijhl.ca"
+  ],
+  "latest": "2026/27 Regular Season",
+  "league_ids": {}
+ },
+ "nwjhl": {
+  "key": "f01e9acdd0105909",
+  "name": "North West Junior Hockey League",
+  "sites": [
+   "nwjhl.com"
+  ],
+  "latest": "2026 Regular Season",
+  "league_ids": {}
+ },
+ "ut1hl": {
+  "key": "e268a4114bda5887",
+  "name": "United Tier 1 Hockey League 10U",
+  "sites": [
+   "ut1hl.hockeytech.com"
+  ],
+  "league_ids": {
+   "2": "ut1hl.hockeytech.com",
+   "3": "ut1hl.hockeytech.com",
+   "8": "ut1hl.hockeytech.com",
+   "4": "ut1hl.hockeytech.com",
+   "5": "ut1hl.hockeytech.com",
+   "6": "ut1hl.hockeytech.com",
+   "7": "ut1hl.hockeytech.com"
+  }
+ },
+ "oua": {
+  "key": "0930e57c7a71fa87",
+  "name": "OUA Women's Hockey (U Sports)",
+  "sites": [
+   "women.oua.hockeytech.com",
+   "men.oua.hockeytech.com"
+  ],
+  "league_ids": {
+   "4": "women.oua.hockeytech.com",
+   "5": "men.oua.hockeytech.com"
+  }
+ }
+}

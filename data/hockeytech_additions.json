@@ -1,0 +1,163 @@
+[
+ {
+  "client_code": "hockeyalberta",
+  "key": "c5f7fc2efb35ab14",
+  "league_id": "3",
+  "site": "u18aaa.ca",
+  "name": "AEHL U18 AAA"
+ },
+ {
+  "client_code": "hockeyalberta",
+  "key": "c5f7fc2efb35ab14",
+  "league_id": "4",
+  "site": "u17aaa.ca",
+  "name": "AEHL U17 AAA"
+ },
+ {
+  "client_code": "hockeyalberta",
+  "key": "c5f7fc2efb35ab14",
+  "league_id": "5",
+  "site": "u15aaa.ca",
+  "name": "AEHL U15 AAA"
+ },
+ {
+  "client_code": "hockeyalberta",
+  "key": "c5f7fc2efb35ab14",
+  "league_id": "6",
+  "site": "u18femaleaaa.ca",
+  "name": "AFHL U18 AAA"
+ },
+ {
+  "client_code": "hockeyalberta",
+  "key": "c5f7fc2efb35ab14",
+  "league_id": "7",
+  "site": "u18femaleaa.ca",
+  "name": "AFHL U18 AA"
+ },
+ {
+  "client_code": "hockeyalberta",
+  "key": "c5f7fc2efb35ab14",
+  "league_id": "8",
+  "site": "u15femaleaa.ca",
+  "name": "AFHL U15 AA"
+ },
+ {
+  "client_code": "hockeyalberta",
+  "key": "c5f7fc2efb35ab14",
+  "league_id": "18",
+  "site": "aehlu13aa.ca",
+  "name": "AEHL U13 AA"
+ },
+ {
+  "client_code": "csshl",
+  "key": "dbb3085c9c2968c6",
+  "league_id": "2",
+  "site": "u15.csshl.hockeytech.com",
+  "name": "CSSHL U15 Varsity"
+ },
+ {
+  "client_code": "csshl",
+  "key": "dbb3085c9c2968c6",
+  "league_id": "3",
+  "site": "u15prep.csshl.hockeytech.com",
+  "name": "CSSHL U15 Prep"
+ },
+ {
+  "client_code": "csshl",
+  "key": "dbb3085c9c2968c6",
+  "league_id": "4",
+  "site": "u17.csshl.hockeytech.com",
+  "name": "CSSHL U17 Varsity"
+ },
+ {
+  "client_code": "csshl",
+  "key": "dbb3085c9c2968c6",
+  "league_id": "5",
+  "site": "u17prep.csshl.hockeytech.com",
+  "name": "CSSHL U17 Prep"
+ },
+ {
+  "client_code": "csshl",
+  "key": "dbb3085c9c2968c6",
+  "league_id": "6",
+  "site": "u18prep.csshl.hockeytech.com",
+  "name": "CSSHL U18 Prep"
+ },
+ {
+  "client_code": "csshl",
+  "key": "dbb3085c9c2968c6",
+  "league_id": "7",
+  "site": "femaleu18prep.csshl.hockeytech.com",
+  "name": "CSSHL Female U18 Prep"
+ },
+ {
+  "client_code": "csshl",
+  "key": "dbb3085c9c2968c6",
+  "league_id": "10",
+  "site": "ewchallenge.csshl.hockeytech.com",
+  "name": "CSSHL East-West Challenge"
+ },
+ {
+  "client_code": "ut1hl",
+  "key": "e268a4114bda5887",
+  "league_id": "2",
+  "site": "ut1hl.hockeytech.com",
+  "name": "United Tier 1 Hockey League 10U"
+ },
+ {
+  "client_code": "ut1hl",
+  "key": "e268a4114bda5887",
+  "league_id": "3",
+  "site": "ut1hl.hockeytech.com",
+  "name": "United Tier 1 Hockey League 12U"
+ },
+ {
+  "client_code": "ut1hl",
+  "key": "e268a4114bda5887",
+  "league_id": "8",
+  "site": "ut1hl.hockeytech.com",
+  "name": "United Tier 1 Hockey League 13U"
+ },
+ {
+  "client_code": "ut1hl",
+  "key": "e268a4114bda5887",
+  "league_id": "4",
+  "site": "ut1hl.hockeytech.com",
+  "name": "United Tier 1 Hockey League 14U"
+ },
+ {
+  "client_code": "ut1hl",
+  "key": "e268a4114bda5887",
+  "league_id": "5",
+  "site": "ut1hl.hockeytech.com",
+  "name": "United Tier 1 Hockey League 15U"
+ },
+ {
+  "client_code": "ut1hl",
+  "key": "e268a4114bda5887",
+  "league_id": "6",
+  "site": "ut1hl.hockeytech.com",
+  "name": "United Tier 1 Hockey League 16U"
+ },
+ {
+  "client_code": "ut1hl",
+  "key": "e268a4114bda5887",
+  "league_id": "7",
+  "site": "ut1hl.hockeytech.com",
+  "name": "United Tier 1 Hockey League 18U"
+ },
+ {
+  "client_code": "oua",
+  "key": "0930e57c7a71fa87",
+  "league_id": "4",
+  "site": "women.oua.hockeytech.com",
+  "name": "OUA Women's Hockey (U Sports)"
+ },
+ {
+  "client_code": "oua",
+  "key": "0930e57c7a71fa87",
+  "league_id": "5",
+  "site": "men.oua.hockeytech.com",
+  "name": "OUA Men's Hockey (U Sports)"
+ }
+]

@@ -1,0 +1,71 @@
+{
+ "_about": "Kreezee Sports sites (tournaments and leagues). hubs: pages that link tournament subdomains of one organiser; sites: fixed hosts. names: whole-word abbreviations on the site -> header spelling. comp: header competition words that point at the site (lower case). tz: local time zone.",
+ "hubs": [
+  {
+   "url": "https://www.bluelinetournaments.com/",
+   "host_re": "https://([a-z0-9-]+\\.bluelinetournaments\\.com)",
+   "tz": "America/New_York",
+   "comp": [
+    "barn burner",
+    "blue line",
+    "columbus day",
+    "greater orlando",
+    "mid florida meltdown",
+    "mlk showdown",
+    "turkey tussle"
+   ],
+   "names": "florida"
+  }
+ ],
+ "sites": [
+  {
+   "host": "www.sfhlhockey.com",
+   "tz": "America/New_York",
+   "comp": [
+    "statewide florida",
+    "sfhl"
+   ],
+   "names": "florida"
+  },
+  {
+   "host": "boston-breakout.kreezee-sports.com",
+   "tz": "America/New_York",
+   "comp": [
+    "boston breakout"
+   ],
+   "names": "new_england"
+  }
+ ],
+ "names": {
+  "florida": {
+   "TBHC": "Tampa Bay Hockey Club",
+   "TB Crunch": "Tampa Bay Crunch",
+   "Jr Everblades": "Florida Jr. Everblades",
+   "FJP": "Florida Jr. Panthers",
+   "Fla Jr Panthers": "Florida Jr. Panthers",
+   "Fla": "Florida",
+   "PB": "Palm Beach",
+   "JAX": "Jacksonville",
+   "CIS": "Clearwater Ice Storm",
+   "Clrwtr": "Clearwater",
+   "GC Flames": "Gulf Coast Flames",
+   "SC Rockets": "Space Coast Rockets",
+   "Span Rvr": "Spanish River",
+   "CFHC": "Central Florida Hockey Club",
+   "MadHatters": "Mad Hatters",
+   "Madhatters": "Mad Hatters",
+   "Jr Mocs": "Jr. Mocs",
+   "Jr Icemen": "Jr. Icemen",
+   "Jr Bulls": "Jr. Bulls"
+  },
+  "new_england": {
+   "NS Wings": "North Shore Wings",
+   "NW Chargers": "Northwest Chargers",
+   "NH Avalanche": "New Hampshire Avalanche",
+   "NJ Jets": "New Jersey Jets",
+   "NC Golden Bears": "North Carolina Golden Bears",
+   "JR": "Jr.",
+   "Jr": "Jr."
+  }
+ }
+}

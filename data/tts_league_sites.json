@@ -1,0 +1,16 @@
+{
+ "_about": "League websites that show TimeToScore games (for the lead's timetoscore adapter and the replay's game identity). Each site embeds the TimeToScore game widget (cdn.timetoscore.com/game/loader.js or api.<host>.timetoscore.com) and its game id IS the TimeToScore game_id on stats.<host>.timetoscore.com (checked: AHF 86577, THF 85997, NGHL 85833, AGHF 84225 on blackbear; USPHL 27005 on usphl). So analyst links like usphl.com/ncdc/game-center/?game_id=27005 equal stats.usphl.timetoscore.com game 27005. site_url: the league site's game page for a TimeToScore game id.",
+ "sites": [
+  {"domain": "atlantichockeyfederation.com", "tts_host": "blackbear", "league": 4, "name": "Atlantic Hockey Federation (AHF)",
+   "site_url": "https://atlantichockeyfederation.com/gamecenter-2526/?game={gid}&league=4", "sheet_games": 11},
+  {"domain": "tier1hockeyfederation.com", "tts_host": "blackbear", "league": 5, "name": "Tier 1 Hockey Federation (THF)",
+   "site_url": "https://www.tier1hockeyfederation.com/gamecenter-widget/?game={gid}&league=5", "sheet_games": 13},
+  {"domain": "nghlhockey.com", "tts_host": "blackbear", "league": 41, "name": "National Girls Hockey League (NGHL)",
+   "site_url": "https://nghlhockey.com/game-center-red/?game={gid}", "sheet_games": 12},
+  {"domain": "atlanticgirlshockeyfederation.com", "tts_host": "blackbear", "league": 3, "name": "Atlantic Girls Hockey Federation (AGHF)",
+   "site_url": "https://atlanticgirlshockeyfederation.com/gamecenter-2526/?game={gid}&league=3", "sheet_games": 1},
+  {"domain": "usphl.com", "tts_host": "usphl", "league": null, "name": "USPHL (NCDC, Premier, Elite)",
+   "site_url": "https://usphl.com/ncdc/game-center/?game_id={gid}", "sheet_games": 14,
+   "note": "path is /ncdc/, /premier/ or /elite/ by division"}
+ ]
+}

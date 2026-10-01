@@ -1,0 +1,15 @@
+{
+ "_about": "RAMP InterActive sites (Website by RAMP InterActive; also tournamentsgurus.com tournaments). Game ids (GID) are global: /division/{cat}/{div}/game/view/{GID} opens the game on any RAMP host. Sources per entry: classic = the association's league games as JSON (https://www.owha.on.ca/api/leaguegame/get/{aid}/{sid}/0/0/0/0/, any classic RAMP host answers for any association); pages = Blazor schedule pages (division schedule or team masterschedule) read in a headless browser for the header's month, which also list tournament and exhibition games; discover = a tournament page whose menu lists the divisions and their teams, read without a browser, then only the divisions holding a header team are opened. comp: header competition words (lower case); teams: header team-name words that point at the entry; from/to: tournament dates (local).",
+ "sites": [
+  {"name": "OWHL U22 Elite", "site": "https://www.owhlu22elite.ca", "tz": "America/Toronto", "context": "U22",
+   "comp": ["ontario women's hockey league", "owhl"],
+   "classic": {"host": "https://www.owha.on.ca", "aid": 2789, "sid": 14459},
+   "pages": [{"path": "/division/1594/14813/schedule", "cat": 1594, "div": 14813}]},
+  {"name": "Eastern Alliance Kickoff", "site": "https://eakickoff.tournamentsgurus.com", "tz": "America/New_York", "context": "",
+   "comp": ["eak tournament", "eastern alliance kickoff", "eak kickoff"], "from": "2026-09-03", "to": "2026-09-08",
+   "discover": "/division/0/34779/masterschedule"},
+  {"name": "Ottawa 67's AA", "site": "https://www.ottawa67saa.org", "tz": "America/Toronto", "context": "",
+   "comp": [], "teams": ["ottawa jr. 67", "ottawa 67"],
+   "pages": [{"path": "/team/14604/0/0/399526/masterschedule", "cat": 0, "div": 14803}]}
+ ]
+}

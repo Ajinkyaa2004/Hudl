@@ -1,0 +1,5 @@
+{
+ "_note": "RAMP InterActive tournament sites (<sub>.tournamentsgurus.com). Key: words that must all appear in the header competition (lower case); value: the site's subdomain. 'EAK Tournament' = Eastern Alliance Kickoff (Worcester/Marlborough MA, early September, U12-U18 AAA).",
+ "eak": "eakickoff",
+ "eastern alliance kickoff": "eakickoff"
+}

@@ -1,0 +1,11 @@
+{
+ "_note": "hockeyslovakia.sk competition ids per season (from analysts' report links). Header competition words -> id and URL slug. The site is behind a Cloudflare check, so ids cannot be read automatically; add a season's ids from any report link /stats/matches/<id>/<slug>/match/<n>.",
+ "2026": {
+  "tipos extraliga":          [1197, "tipsport-liga", "Tipsport liga"],
+  "slovenska hokejova liga":  [1198, "tipos-shl", "Tipos SHL"],
+  "extraleague u20":          [1201, "extraliga-juniorov", "Extraliga juniorov (U20)"],
+  "extraleague u18":          [1202, "kaufland-extraliga-dorastu", "Kaufland extraliga dorastu (U18)"],
+  "friendly":                 [1215, "pripravne-zapasy-szlh", "Pripravne zapasy (friendlies)"],
+  "tatra cup":                [1235, "tatransky-pohar-2026", "Tatransky pohar"]
+ }
+}

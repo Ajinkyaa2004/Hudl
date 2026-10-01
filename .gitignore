@@ -1,0 +1,27 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+.env
+
+# Hudl-internal data and anything built from it: stays on the local machine
+data/*.xlsx
+data/knowledge.json
+data/aliases_learned.json
+data/roster_probe_results.json
+data/cache/
+data/screens/
+data/shots/
+data/games.db*
+data/gamesheet_games.json
+data/gamesheet_fs_key.txt
+data/harvest_status.json
+data/health.json
+data/*_scan.json
+tests/*.csv
+tests/logs/
+tests/sheet_corrections.json
+tests/RESULTS_*.md
+
+# OS
+.DS_Store

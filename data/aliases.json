@@ -1,0 +1,91 @@
+{
+ "_note": "short or site name -> the full names it stands for. Used when comparing a header team with a site's team. Add pairs here as you meet them.",
+ "HPK": [
+  "Hameenlinnan Pallokerho"
+ ],
+ "HIFK": [
+  "HIFK Helsinki",
+  "Helsingfors IFK"
+ ],
+ "TPS": [
+  "Turun Palloseura",
+  "TPS Turku",
+  "TPS Juniorit"
+ ],
+ "KalPa": [
+  "Kuopion Palloseura",
+  "KalPa Kuopio"
+ ],
+ "SaiPa": [
+  "Saimaan Pallo",
+  "SaiPa Lappeenranta"
+ ],
+ "JYP": [
+  "JYP Jyvaskyla",
+  "Jyvaskylan Palloilijat"
+ ],
+ "KooKoo": [
+  "KooKoo Kouvola"
+ ],
+ "Assat": [
+  "Porin Assat"
+ ],
+ "Pelicans": [
+  "Lahden Pelicans",
+  "Pelicans Lahti"
+ ],
+ "Ilves": [
+  "Tampereen Ilves",
+  "Ilves Tampere"
+ ],
+ "Tappara": [
+  "Tampereen Tappara",
+  "Tappara Tampere"
+ ],
+ "Lukko": [
+  "Rauman Lukko",
+  "Lukko Rauma"
+ ],
+ "Karpat": [
+  "Oulun Karpat",
+  "Karpat Oulu"
+ ],
+ "Sport": [
+  "Vaasan Sport",
+  "Sport Vaasa"
+ ],
+ "Jukurit": [
+  "Mikkelin Jukurit",
+  "Jukurit Mikkeli"
+ ],
+ "K-Espoo": [
+  "Kiekko-Espoo"
+ ],
+ "KeuPa HT": [
+  "Keuruun Pallo"
+ ],
+ "IPK": [
+  "Iisalmen Peli-Karhut"
+ ],
+ "RoKi": [
+  "Rovaniemen Kiekko"
+ ],
+ "JoKP": [
+  "Joensuun Kiekko-Pojat"
+ ],
+ "LeKi": [
+  "Lempaalan Kisa"
+ ],
+ "KJT Haukat": [
+  "Jarvenpaan Haukat"
+ ],
+ "SKA-Neva": [
+  "SKA-VMF"
+ ],
+ "USNTDP": [
+  "USA Hockey NTDP",
+  "US NTDP",
+  "USNTDP U18",
+  "USNTDP U17"
+ ]
+}
