@@ -8,7 +8,7 @@ PuckTrace has two parts:
 ## 1. Backend on Render
 
 1. In Render, choose **New > Blueprint**, pick the `Hudl` repo, and apply `render.yaml`. This creates `pucktrace-api` on the Starter plan with a 5 GB disk at `/app/data`.
-2. Set **APP_PASSWORD** to the team password. APP_SECRET is generated for you.
+2. Render generates **APP_PASSWORD** (the team password) and APP_SECRET. Read or change the password under the service's Environment tab.
 3. Wait for the first deploy, then open `https://<service>.onrender.com/api/healthz`. It should show `{"ok": true}`.
 4. On the first start the game list is empty. The daily refresh starts by itself and takes about 30 minutes. Until it finishes, searches use the live sources only.
 5. Upload the knowledge base from your Mac. It is built from Club Data, so it is not in the public repo:

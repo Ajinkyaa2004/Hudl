@@ -6,8 +6,8 @@ services:
     plan: starter            # a persistent disk needs a paid instance
     healthCheckPath: /api/healthz
     envVars:
-      - key: APP_PASSWORD    # the team password asked on the sign-in screen
-        sync: false
+      - key: APP_PASSWORD    # the team password asked on the sign-in screen (generated; see Environment, change it any time)
+        generateValue: true
       - key: APP_SECRET      # any long random string; signs the sign-in cookie
         generateValue: true
     disk:
