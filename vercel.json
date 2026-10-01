@@ -5,7 +5,7 @@
   "installCommand": "",
   "outputDirectory": "frontend",
   "rewrites": [
-    { "source": "/api/:path*", "destination": "https://BACKEND_HOST/api/:path*" },
+    { "source": "/api/:path*", "destination": "https://pucktrace-api-8u5i.onrender.com/api/:path*" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
