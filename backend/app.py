@@ -105,9 +105,13 @@ async def _daily_harvest():
             last = json.loads(status.read_text()).get("at") if status.exists() else None
             age = time.time() - time.mktime(time.strptime(last, "%Y-%m-%dT%H:%M:%S")) if last else 1e9
             if age > 20 * 3600:
-                await harvest.run(log=lambda m: print("[harvest]", m, flush=True))
-                from . import health
-                await health.run()
+                # HARVEST_SOURCES picks the bulk sources (a small free server can't take them all);
+                # HEALTH_DAILY=0 skips the daily source check
+                names = [x.strip() for x in _os.environ.get("HARVEST_SOURCES", "").split(",") if x.strip()] or None
+                await harvest.run(names, log=lambda m: print("[harvest]", m, flush=True))
+                if _os.environ.get("HEALTH_DAILY", "1") != "0":
+                    from . import health
+                    await health.run()
         except Exception as e:
             print("[harvest] failed:", e, flush=True)
         await asyncio.sleep(3600)

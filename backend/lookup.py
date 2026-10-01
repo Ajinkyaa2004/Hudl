@@ -110,10 +110,24 @@ def is_friendly(comp):
 
 # ------------------------------------------------------------ knowledge base
 
+SECRET_KB = Path("/etc/secrets/knowledge.b64")   # Render secret file (python -m backend.export_kb)
+
+
 def load_kb():
+    if not KNOWLEDGE.exists() and SECRET_KB.exists():
+        # a server without a disk: unpack the knowledge base kept as a private secret file
+        import base64, gzip
+        try:
+            KNOWLEDGE.parent.mkdir(parents=True, exist_ok=True)
+            KNOWLEDGE.write_bytes(gzip.decompress(base64.b64decode(SECRET_KB.read_text().strip())))
+        except Exception:
+            pass
     if not KNOWLEDGE.exists():
         return dict(teams={}, tournaments={}, comp_sources={}, team_sources={}, history=[])
-    return json.loads(KNOWLEDGE.read_text())
+    kb = json.loads(KNOWLEDGE.read_text())
+    for k, v in (("teams", {}), ("tournaments", {}), ("comp_sources", {}), ("team_sources", {}), ("history", [])):
+        kb.setdefault(k, v)
+    return kb
 
 
 def save_kb(kb):

@@ -21,6 +21,13 @@ PuckTrace has two parts:
    curl -b /tmp/pt.txt -X POST "$B/api/admin/upload?name=aliases_learned.json" --data-binary @data/aliases_learned.json -H 'content-type: application/json'
    ```
 
+### Render Free (no disk)
+
+The free plan sleeps after 15 minutes without use and forgets its files on every restart. To run on it:
+- Set the environment variables **APP_PASSWORD** (the team password), **APP_SECRET** (click Generate), **HARVEST_SOURCES** = `timetoscore,hockeytech,poland` (the light sources; GameSheet is read live by day) and **HEALTH_DAILY** = `0`.
+- Keep the knowledge base as a secret file. On the Mac, run `.venv/bin/python -m backend.export_kb`, which copies it to the clipboard. Then in Render, go to Advanced (or Environment) > Secret Files > Add, use the filename `knowledge.b64`, and paste the contents. Rerun this after big Club Data or Sources changes.
+- Learned spellings and saved answers on the server are lost when it restarts. Those on your Mac are kept.
+
 Railway or Fly.io work the same way: build the `Dockerfile`, mount a volume at `/app/data`, set `APP_PASSWORD`, and set `PORT` if the host requires it.
 
 ## 2. Frontend on Vercel

@@ -25,3 +25,4 @@ tests/RESULTS_*.md
 
 # OS
 .DS_Store
+data/knowledge.b64
