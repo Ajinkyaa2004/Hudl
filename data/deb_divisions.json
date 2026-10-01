@@ -341,8 +341,9 @@
    "season": "",
    "first": "2026-08-15",
    "last": "2026-10-09",
-   "games": 36,
+   "games": 39,
    "teams": [
+    "Adendorfer EC",
     "Bayreuth Tigers",
     "Beach Devils Timmendorf",
     "Chemnitz Crashers",
@@ -350,8 +351,10 @@
     "EJ Kassel U15",
     "ERSC Amberg",
     "ESC Dresden",
+    "ESC Halle 1b",
     "ESC Haßfurt",
     "ESG Hannover",
+    "Eisadler Dortmund",
     "Eisbären Berlin",
     "FASS Berlin",
     "GIJS Marne Groningen",
@@ -359,6 +362,7 @@
     "Grizzlys Bergkamen",
     "HC Slovan Ústí nad Labem",
     "Hamburger SV",
+    "Harzer Falken",
     "Herforder EV",
     "Jadehaie Sande",
     "KSW Icefighters Leipzig",
@@ -788,7 +792,7 @@
    "games": 18,
    "teams": [
     "EHC Erfurt II",
-    "SG Halle/Leipzig",
+    "SG Leipzig/Halle",
     "SG Schönheide/Chemnitz/ETC"
    ]
   },
@@ -798,12 +802,13 @@
    "season": "",
    "first": "2026-09-20",
    "last": "2027-04-03",
-   "games": 8,
+   "games": 11,
    "teams": [
     "Beaufort Knights",
     "EHC \"Die Bären\" Neuwied",
     "EHC Zweibrücken",
-    "SG EG Diez-Limburg / EC Lauterbach"
+    "SG EG Diez Limburg / EC Lauterbach / EV Wiesbaden",
+    "SG EG Diez-Limburg / EC Lauterbach / EV Wiesbaden"
    ]
   },
   "22098": {
@@ -982,7 +987,7 @@
    "season": "",
    "first": "2026-09-20",
    "last": "2027-04-03",
-   "games": 16,
+   "games": 18,
    "teams": [
     "EHC \"Die Bären\" Neuwied",
     "EHC Zweibrücken",
@@ -1882,7 +1887,7 @@
    "league": "BEV - U17 Jugend Landesliga",
    "division": "U 17 Landesliga Gruppe 3",
    "season": "273847",
-   "first": "2026-10-03",
+   "first": "2026-10-09",
    "last": "2027-03-07",
    "games": 80,
    "teams": [
@@ -2666,9 +2671,9 @@
    "league": "RLP - U17 Jugend",
    "division": "RLP U17",
    "season": "",
-   "first": "2026-11-01",
-   "last": "2027-02-20",
-   "games": 4,
+   "first": "2026-10-03",
+   "last": "2027-02-28",
+   "games": 6,
    "teams": [
     "EHC Zweibrücken",
     "EHC “Die Bären“ Neuwied",
@@ -3429,7 +3434,7 @@
    "games": 18,
    "teams": [
     "EHC Erfurt II",
-    "SG Halle/Leipzig",
+    "SG Leipzig/Halle",
     "SG Schönheide/Chemnitz/ETC"
    ]
   },
@@ -3454,9 +3459,9 @@
    "league": "RLP - U17 Jugend",
    "division": "Saison 2026/27",
    "season": "",
-   "first": "2026-11-01",
-   "last": "2027-02-20",
-   "games": 4,
+   "first": "2026-10-03",
+   "last": "2027-02-28",
+   "games": 6,
    "teams": [
     "EHC Zweibrücken",
     "EHC “Die Bären“ Neuwied",
@@ -3528,7 +3533,7 @@
    "season": "",
    "first": "2026-09-20",
    "last": "2027-04-03",
-   "games": 16,
+   "games": 18,
    "teams": [
     "EHC \"Die Bären\" Neuwied",
     "EHC Zweibrücken",
@@ -3676,12 +3681,13 @@
    "season": "",
    "first": "2026-09-20",
    "last": "2027-04-03",
-   "games": 8,
+   "games": 11,
    "teams": [
     "Beaufort Knights",
     "EHC \"Die Bären\" Neuwied",
     "EHC Zweibrücken",
-    "SG EG Diez-Limburg / EC Lauterbach"
+    "SG EG Diez Limburg / EC Lauterbach / EV Wiesbaden",
+    "SG EG Diez-Limburg / EC Lauterbach / EV Wiesbaden"
    ]
   },
   "21870": {
@@ -4803,7 +4809,7 @@
    "division": "2026/27",
    "season": "",
    "first": "2026-10-03",
-   "last": "2027-03-28",
+   "last": "2027-03-24",
    "games": 123,
    "teams": [
     "HC Everest",
@@ -4825,8 +4831,8 @@
    "league": "EESTI Noored U8 Liiga",
    "division": "2026/27",
    "season": "",
-   "first": "2026-11-16",
-   "last": "2026-11-16",
+   "first": "2026-11-07",
+   "last": "2026-11-28",
    "games": 132,
    "teams": [
     "HC Everest",
@@ -5570,8 +5576,8 @@
    "league": "EESTI Noored U8 Liiga",
    "division": "U8",
    "season": "",
-   "first": "2026-11-16",
-   "last": "2026-11-16",
+   "first": "2026-11-07",
+   "last": "2026-11-28",
    "games": 132,
    "teams": [
     "HC Everest",
@@ -5699,8 +5705,8 @@
    "league": "EESTI Noored U12 Liiga",
    "division": "U12-2",
    "season": "",
-   "first": "2026-11-16",
-   "last": "2026-11-16",
+   "first": "2026-10-11",
+   "last": "2027-03-02",
    "games": 56,
    "teams": [
     "HC Everest",
@@ -5718,7 +5724,7 @@
    "division": "U10-1",
    "season": "",
    "first": "2026-10-03",
-   "last": "2027-03-28",
+   "last": "2027-03-24",
    "games": 63,
    "teams": [
     "HC Panter Must",
@@ -5858,7 +5864,7 @@
    "season": "273847",
    "first": "2026-08-08",
    "last": "2026-10-04",
-   "games": 42,
+   "games": 43,
    "teams": [
     "Aachener EC",
     "Dinslakener Kobras U13",
@@ -5880,6 +5886,7 @@
     "Eisadler Dortmund  U15",
     "Eisadler Dortmund  U17",
     "Eisadler Dortmund U20",
+    "Grefrather EG",
     "HC TIWAG Innsbruck Juniors",
     "Herforder EV U15",
     "Herforder EV U17",
@@ -5910,6 +5917,7 @@
     "Ratinger Ice Aliens U20",
     "SpG GSC Moers / Neusser EV",
     "SpG Kristall Lippstadt / Soester EG",
+    "SpG Neusser EV / GSC Moers",
     "TuS Wiehl U13",
     "TuS Wiehl U15",
     "TuS Wiehl U17",
@@ -6004,7 +6012,7 @@
    "season": "273847",
    "first": "2026-08-08",
    "last": "2026-10-16",
-   "games": 143,
+   "games": 144,
    "teams": [
     "1. CfR Pforzheim Bisons",
     "Aachener EC",
@@ -6108,6 +6116,7 @@
     "Soester EG",
     "SpG GSC Moers / Neusser EV",
     "SpG Kristall Lippstadt / Soester EG",
+    "SpG Neusser EV / GSC Moers",
     "Stavanger Oilers",
     "TuS Wiehl",
     "TuS Wiehl 1b",
@@ -7263,7 +7272,7 @@
    "league": "IJshockey Nederland - Vrouwen",
    "division": "Vrouwen Eerste divisie",
    "season": "",
-   "first": "2026-10-03",
+   "first": "2026-10-04",
    "last": "2027-03-13",
    "games": 42,
    "teams": [
@@ -7935,21 +7944,25 @@
    "season": "",
    "first": "2026-08-23",
    "last": "2026-10-09",
-   "games": 18,
+   "games": 21,
    "teams": [
+    "Adendorfer EC",
     "Bayreuth Tigers",
     "Beach Devils Timmendorf",
     "Chemnitz Crashers",
     "Crocodiles im FTV Hamburg",
     "ERSC Amberg",
     "ESC Dresden",
+    "ESC Halle 1b",
     "ESC Haßfurt",
+    "Eisadler Dortmund",
     "FASS Berlin",
     "GIJS Marne Groningen",
     "GSC Moers Black Tigers",
     "Grizzlys Bergkamen",
     "HC Slovan Ústí nad Labem",
     "Hamburger SV",
+    "Harzer Falken",
     "Herforder EV",
     "Jadehaie Sande",
     "KSW Icefighters Leipzig",
@@ -9683,10 +9696,15 @@
    "season": "273847",
    "first": "2026-11-08",
    "last": "2027-02-27",
-   "games": 81,
+   "games": 111,
    "teams": [
     "Black Devils Prägraten",
+    "Carinthian Team",
+    "DSG Ledenitzen",
+    "EC Feld am See",
+    "EC Tigers Paternion",
     "EC Virgen",
+    "ELV Zauchen",
     "ESV Ferlach",
     "FIN-A",
     "FIN-B",
@@ -9697,6 +9715,7 @@
     "HF2-B",
     "Lendhafen Seelöwen",
     "Reifnitz Trouts",
+    "SE Massivhaus Köttern",
     "SV Schüttdorf",
     "Spartans Althofen",
     "Tarco Wölfe",
@@ -13582,6 +13601,53 @@
     "Ultras Spittal",
     "VST Völkermarkt",
     "ViArPo"
+   ]
+  },
+  "22534": {
+   "league": "STEHV",
+   "division": "2026/27",
+   "season": "273847",
+   "first": "2026-10-11",
+   "last": "2027-02-07",
+   "games": 40,
+   "teams": [
+    "EV Zeltweg",
+    "Eishockeyclub Ice Park Rangers",
+    "Eishockeyclub LE Kings",
+    "Graz99 Juniors - Eishockeyclub",
+    "Ice Park Rangers Langenwang",
+    "KSV Eishockey Juniors",
+    "SPG ATSE Graz / Graz 99ers Juniors"
+   ]
+  },
+  "22580": {
+   "league": "STEHV",
+   "division": "STEHV U14",
+   "season": "273847",
+   "first": "2026-11-30",
+   "last": "2026-11-30",
+   "games": 20,
+   "teams": [
+    "EV Zeltweg",
+    "Eishockeyclub LE Kings",
+    "Ice Park Rangers Langenwang",
+    "KSV Eishockey Juniors",
+    "SPG ATSE Graz / Graz 99ers Juniors"
+   ]
+  },
+  "22579": {
+   "league": "STEHV",
+   "division": "STEHV U12",
+   "season": "273847",
+   "first": "2026-10-11",
+   "last": "2027-02-07",
+   "games": 20,
+   "teams": [
+    "EV Zeltweg",
+    "Eishockeyclub Ice Park Rangers",
+    "Eishockeyclub LE Kings",
+    "Graz99 Juniors - Eishockeyclub",
+    "KSV Eishockey Juniors"
    ]
   }
  }
