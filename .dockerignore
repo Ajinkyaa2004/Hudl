@@ -1,0 +1,9 @@
+.venv
+.git
+data/cache
+data/games.db*
+data/gamesheet_games.json
+data/*.xlsx
+data/knowledge.json
+tests
+**/__pycache__

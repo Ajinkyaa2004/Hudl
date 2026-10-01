@@ -204,6 +204,10 @@ textarea.f{min-height:120px}
 .drawer .shot img{object-fit:contain}
 .toast{position:fixed;bottom:22px;left:50%;transform:translate(-50%,20px);background:var(--tx);color:var(--bg);padding:8px 14px;border-radius:9px;font-size:13px;font-weight:500;opacity:0;transition:all .2s var(--ease);z-index:60;pointer-events:none}
 .toast.on{opacity:1;transform:translate(-50%,0)}
+.login{position:fixed;inset:0;z-index:80;display:none;align-items:center;justify-content:center;background:var(--bg);padding:16px}
+.login.on{display:flex}
+.lcard{width:min(360px,100%);background:var(--s1);border:1px solid var(--line);border-radius:16px;padding:28px 24px;box-shadow:var(--shade)}
+.lcard:before{content:"";display:block;height:3px;margin:-28px -24px 24px;border-radius:16px 16px 0 0;background:linear-gradient(90deg,var(--ac),var(--ac-hi))}
 kbd{font:11px var(--mono);border:1px solid var(--line2);border-bottom-width:2px;border-radius:4px;padding:0 5px;color:var(--mu)}
 </style>
 </head>
@@ -269,16 +273,28 @@ kbd{font:11px var(--mono);border:1px solid var(--line2);border-bottom-width:2px;
   <div class="db" id="dbody"></div>
 </aside>
 <div class="toast" id="toast"></div>
+<div class="login" id="login"><form class="lcard" id="lform">
+  <div class="logo" style="justify-content:center;margin-bottom:6px"><svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true"><ellipse cx="16" cy="20" rx="12" ry="5" fill="var(--ac)"/><rect x="4" y="15" width="24" height="5" fill="var(--ac)"/><ellipse cx="16" cy="15" rx="12" ry="5" fill="var(--ac-hi)"/></svg><span style="font-size:20px">Puck<b>Trace</b></span></div>
+  <div class="mu small" style="text-align:center;margin-bottom:16px">Match reports and rosters for RTT</div>
+  <input class="f" id="lpw" type="password" placeholder="Team password" autocomplete="current-password">
+  <button class="btn" type="submit" style="width:100%;height:40px;margin-top:10px">Sign in</button>
+  <div class="msg err" id="lmsg" style="margin-top:8px;text-align:center"></div>
+</form></div>
 
 <script>
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const api=async(p,o={})=>{const r=await fetch('/api'+p,{headers:{'content-type':'application/json'},...o});if(!r.ok){let m=r.statusText;try{m=(await r.json()).detail||m}catch(e){}throw new Error(m)}return r.json()};
+const api=async(p,o={})=>{const r=await fetch('/api'+p,{headers:{'content-type':'application/json'},credentials:'same-origin',...o});if(r.status===401&&p!=='/login'){showLogin();throw new Error('Sign in required')}if(!r.ok){let m=r.statusText;try{m=(await r.json()).detail||m}catch(e){}throw new Error(m)}return r.json()};
 const post=(p,b,o)=>api(p,{method:'POST',body:JSON.stringify(b),...o});
 const host=u=>{try{return new URL(u).hostname.replace(/^www\./,'')}catch(e){return ''}};
 const shotUrl=u=>'/api/shot?url='+encodeURIComponent(u);
 function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('on');clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove('on'),1600)}
 async function copy(t){try{await navigator.clipboard.writeText(t);toast('Link copied')}catch(e){toast('Copy failed')}}
+
+/* ---------- sign in (only when the server has a password) ---------- */
+function showLogin(){$('#login').classList.add('on');setTimeout(()=>$('#lpw').focus(),50)}
+$('#lform').onsubmit=async e=>{e.preventDefault();$('#lmsg').textContent='';try{await post('/login',{password:$('#lpw').value});$('#login').classList.remove('on');$('#lpw').value='';stats()}catch(err){$('#lmsg').textContent=err.message||'Wrong password'}};
+api('/session').then(s=>{if(s.required&&!s.ok)showLogin()}).catch(()=>{});
 
 /* ---------- theme ---------- */
 $('#theme').onclick=()=>{const d=document.documentElement,t=d.dataset.theme==='dark'?'light':'dark';d.dataset.theme=t;try{localStorage.setItem('pt-theme',t)}catch(e){}};

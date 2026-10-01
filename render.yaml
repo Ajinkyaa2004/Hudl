@@ -1,0 +1,16 @@
+# Render Blueprint for the PuckTrace backend (Dashboard > New > Blueprint > this repo).
+services:
+  - type: web
+    name: pucktrace-api
+    runtime: docker
+    plan: starter            # a persistent disk needs a paid instance
+    healthCheckPath: /api/healthz
+    envVars:
+      - key: APP_PASSWORD    # the team password asked on the sign-in screen
+        sync: false
+      - key: APP_SECRET      # any long random string; signs the sign-in cookie
+        generateValue: true
+    disk:
+      name: pucktrace-data
+      mountPath: /app/data
+      sizeGB: 5

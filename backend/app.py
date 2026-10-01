@@ -15,6 +15,85 @@ FRONT = ROOT / "frontend"
 app = FastAPI(title="PuckTrace")
 KB = lookup.load_kb()
 
+# ---------------------------------------------------------------- access
+# Set APP_PASSWORD on a deployed server: every /api call then needs the session cookie that
+# /api/login gives for the right password. Locally (no APP_PASSWORD) everything is open.
+import hashlib as _hl, hmac as _hm, os as _os
+from fastapi import Request
+from fastapi.responses import JSONResponse
+
+PASSWORD = _os.environ.get("APP_PASSWORD") or ""
+_SECRET = (_os.environ.get("APP_SECRET") or PASSWORD or "local").encode()
+OPEN = {"/api/login", "/api/session", "/api/healthz"}
+
+
+def _token() -> str:
+    return _hm.new(_SECRET, b"pucktrace-session:" + PASSWORD.encode(), _hl.sha256).hexdigest()
+
+
+def _signed_in(request: Request) -> bool:
+    return not PASSWORD or _hm.compare_digest(request.cookies.get("pt_session", ""), _token())
+
+
+@app.middleware("http")
+async def _guard(request: Request, call_next):
+    if PASSWORD and request.url.path.startswith("/api/") and request.url.path not in OPEN and not _signed_in(request):
+        return JSONResponse({"detail": "Sign in required"}, status_code=401)
+    return await call_next(request)
+
+
+class LoginIn(BaseModel):
+    password: str
+
+
+@app.post("/api/login")
+def login(inp: LoginIn, request: Request):
+    if not PASSWORD:
+        return dict(ok=True)
+    if not _hm.compare_digest(inp.password.encode(), PASSWORD.encode()):
+        raise HTTPException(401, "Wrong password")
+    r = JSONResponse(dict(ok=True))
+    secure = request.headers.get("x-forwarded-proto", request.url.scheme) == "https"
+    r.set_cookie("pt_session", _token(), max_age=30 * 86400, httponly=True, samesite="lax", secure=secure)
+    return r
+
+
+@app.post("/api/logout")
+def logout():
+    r = JSONResponse(dict(ok=True))
+    r.delete_cookie("pt_session")
+    return r
+
+
+@app.get("/api/session")
+def session(request: Request):
+    return dict(required=bool(PASSWORD), ok=_signed_in(request))
+
+
+@app.post("/api/admin/upload")
+async def admin_upload(name: str, request: Request):
+    """Put a local data file on a deployed server (signed in): the knowledge base built from
+    Club Data and learned spellings are not in the public repo."""
+    global KB
+    allowed = {"knowledge.json", "aliases_learned.json"}
+    if name not in allowed:
+        raise HTTPException(400, f"Allowed: {sorted(allowed)}")
+    body = await request.body()
+    import json as _j
+    try:
+        _j.loads(body)
+    except Exception:
+        raise HTTPException(400, "Not valid JSON")
+    (ROOT / "data" / name).write_bytes(body)
+    if name == "knowledge.json":
+        KB = lookup.load_kb()
+    return dict(ok=True, bytes=len(body))
+
+
+@app.get("/api/healthz")
+def healthz():
+    return dict(ok=True)
+
 
 async def _daily_harvest():
     """Refresh the game index from the bulk sources once a day while the server runs."""
