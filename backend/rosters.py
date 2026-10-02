@@ -176,11 +176,48 @@ async def check_team(team: dict | None, header_team: str, date: str) -> list[dic
     return out
 
 
-async def team_rosters(team: dict | None, header_team: str, parsed: dict, game: dict | None = None) -> list[dict]:
+def effective_team(parsed: dict, key: str, game: dict | None = None) -> tuple[str, str | None]:
+    """The team name rosters are searched and age-checked with, and a note when it differs from
+    the header. HokReg headers sometimes carry the wrong age for one team ("Seacoast 16U AAA" in a
+    "USA Hockey 13U" game). The age is taken from the found game when there is one (its team or
+    division name), else from the competition hint when only this team's header age disagrees
+    with it and the other team agrees."""
+    from .adapters.base import _same_age, team_similarity
+    from .lookup import AGE_RE
+    name, other = parsed[key], parsed["t2" if key == "t1" else "t1"]
+    ha = tokens(name)[1]
+    if not ha:
+        return name, None
+    same = lambda a, b: bool(a & b) or _same_age(a, b)
+    target, src = None, None
+    if game and (game.get("home") or game.get("away")):
+        bare = lambda n: AGE_RE.sub(" ", n or "")
+        sides = [n for n in (game.get("home"), game.get("away")) if n]
+        side = max(sides, key=lambda n: team_similarity(bare(name), bare(n))[0])
+        ga = tokens(side)[1] or tokens(game.get("league") or "")[1]
+        if ga and not same(ha, ga):
+            target, src = ga, "the game"
+    if target is None and not game:
+        ca = tokens(parsed.get("comp") or "")[1]
+        oa = tokens(other)[1]
+        if ca and not same(ha, ca) and oa and same(oa, ca):
+            target, src = ca, "the competition"
+    if not target:
+        return name, None
+    fmt = lambda a: "/".join(f"born {x}" if len(x) == 4 else x + "U" for x in sorted(a))
+    t = sorted(target)[0]
+    fixed = re.sub(r"\s+", " ", AGE_RE.sub(" ", name) + " " + (t if len(t) == 4 else t + "U")).strip()
+    is_ = f"is for players born {t}" if len(t) == 4 else f"is {t}U"
+    return fixed, f"Header says {fmt(ha)}, but {src} {is_}, so rosters are checked for {fmt(target)}."
+
+
+async def team_rosters(team: dict | None, header_team: str, parsed: dict, game: dict | None = None, key: str | None = None) -> list[dict]:
     """Current rosters from the data sources (EliteProspects data server, GameSheet, HockeyTech,
     TimeToScore, ...), then the Club Data pages; shaped for the app's roster box."""
     from .roster_sources import find_rosters
     from .lookup import load_kb
+    if key:
+        header_team, _ = effective_team(parsed, key, game)
     rs = await find_rosters(header_team, parsed["date"], dict(team=team or {}, comp=parsed["comp"], kb=load_kb(), game=game or {}))
     out = []
     for r in rs:
@@ -194,10 +231,11 @@ async def team_rosters(team: dict | None, header_team: str, parsed: dict, game: 
 
 async def check_rosters(parsed: dict, teams: dict, budget: float = 30, games: dict | None = None) -> dict:
     games = games or {}
-    t1 = asyncio.create_task(team_rosters(teams["t1n"]["best"], parsed["t1"], parsed, games.get("t1")))
-    t2 = asyncio.create_task(team_rosters(teams["t2n"]["best"], parsed["t2"], parsed, games.get("t2")))
+    t1 = asyncio.create_task(team_rosters(teams["t1n"]["best"], parsed["t1"], parsed, games.get("t1"), key="t1"))
+    t2 = asyncio.create_task(team_rosters(teams["t2n"]["best"], parsed["t2"], parsed, games.get("t2"), key="t2"))
     done, pending = await asyncio.wait([t1, t2], timeout=budget)
     for t in pending:
         t.cancel()
     get = lambda t: t.result() if t in done and not t.cancelled() and t.exception() is None else []
-    return dict(t1=get(t1), t2=get(t2))
+    notes = {k: effective_team(parsed, k, games.get(k))[1] for k in ("t1", "t2")}
+    return dict(t1=get(t1), t2=get(t2), notes={k: v for k, v in notes.items() if v})

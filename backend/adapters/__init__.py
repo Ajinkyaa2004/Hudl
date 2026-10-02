@@ -211,6 +211,23 @@ def decide(parsed: dict, cands: list) -> dict:
             unique.append(c)
     cands = unique
     strong_ones = [c for c in cands if strong(c) and c.get("kind", "protocol") == "protocol"]   # a results page is never a Found
+    # one game listed by two sources (hockeydata via two league sites, onlajny and hockeydata):
+    # the same hockeydata game id, or both teams strong and the same start time to 5 minutes
+    if len(strong_ones) > 1:
+        import datetime as _dt
+        ids = {(re.search(r"gameId=([0-9a-f-]{36})", c["url"]) or [None, None])[1] for c in strong_ones}
+        starts = [c.get("start_utc") for c in strong_ones]
+        same_id = None not in ids and len(ids) == 1
+        same_time = False
+        if all(starts):
+            try:
+                ts = [_dt.datetime.fromisoformat(x) for x in starts]
+                same_time = (max(ts) - min(ts)).total_seconds() <= 300
+            except Exception:
+                pass
+        if same_id or same_time:
+            # keep the league's own page (a live source) over the bulk copy in the game list
+            strong_ones = sorted(strong_ones, key=lambda c: (c.get("via") == "index", -c["confidence"]))[:1]
     # a game of these teams far from the header's time loses to another game of one of the
     # teams that starts right at the header's time (the pair's other game of a weekend)
     from .base import TIME_MATCH

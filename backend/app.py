@@ -176,14 +176,20 @@ async def search(inp: SearchIn, auto: bool = True, rosters: bool = True):
     return r
 
 
+class RostersIn(BaseModel):
+    header: str
+    game: Optional[dict] = None     # the report found for this header: rosters are then read from that game
+
+
 @app.post("/api/rosters")
-async def rosters(inp: SearchIn):
+async def rosters(inp: RostersIn):
     """Roster check for both teams, loaded separately so the report shows first."""
     from .rosters import check_rosters
     r = lookup.search(inp.header, KB)
     if not r["ok"]:
         raise HTTPException(400, r["error"])
-    return await check_rosters(r["parsed"], r["teams"])
+    g = {k: inp.game.get(k) for k in ("url", "league", "home", "away", "date") if inp.game.get(k)} if inp.game else None
+    return await check_rosters(r["parsed"], r["teams"], games=dict(t1=g, t2=g) if g else None)
 
 
 @app.post("/api/save")

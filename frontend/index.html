@@ -621,7 +621,10 @@ async function find(){
     const found=(r.auto&&r.auto.verdict==='found')||r.outcome==='found';
     const st=found?'found':r.auto&&r.auto.verdict==='check'?'check':'none';
     r._rosLoading=true;render(r,h);clearInterval(TIMER);$('#go').disabled=false;
-    r.roster_check=await rosP;if(run!==RUN)return;r._rosLoading=false;
+    // with a report found, read both rosters from that game: the header's team names can carry a wrong age
+    const g=found&&r.auto&&r.auto.best;
+    r.roster_check=g?await post('/rosters',{header:h,game:{url:g.url,league:g.league,home:g.home,away:g.away,date:g.date}}).catch(()=>rosP):await rosP;
+    if(run!==RUN)return;r._rosLoading=false;
     const old=$('#ros-sec');if(old){const t=document.createElement('div');t.innerHTML=rosterSection(r,st);const n=t.firstElementChild;n.style.animation='fade .25s';if(old.classList.contains('open'))n.classList.add('open');old.replaceWith(n);wireShots(n)}
     const pk=l=>((l||[]).find(x=>x.status==='verified'||x.status==='probable')||{}).url||'';
     if($('#sv_1')&&!$('#sv_1').value)$('#sv_1').value=pk(r.roster_check.t1);if($('#sv_2')&&!$('#sv_2').value)$('#sv_2').value=pk(r.roster_check.t2);
@@ -647,7 +650,8 @@ function renderLoading(r){
 const RC={'wrong age group':['vi','Wrong age group'],'few players':['wa','Few players'],'old season':['mu','Old season'],verified:['ok','This season'],probable:['wa','Probably current'],check:['wa','Check it'],blocked:['vi','Open in Chrome'],unreachable:['mu','Did not load'],'not a roster':['mu','Not a roster'],'no roster':['mu','No roster posted'],'not found':['mu','Page gone']};
 function confBar(c){const v=Math.round(c*100),col=v>=85?'var(--ok)':v>=60?'var(--wa)':'var(--no)';return `<div class="conf"><span class="mono" style="min-width:38px">${v}%</span><span class="bar"><i style="width:${v}%;background:${col}"></i></span></div>`}
 function reportFacts(c){
-  return `${c.via==='index'?`<div><span class="badge ok">${ic('bolt','xs')}Remembered</span> <span class="mu small">seen before, no site search needed</span></div>`:''}<div class="teams">${esc(c.home)}<span class="vs">vs</span>${esc(c.away)}</div>
+  const ageNote=(c.reasons||[]).map(x=>(x.match(/header says ([^,;)]+), competition and game say ([^;)]+)/)||[])).find(m=>m.length);
+  return `${ageNote?`<div class="note" style="background:var(--wa-bg);color:var(--wa)">${ic('alert')}<span><b style="color:inherit">Header age looks wrong.</b> It says ${esc(ageNote[1])}, but the competition and this game are ${esc(ageNote[2])}. The start time matches, so check the teams on the video.</span></div>`:''}${c.via==='index'?`<div><span class="badge ok">${ic('bolt','xs')}Remembered</span> <span class="mu small">seen before, no site search needed</span></div>`:''}<div class="teams">${esc(c.home)}<span class="vs">vs</span>${esc(c.away)}</div>
    <dl class="kv"><dt>Date</dt><dd class="mono">${esc(c.date||'')}</dd>${c.score?`<dt>Score</dt><dd class="mono">${esc(c.score)}</dd>`:''}${c.league?`<dt>League</dt><dd>${esc(c.league)}</dd>`:''}<dt>Site</dt><dd>${esc(c.site)}</dd>
    <dt>Match</dt><dd>${confBar(c.confidence)}</dd></dl>`}
 function whyHtml(c){return (c.reasons||[]).length?`<details class="why"><summary>${ic('help','xs')}Why this game</summary><ul>${c.reasons.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></details>`:''}
@@ -674,7 +678,8 @@ function rosterSection(r,state){
       const own=rosterLinks.filter(l=>l.label.startsWith(key));
       body=own.length?`<div class="rows">${own.map(l=>rowHtml({title:l.label.replace(/^Team \d (roster|EliteProspects): /,''),icon:'users',url:l.url})).join('')}</div>`:`<div class="note">${ic('help')}<span>No roster link on file. Add one under <b>Sources</b> when you find it.</span></div>`;
     }
-    return `<div class="team"><h4><span class="av">${initials(name)}</span><span>${esc(name)}</span></h4>${body}</div>`};
+    const note=rc&&rc.notes&&rc.notes[key==='Team 1'?'t1':'t2'];
+    return `<div class="team"><h4><span class="av">${initials(name)}</span><span>${esc(name)}</span></h4>${note?`<div class="note" style="background:var(--wa-bg);color:var(--wa);margin-bottom:10px">${ic('alert')}<span>${esc(note)}</span></div>`:''}${body}</div>`};
   let ros;
   if(rc){ros=`<div class="ros">${teamCol(p.t1,rc.t1,'Team 1')}${teamCol(p.t2,rc.t2,'Team 2')}</div>`}
   else ros=(state==='found'?`<div class="note" style="margin-bottom:14px">${ic('help')}<span>The report was found, so the rosters are usually inside it. Team roster links on file:</span></div>`:'')+`<div class="ros">${teamCol(p.t1,null,'Team 1')}${teamCol(p.t2,null,'Team 2')}</div>`;

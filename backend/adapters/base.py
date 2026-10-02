@@ -215,7 +215,7 @@ def ___team_similarity(header_name: str, site_name: str, context: str = "") -> t
     if ha and sa and ha != sa and not _same_age(ha, sa):
         return base * 0.3, f"age group differs: header {sorted(ha)} vs site {sorted(sa)}"
     if ha and not sa:
-        if ha & ca:
+        if ha & ca or (ca and _same_age(ha, ca)):
             reason = "age group confirmed by league name"
         elif ca:
             return base * 0.3, f"league is for age group {sorted(ca)}, header {sorted(ha)}"
@@ -237,18 +237,43 @@ def ___team_similarity(header_name: str, site_name: str, context: str = "") -> t
     return base, reason
 
 
+def _hdr_team(parsed: dict, key: str, site_name: str, ctx: str) -> tuple:
+    """(score, reason, overridden). HokReg headers sometimes carry the wrong age for one team
+    ("Seacoast 16U AAA" in a "USA Hockey 13U" game). When the header age conflicts with the
+    site but the competition hint's age agrees with the site, score the team with the
+    competition's age instead and flag it; score_candidate caps such a team below strong
+    unless the start time confirms the game."""
+    name = parsed[key]
+    sc, r = team_similarity(name, site_name, ctx)
+    if not r.startswith(("age group differs", "league is for age group")):
+        return sc, r, False
+    # the reference age: the competition hint's, else (friendlies) the other header team's
+    comp_ages = tokens(parsed.get("comp", ""))[1] or tokens(parsed["t2" if key == "t1" else "t1"])[1]
+    site_ages = tokens(site_name)[1] or tokens(ctx)[1]
+    if not comp_ages or not site_ages or not (comp_ages & site_ages or _same_age(comp_ages, site_ages)):
+        return sc, r, False
+    head_ages = tokens(name)[1]
+    if head_ages & comp_ages or _same_age(head_ages, comp_ages):
+        return sc, r, False                       # the header agrees with its reference: a real conflict
+    import re as _re
+    from ..lookup import AGE_RE
+    fixed = AGE_RE.sub(" ", name) + " " + next(iter(sorted(comp_ages))) + ("" if len(next(iter(sorted(comp_ages)))) == 4 else "U")
+    s2, r2 = team_similarity(_re.sub(r"\s+", " ", fixed).strip(), site_name, ctx)
+    if s2 <= sc:
+        return sc, r, False
+    u = lambda a: "/".join(x if len(x) == 4 else x + "U" for x in sorted(a))
+    return s2, f"{r2}; header says {u(head_ages)}, competition and game say {u(site_ages)}", True
+
+
 def score_candidate(cand: dict, parsed: dict, context: str = "") -> dict:
     """Attach confidence and reasons. cand needs home, away, date (ISO), url, source."""
     reasons = []
-    s1, r1 = team_similarity(parsed["t1"], cand["home"], context or cand.get("league", ""))
-    s2, r2 = team_similarity(parsed["t2"], cand["away"], context or cand.get("league", ""))
+    ctx = context or cand.get("league", "")
+    (s1, r1, o1), (s2, r2, o2) = _hdr_team(parsed, "t1", cand["home"], ctx), _hdr_team(parsed, "t2", cand["away"], ctx)
     swapped = False
-    x1, _ = team_similarity(parsed["t1"], cand["away"], context or cand.get("league", ""))
-    x2, _ = team_similarity(parsed["t2"], cand["home"], context or cand.get("league", ""))
+    (x1, q1, p1), (x2, q2, p2) = _hdr_team(parsed, "t1", cand["away"], ctx), _hdr_team(parsed, "t2", cand["home"], ctx)
     if x1 + x2 > s1 + s2:
-        s1, s2, swapped = x1, x2, True
-        _, r1 = team_similarity(parsed["t1"], cand["away"], context or cand.get("league", ""))
-        _, r2 = team_similarity(parsed["t2"], cand["home"], context or cand.get("league", ""))
+        (s1, r1, o1), (s2, r2, o2), swapped = (x1, q1, p1), (x2, q2, p2), True
     reasons.append(f"team 1: {s1:.0%} ({r1})")
     reasons.append(f"team 2: {s2:.0%} ({r2})")
     if swapped:
@@ -272,6 +297,15 @@ def score_candidate(cand: dict, parsed: dict, context: str = "") -> dict:
     else:
         dscore, dr = 0.0, f"{d} days off"
     reasons.append(dr)
+    if o1 or o2:
+        # a header age that contradicts its own competition is trusted only for one team, when the
+        # other team matches by name and age, and the start time is the header's to 15 minutes
+        exact = abs(cand.get("time_diff_min", 999)) <= 15
+        other_ok = (not o1 and s1 >= 0.9 and r1.startswith("age group")) or (not o2 and s2 >= 0.9 and r2.startswith("age group"))
+        cap = 0.8 if (exact and other_ok and not (o1 and o2)) else 0.7
+        s1, s2 = (min(s1, cap) if o1 else s1), (min(s2, cap) if o2 else s2)
+        reasons.insert(2, "header age is probably wrong: the competition and the game agree on another age"
+                       + ("" if exact else "; start time not confirmed, so check it"))
     conf = min(s1, s2) * 0.75 + dscore * 0.25
     if dscore == 0:
         conf = min(conf, 0.3)

@@ -403,7 +403,9 @@ async def gs_roster(sid: str, tid: str, date: str) -> dict | None:
 async def gs_game_teams(sid: str, gid: str) -> list[tuple[str, str, str]]:
     """[(team name, sid, team id)] of both sides of a GameSheet game."""
     g = gs_index()["games"].get(str(gid))
-    if g:
+    tbd = lambda n: not n or re.search(r"\b(tbd|to be determined|winner of|loser of|seed|place)\b", n, re.I)
+    # bracket games are stored as "To Be Determined" until the teams are known: read those live
+    if g and g.get("home_id") and g.get("away_id") and not (tbd(g["home"]) or tbd(g["away"])):
         return [(g["home"], g["sid"], g["home_id"]), (g["away"], g["sid"], g["away_id"])]
     d = await gs_json(f"/api/unified-games/{sid}", ttl=1800)
     for x in (d or {}).get("data") or []:
@@ -434,7 +436,12 @@ async def from_gamesheet(team_name: str, date: str, team: dict, game: dict) -> l
     m = GS_GAME_LINK.search(game.get("url") or "")
     if m:
         sides = await gs_game_teams(m.group(1), m.group(2))
-        scored = sorted(((team_similarity(team_name, n, game.get("league") or "")[0], s, t) for n, s, t in sides), reverse=True)
+        # the game was already matched to the header, so pick its side by name; ages are left out
+        # because headers sometimes carry the wrong age for one team (16U in a 13U game)
+        from .lookup import AGE_RE
+        bare = lambda n: AGE_RE.sub(" ", n or "")
+        scored = sorted(((max(team_similarity(team_name, n, game.get("league") or "")[0],
+                              team_similarity(bare(team_name), bare(n))[0]), s, t) for n, s, t in sides if t), reverse=True)
         if scored and scored[0][0] >= 0.5:
             targets.append((max(scored[0][0], 0.9), scored[0][1], scored[0][2], "game"))
     cur_sids = set(gs_index()["seasons"])
