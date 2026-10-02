@@ -64,11 +64,34 @@ def _cached(key, ttl):
     return None
 
 
+import threading as _th
+_cache_lock = _th.Lock()
+
+
 def _store(key, val):
-    _cache[key] = (time.time(), val)
-    if len(_cache) > 500:
-        for k in sorted(_cache, key=lambda k: _cache[k][0])[:100]:
-            _cache.pop(k, None)
+    with _cache_lock:                     # the daily refresh writes from its own thread
+        _cache[key] = (time.time(), val)
+        if len(_cache) > 500:
+            for k in sorted(_cache, key=lambda k: _cache[k][0])[:100]:
+                _cache.pop(k, None)
+
+
+_clients: dict = {}
+
+
+def _client_for_loop(timeout: float) -> httpx.AsyncClient:
+    """One HTTP client per event loop: the web server's loop and the daily refresh's own
+    thread each keep theirs (connections can't move between loops)."""
+    global _client
+    loop = asyncio.get_running_loop()
+    entry = _clients.get(id(loop))
+    if entry is None or entry[0] is not loop:
+        for k in [k for k, (lp, _) in _clients.items() if lp.is_closed()]:
+            _clients.pop(k, None)
+        entry = _clients[id(loop)] = (loop, httpx.AsyncClient(headers={"User-Agent": UA, "Accept-Language": "en-US,en;q=0.8"},
+                                                              follow_redirects=True, timeout=timeout))
+    _client = entry[1]
+    return entry[1]
 
 
 async def get_text(url: str, ttl: int = 600, timeout: float = 15.0, headers: dict | None = None) -> str | None:
@@ -82,14 +105,9 @@ async def get_text(url: str, ttl: int = 600, timeout: float = 15.0, headers: dic
         if d is not None:
             _store(("http", url), d)
             return d
-    global _client_loop
-    if _client is not None and _client_loop is not asyncio.get_running_loop():
-        _client = None                      # connections belong to an earlier asyncio.run
-    if _client is None:
-        _client_loop = asyncio.get_running_loop()
-        _client = httpx.AsyncClient(headers={"User-Agent": UA, "Accept-Language": "en-US,en;q=0.8"}, follow_redirects=True, timeout=timeout)
+    client = _client_for_loop(timeout)
     try:
-        r = await _client.get(url, headers=headers or {})
+        r = await client.get(url, headers=headers or {})
         if r.status_code != 200:
             return None
         _store(("http", url), r.text)

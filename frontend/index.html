@@ -350,6 +350,10 @@ kbd{font:11px var(--mono);border:1px solid var(--line2);border-bottom-width:2px;
 .toast.on{opacity:1;transform:translate(-50%,0)}
 @media (max-width:719px){.toast{bottom:calc(var(--tabbar) + var(--safe-b) + 14px)}}
 
+/* server waking up */
+.wake{position:fixed;top:12px;left:50%;transform:translate(-50%,-140%);display:flex;align-items:center;gap:10px;max-width:calc(100% - 32px);background:var(--s1);border:1px solid var(--line2);box-shadow:var(--sh3);padding:10px 16px;border-radius:12px;font-size:13px;color:var(--tx);z-index:95;transition:transform .25s var(--ease)}
+.wake.on{transform:translate(-50%,0)}
+
 /* sign in */
 .login{position:fixed;inset:0;z-index:100;display:none;align-items:center;justify-content:center;background:var(--bg);padding:16px}
 .login.on{display:flex}
@@ -490,6 +494,7 @@ kbd{font:11px var(--mono);border:1px solid var(--line2);border-bottom-width:2px;
   <div class="df"><button class="btn2" id="dcopy2"><svg class="ic sm"><use href="#i-copy"/></svg>Copy link</button><a class="btn2 pri" id="dopen2" target="_blank" rel="noopener"><svg class="ic sm"><use href="#i-ext"/></svg>Open site</a></div>
 </aside>
 <div class="toast" id="toast"></div>
+<div class="wake" id="wake"><span class="spin"></span><span>Waking up the server… the first search after a break can take up to a minute.</span></div>
 <div class="login" id="login"><form class="lcard" id="lform">
   <div class="brand" style="justify-content:center;padding:0 0 6px;font-size:22px"><svg width="34" height="34"><use href="#i-puck"/></svg><span>Puck<b>Trace</b></span></div>
   <div class="mu small" style="text-align:center;margin-bottom:20px">Match reports and rosters for RTT</div>
@@ -502,7 +507,42 @@ kbd{font:11px var(--mono);border:1px solid var(--line2);border-bottom-width:2px;
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const ic=(n,c='sm')=>`<svg class="ic ${c}"><use href="#i-${n}"/></svg>`;
-const api=async(p,o={})=>{const r=await fetch('/api'+p,{headers:{'content-type':'application/json'},credentials:'same-origin',...o});if(r.status===401&&p!=='/login'){showLogin();throw new Error('Sign in required')}if(!r.ok){let m=r.statusText;try{m=(await r.json()).detail||m}catch(e){}throw new Error(m)}return r.json()};
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+/* the server sleeps on the free plan and can be briefly unreachable while it wakes or restarts:
+   502/503/504 and network errors are retried with a "waking up" banner instead of failing */
+function wake(on){$('#wake').classList.toggle('on',!!on)}
+async function api(p,o={},tries=5){
+  for(let i=0;;i++){
+    let r;
+    try{r=await fetch('/api'+p,{headers:{'content-type':'application/json'},credentials:'same-origin',cache:'no-store',...o})}
+    catch(e){if(i<tries-1){wake(1);await sleep(Math.min(2000*2**i,10000));continue}wake(0);throw new Error("Can't reach the server. Check the internet connection and try again.")}
+    if([502,503,504].includes(r.status)&&i<tries-1){wake(1);await sleep(Math.min(2000*2**i,10000));continue}
+    wake(0);
+    if(r.status===401&&p!=='/login'){showLogin();throw new Error('Sign in required')}
+    if(!r.ok){let m=r.statusText;try{m=(await r.json()).detail||m}catch(e){}const err=new Error(m||('Server error '+r.status));err.status=r.status;throw err}
+    return r.json();
+  }
+}
+/* long work runs as a server job: start it, then ask for the result every second. A lost job
+   (the server restarted) is started again, so the page never waits on one long request */
+async function job(path,body){
+  for(let attempt=0;attempt<3;attempt++){
+    const {job:id}=await post(path,body);
+    const t0=Date.now();let fails=0,lost=false;
+    while(true){
+      await sleep(Date.now()-t0<4000?500:1000);
+      let j;
+      try{j=await api('/job/'+id,{},1)}
+      catch(e){if(e.status===404){lost=true;break}if(++fails>30)throw e;wake(1);await sleep(1500);continue}
+      fails=0;wake(0);
+      if(j.status==='done')return j.result;
+      if(j.status==='error'){const err=new Error(j.error);err.status=j.code;throw err}
+      if(Date.now()-t0>300000)throw new Error('The search is taking too long. Press Find to try again.');
+    }
+    if(!lost)break;
+  }
+  throw new Error('The server restarted during the search. Press Find to try again.');
+}
 const post=(p,b,o)=>api(p,{method:'POST',body:JSON.stringify(b),...o});
 const host=u=>{try{return new URL(u).hostname.replace(/^www\./,'')}catch(e){return ''}};
 const shotUrl=u=>'/api/shot?url='+encodeURIComponent(u);
@@ -511,8 +551,10 @@ async function copy(t){try{await navigator.clipboard.writeText(t);toast('Link co
 
 /* ---------- sign in (only when the server has a password) ---------- */
 function showLogin(){$('#login').classList.add('on');setTimeout(()=>$('#lpw').focus(),50)}
-$('#lform').onsubmit=async e=>{e.preventDefault();$('#lmsg').textContent='';try{await post('/login',{password:$('#lpw').value});$('#login').classList.remove('on');$('#lpw').value='';stats()}catch(err){$('#lmsg').textContent=err.message||'Wrong password'}};
-api('/session').then(s=>{if(s.required&&!s.ok)showLogin()}).catch(()=>{});
+$('#lform').onsubmit=async e=>{e.preventDefault();$('#lmsg').textContent='';try{await post('/login',{password:$('#lpw').value});$('#login').classList.remove('on');$('#lpw').value='';stats();if(q.value.trim()&&!CUR)find()}catch(err){$('#lmsg').textContent=err.message||'Wrong password'}};
+const Q0=new URLSearchParams(location.search).get('q');
+const _wt=setTimeout(()=>wake(1),2500);   // a sleeping server answers the first call slowly: say so
+api('/session').then(s=>{clearTimeout(_wt);wake(0);if(s.required&&!s.ok)showLogin();else if(Q0){q.value=Q0;chips(Q0);find()}}).catch(()=>{clearTimeout(_wt);wake(0)});
 
 /* ---------- theme ---------- */
 function themeLabel(){$$('.tlabel').forEach(l=>l.textContent=document.documentElement.dataset.theme==='dark'?'Dark':'Light')}
@@ -605,25 +647,27 @@ function chips(t){const m=t.match(HRE),c=$('#chips');
   c.innerHTML=`<span class="chip"><i>Home</i><span>${tok(m[2])}</span></span><span class="chip"><i>Away</i><span>${tok(m[3])}</span></span><span class="chip"><span>${esc(m[4])}</span></span><span class="chip mono"><span>${m[5]}</span></span>${m[1]?`<span class="chip mono"><span>#${m[1]}</span></span>`:''}`}
 $('#sform').addEventListener('submit',e=>{e.preventDefault();q.blur();find()});
 
-const errHtml=m=>`<div class="errbox">${ic('alert','')}<div><b>Something went wrong</b><div class="small">${esc(m)}</div></div></div>`;
+const errHtml=m=>`<div class="errbox">${ic('alert','')}<div style="flex:1"><b>Something went wrong</b><div class="small">${esc(m)}</div></div><button class="btn2" onclick="find()">${ic('refresh')}Try again</button></div>`;
 let CUR=null,RUN=0,TIMER=null;
 async function find(){
   const h=q.value.trim();if(!h)return;const run=++RUN;closePreview();
+  try{const u=new URL(location.href);u.searchParams.set('q',h);history.replaceState(null,'',u)}catch(e){}
   $('#go').disabled=true;
   let quick=null;
-  try{quick=await post('/search?auto=false',{header:h})}catch(e){$('#out').innerHTML=errHtml(e.message);$('#go').disabled=false;return}
+  try{quick=await post('/search?auto=false',{header:h})}catch(e){if(run===RUN){$('#out').innerHTML=errHtml(e.message);$('#go').disabled=false}return}
+  if(run!==RUN)return;
   renderLoading(quick);
   const t0=Date.now();clearInterval(TIMER);
   TIMER=setInterval(()=>{const s=(Date.now()-t0)/1000;const p=$('#prog');if(p)p.style.width=Math.min(94,100*(1-Math.exp(-s/14)))+'%';const e=$('#elapsed');if(e)e.textContent=Math.round(s)+'s'},250);
   // rosters are checked at the same time as the report search, shown when the report is missing
-  const rosP=post('/rosters',{header:h}).catch(()=>({t1:[],t2:[]}));
-  try{const r=await post('/search?rosters=false',{header:h});if(run!==RUN)return;CUR=r;
+  const rosP=job('/rosters/start',{header:h}).catch(()=>({t1:[],t2:[]}));
+  try{const r=await job('/search/start',{header:h});if(run!==RUN)return;CUR=r;
     const found=(r.auto&&r.auto.verdict==='found')||r.outcome==='found';
     const st=found?'found':r.auto&&r.auto.verdict==='check'?'check':'none';
     r._rosLoading=true;render(r,h);clearInterval(TIMER);$('#go').disabled=false;
     // with a report found, read both rosters from that game: the header's team names can carry a wrong age
     const g=found&&r.auto&&r.auto.best;
-    r.roster_check=g?await post('/rosters',{header:h,game:{url:g.url,league:g.league,home:g.home,away:g.away,date:g.date}}).catch(()=>rosP):await rosP;
+    r.roster_check=g?await job('/rosters/start',{header:h,game:{url:g.url,league:g.league,home:g.home,away:g.away,date:g.date}}).catch(()=>rosP):await rosP;
     if(run!==RUN)return;r._rosLoading=false;
     const old=$('#ros-sec');if(old){const t=document.createElement('div');t.innerHTML=rosterSection(r,st);const n=t.firstElementChild;n.style.animation='fade .25s';if(old.classList.contains('open'))n.classList.add('open');old.replaceWith(n);wireShots(n)}
     const pk=l=>((l||[]).find(x=>x.status==='verified'||x.status==='probable')||{}).url||'';
@@ -719,7 +763,7 @@ function render(r,header){
         <div class="acts"><button class="btn2 pick" data-url="${esc(c.url)}" data-k="${k}">${ic('check')}This one</button><a class="btn2" href="${esc(c.url)}" target="_blank" rel="noopener">${ic('ext')}Open</a></div></div></div>`}).join('')}</div>`;
   }else{
     const srcs=auto.adapters.filter(a=>a.name!=='index'),ok=srcs.filter(a=>a.ok).map(a=>a.site),bad=srcs.filter(a=>!a.ok);
-    rep=`<div class="note">${ic('alert')}<div><b>No report found automatically.</b><div style="margin-top:3px">${srcs.length?`Checked memory and ${srcs.length} site${srcs.length>1?'s':''} in ${auto.seconds}s: ${esc(ok.join(', '))}${bad.length?` · did not respond: ${esc(bad.map(a=>a.site).join(', '))}`:''}.`:'No automatic source covers these teams yet.'} Use the rosters below, or search by hand from the links further down.</div></div></div>`;
+    rep=`<div class="note">${ic('alert')}<div><b>No report found automatically.</b><div style="margin-top:3px">${srcs.length?`Checked memory and ${srcs.length} site${srcs.length>1?'s':''} in ${auto.seconds}s: ${esc(ok.join(', '))}${bad.length?` · did not respond: ${esc(bad.map(a=>a.site).join(', '))}`:''}.`:'No automatic source covers these teams yet.'} Use the rosters below, or search by hand from the links further down.</div>${bad.length?`<button class="btn2" style="margin-top:10px" onclick="find()">${ic('refresh')}Search again</button>`:''}</div></div>`;
   }
   const rcls=state==='found'?'ok':state==='check'?'wa':'no';
   h+=`<div class="sec">${secHead('doc',rcls,'Match report',state==='found'?'found':state==='check'?'pick one':'not found')}<div class="bd">${rep}</div></div>`;

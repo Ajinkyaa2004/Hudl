@@ -108,10 +108,10 @@ async def _daily_harvest():
                 # HARVEST_SOURCES picks the bulk sources (a small free server can't take them all);
                 # HEALTH_DAILY=0 skips the daily source check
                 names = [x.strip() for x in _os.environ.get("HARVEST_SOURCES", "").split(",") if x.strip()] or None
-                await harvest.run(names, log=lambda m: print("[harvest]", m, flush=True))
+                await harvest.run_in_thread(names, log=lambda m: print("[harvest]", m, flush=True), delay_s=180)
                 if _os.environ.get("HEALTH_DAILY", "1") != "0":
                     from . import health
-                    await health.run()
+                    await asyncio.to_thread(lambda: asyncio.run(health.run()))
         except Exception as e:
             print("[harvest] failed:", e, flush=True)
         await asyncio.sleep(3600)
@@ -159,7 +159,7 @@ class VpnIn(BaseModel):
 
 @app.get("/")
 def index():
-    return FileResponse(FRONT / "index.html")
+    return FileResponse(FRONT / "index.html", headers={"Cache-Control": "no-cache"})
 
 
 @app.get("/api/config")
@@ -190,6 +190,91 @@ async def rosters(inp: RostersIn):
         raise HTTPException(400, r["error"])
     g = {k: inp.game.get(k) for k in ("url", "league", "home", "away", "date") if inp.game.get(k)} if inp.game else None
     return await check_rosters(r["parsed"], r["teams"], games=dict(t1=g, t2=g) if g else None)
+
+
+# ---------------------------------------------------------------- background jobs
+# A search can outlast the hosting proxy (Vercel -> Render) on a slow or just-woken server: the
+# browser then saw an error while the server finished and remembered the answer, so the same
+# header worked in a new tab. Searches now run as jobs: /start returns at once and the page polls
+# /api/job/{id}. The same header asked twice shares one job.
+import asyncio as _aio, secrets as _secrets, time as _time
+_JOBS: dict = {}
+_JOB_KEYS: dict = {}
+_JOB_SEM = None          # at most 3 searches at once: the free server has 512 MB and little CPU
+
+
+def _job_start(key: str, factory) -> dict:
+    now = _time.time()
+    for jid in [j for j, v in _JOBS.items() if v["status"] != "running" and now - v["started"] > 600]:
+        _JOB_KEYS.pop(_JOBS[jid]["key"], None)
+        _JOBS.pop(jid, None)
+    jid = _JOB_KEYS.get(key)
+    if jid in _JOBS and (_JOBS[jid]["status"] == "running" or now - _JOBS[jid]["started"] < 20):
+        return dict(job=jid)
+    jid = _secrets.token_urlsafe(9)
+    _JOBS[jid] = dict(status="running", key=key, started=now)
+    _JOB_KEYS[key] = jid
+
+    async def run():
+        global _JOB_SEM
+        _JOB_SEM = _JOB_SEM or _aio.Semaphore(3)
+        j = _JOBS[jid]
+        try:
+            async with _JOB_SEM:
+                j["result"] = await factory()
+            j["status"] = "done"
+        except HTTPException as e:
+            j.update(status="error", error=str(e.detail), code=e.status_code)
+        except Exception as e:
+            j.update(status="error", error=f"{type(e).__name__}: {e}"[:300], code=500)
+        j["seconds"] = round(_time.time() - j["started"], 1)
+    _aio.create_task(run())
+    return dict(job=jid)
+
+
+async def _search_with_retry(header: str, rosters: bool) -> dict:
+    """Sources that time out on a slow server are usually ready a moment later (their pages are
+    cached by then), so a search with timed-out sources and no report runs once more."""
+    r = await lookup.search_full(header, KB, rosters=rosters)
+    if not r["ok"]:
+        raise HTTPException(400, r["error"])
+    a = r.get("auto") or {}
+    timed_out = [x for x in a.get("adapters", []) if not x.get("ok") and "timed out" in str(x.get("error") or "")]
+    if a.get("verdict") != "found" and timed_out:
+        r2 = await lookup.search_full(header, KB, rosters=rosters)
+        a2 = r2.get("auto") or {}
+        order = {"found": 2, "check": 1}
+        if r2.get("ok") and order.get(a2.get("verdict"), 0) >= order.get(a.get("verdict"), 0):
+            a2["retried"] = [x["site"] for x in timed_out]
+            r = r2
+    return r
+
+
+@app.post("/api/search/start")
+async def search_start(inp: SearchIn, rosters: bool = False):
+    if not lookup.parse_header(inp.header):
+        raise HTTPException(400, "Could not read this header. Use: Team 1 vs Team 2 | Competition | YYYY-MM-DD")
+    h = inp.header.strip()
+    return _job_start(f"search|{rosters}|{h}", lambda: _search_with_retry(h, rosters))
+
+
+@app.post("/api/rosters/start")
+async def rosters_start(inp: RostersIn):
+    h = inp.header.strip()
+    return _job_start(f"rosters|{(inp.game or {}).get('url', '')}|{h}", lambda: rosters(RostersIn(header=h, game=inp.game)))
+
+
+@app.get("/api/job/{jid}")
+async def job(jid: str):
+    j = _JOBS.get(jid)
+    if not j:
+        raise HTTPException(404, "Job not found (the server restarted)")
+    out = dict(status=j["status"], seconds=j.get("seconds", round(_time.time() - j["started"], 1)))
+    if j["status"] == "done":
+        out["result"] = j["result"]
+    elif j["status"] == "error":
+        out.update(error=j["error"], code=j.get("code", 500))
+    return out
 
 
 @app.post("/api/save")

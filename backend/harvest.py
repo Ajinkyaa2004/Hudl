@@ -328,6 +328,14 @@ async def run(names=None, log=print) -> dict:
     return out
 
 
+async def run_in_thread(names=None, log=print, delay_s: float = 0) -> dict:
+    """The refresh in its own thread and event loop, so its CPU-heavy parsing doesn't hold up
+    the web server's requests (a small server has a fraction of one CPU)."""
+    if delay_s:
+        await asyncio.sleep(delay_s)
+    return await asyncio.to_thread(lambda: asyncio.run(run(names, log)))
+
+
 if __name__ == "__main__":
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     if "--from-file" in sys.argv:
