@@ -44,7 +44,7 @@ UA_JSON = {"Accept": "application/json", "Referer": "https://gamesheetstats.com/
 MIN_MATCH = 0.85          # name match needed for a team found by name (not by id)
 TTL = 6 * 3600
 
-SOURCE_RANK = {"GameSheet": 0, "HockeyTech": 0, "TimeToScore": 0, "EliteProspects": 1}
+SOURCE_RANK = {"GameSheet": 0, "HockeyTech": 0, "TimeToScore": 0, "Roster link on file": 0, "Team site": 1, "EliteProspects": 1, "MyHockeyRankings": 1, "Web search": 2}
 
 
 # ---------------------------------------------------------------- season and age helpers
@@ -94,7 +94,7 @@ def finish(r: dict, team_name: str, date: str) -> dict:
     return r
 
 
-STATUS_ORDER = {"verified": 0, "probable": 1, "wrong age group": 2, "few players": 3, "check": 4, "old season": 5}
+STATUS_ORDER = {"verified": 0, "probable": 1, "check": 2, "blocked": 3, "wrong age group": 4, "few players": 5, "old season": 6}
 
 
 BY_ORDER = {"game": 0, "confirmed": 1, "id": 2, "name": 3}
@@ -879,9 +879,57 @@ async def from_observer(team_name: str, date: str, team: dict) -> list[dict]:
 
 # ---------------------------------------------------------------- fallback: Club Data pages (backend/rosters.py)
 
+# ---------------------------------------------------------------- team, club and league sites
+
+READ_DIRECT = re.compile(r"eliteprospects|myhockeyrankings|gamesheetstats|hockeytech|timetoscore|prnt\.sc|ibb\.co|facebook|instagram", re.I)
+
+
+def _root(u: str | None) -> str | None:
+    m = re.match(r"(https?://[^/]+)", u or "")
+    return m.group(1) + "/" if m else None
+
+
+async def from_team_site(team_name: str, date: str, team: dict, allow_search: bool = True) -> list[dict]:
+    """Rosters on the team's own pages: the roster link on file, then the club or league site on file
+    (walked for this age group's roster), then a web search when nothing is on file. Pages are read
+    by backend/roster_pages.py whatever their layout; the page must name the age group (and, for a
+    search result, the club) to count as this team's."""
+    from . import roster_pages as RP
+    cur = season_label(season_start(date))
+    found = []
+    direct = team.get("roster") if team.get("roster") and not READ_DIRECT.search(team.get("roster")) else None
+    blocked = []
+    if direct:
+        r = await RP.read(direct)
+        if r.get("blocked"):
+            blocked.append(dict(url=direct, source="Roster link on file", status="blocked", players=[], season=None, team=None, league="",
+                                match=1.0, by="id", note="This site blocks automatic reading. Open it in Chrome."))
+        if len(r["players"]) >= 8:
+            sc, why = RP.identity(team_name, f"{r.get('title', '')} | {r.get('heads', '')}", direct, date, own_site=True)
+            found.append(dict(r, url=direct, match=sc, why=why, by="id", label="Roster link on file"))
+    sites = [x for x in dict.fromkeys([team.get("site"), _root(team.get("schedule")), _root(direct)]) if x and not READ_DIRECT.search(x)]
+    for site in sites[:2]:
+        if any(f["match"] >= 0.9 for f in found):
+            break
+        for r in await RP.find_on_site(site, team_name, date):
+            found.append(dict(r, label="Team site"))
+    if allow_search and not found and not sites:
+        for r in await RP.find_by_search(team_name, date):
+            found.append(dict(r, label="Web search"))
+    out = []
+    for r in found:
+        n, season = len(r["players"]), r.get("season")
+        out.append(dict(url=r["url"], source=r["label"], season=season or cur, season_shown=bool(season), players=r["players"],
+                        team=r.get("title"), league="", match=r["match"], by=r["by"],
+                        note=f"{r['label']}: {r['why']}, {n} players, " + (f"season {season}" if season else "season not shown on the page")))
+    return out + blocked
+
+
 async def from_pages(team_name: str, date: str, team: dict) -> list[dict]:
+    """MyHockeyRankings (and GameSheet links on file) through the paced browser check; team sites go
+    through from_team_site."""
     from .rosters import candidates, check
-    cands = [(lab, u) for lab, u in candidates(team, date) if "eliteprospects" not in domain(u)]
+    cands = [(lab, u) for lab, u in candidates(team, date) if re.search(r"myhockeyrankings|gamesheetstats", domain(u))]
     res = await asyncio.gather(*[check(u, date, team_name) for _, u in cands], return_exceptions=True)
     out = []
     cur = season_label(season_start(date))
@@ -927,10 +975,26 @@ async def find_rosters(team_name: str, date: str, hints: dict | None = None) -> 
             out += [finish(x, team_name, date) for x in r if x.get("players")]   # an empty roster is no source
     cross_check(out)
     if hints.get("fallback", True) and not any(x["status"] == "verified" for x in out):
-        try:
-            out += await from_pages(team_name, date, team)
-        except Exception:
-            pass
+        jobs2 = [from_pages(team_name, date, team), from_team_site(team_name, date, team, allow_search=hints.get("search", True))]
+        tasks2 = [asyncio.ensure_future(j) for j in jobs2]
+        done2, pending2 = await asyncio.wait(tasks2, timeout=hints.get("page_budget", 45))
+        for t in pending2:
+            t.cancel()
+        res2 = [t.result() for t in tasks2 if t in done2 and not t.cancelled() and t.exception() is None]
+        for r in res2:
+            if isinstance(r, list):
+                for x in r:
+                    if not x.get("players") and x.get("status") != "blocked":
+                        continue
+                    if x.get("by") in ("site", "search", "id") and "status" not in x:
+                        x = finish(x, team_name, date)
+                        # a page that does not clearly name this team and age group, or shows no season, is weaker
+                        if x["status"] in ("verified", "probable") and x.get("match", 1) < 0.9:
+                            x["status"] = "check"
+                        elif x["status"] == "verified" and not x.get("season_shown", True):
+                            x["status"] = "probable"
+                    out.append(x)
+        cross_check(out)
     seen, uniq = set(), []
     for x in sorted(out, key=rank):
         if x["url"] not in seen:

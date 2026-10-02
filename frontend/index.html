@@ -714,6 +714,7 @@ function rosterSection(r,state){
       const meta=[b.players>=5?`${b.players} players`:'',b.season&&b.season!=='not stated'?`season ${b.season}`:'',b.age_fit&&b.age_fit!=='unknown'?b.age_fit:''].filter(Boolean).join(' · ');
       body+=`<div class="rows">${rowHtml({title:b.label,icon:'users',url:b.url,sub:meta,players:b.listed,badge:`<span class="badge ${bc}">${bl}</span>`},esc(host(b.url))+(meta?' · '+esc(meta):''))}</div>`;
       const bi=ITEMS.length-1;
+      if(b.note)body+=`<div class="mu2 small" style="margin:2px 0 4px">${esc(b.note)}</div>`;
       if(b.listed&&b.listed.length>=5)body+=playersHtml(b.listed);
       else if(!['blocked','unreachable','not found'].includes(b.status))body+=`<div class="frame" style="margin-top:10px" data-p="${bi}">${shotHtml(b.url)}</div>`;
       if(list.length>1)body+=`<div class="grp">Other links</div><div class="rows">${list.slice(1).map(x=>{const[c,l]=RC[x.status]||['mu',x.status];const m=[x.players>=5?`${x.players} players`:'',x.season&&x.season!=='not stated'?x.season:''].filter(Boolean).join(' · ');
