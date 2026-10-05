@@ -92,7 +92,9 @@ async def admin_upload(name: str, request: Request):
 
 @app.get("/api/healthz")
 def healthz():
-    return dict(ok=True)
+    # open (no sign-in): only whether the published game list is loaded, no names or headers
+    gl = globals().get("GAME_LIST") or {}
+    return dict(ok=True, game_list=gl.get("games", 0), game_list_at=gl.get("at"))
 
 
 GAME_LIST_URL = _os.environ.get("GAME_LIST_URL", "https://github.com/Ajinkyaa2004/Hudl/releases/download/game-list/game-list.db.gz")
