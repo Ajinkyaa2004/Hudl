@@ -31,6 +31,10 @@ async def harvest_gamesheet(log=print) -> dict:
     from . import gamesheet_api as ga
     kb = lookup.load_kb()
     known = list((kb.get("gamesheet_seasons") or {}).keys())
+    try:                                   # the public season list, for machines without the knowledge base
+        known = sorted(set(known) | {str(i) for i in json.loads((DATA / "gamesheet_season_ids.json").read_text())["ids"]}, key=int)
+    except Exception:
+        pass
     t = time.time()
     try:
         seasons = await ga.current_seasons(known)
@@ -54,6 +58,13 @@ async def harvest_gamesheet(log=print) -> dict:
             e = gsk.setdefault(str(s["sid"]), {})
             e.update(name=s.get("name") or e.get("name"), start=s.get("start"), end=s.get("end"), harvested=time.strftime("%Y-%m-%d"))
         lookup.save_kb(kb)
+        try:                               # keep the public season list current
+            f = DATA / "gamesheet_season_ids.json"
+            d = json.loads(f.read_text()) if f.exists() else {}
+            d["ids"] = sorted({int(i) for i in d.get("ids", [])} | {int(x["sid"]) for x in seasons})
+            f.write_text(json.dumps(d))
+        except Exception:
+            pass
     finally:
         await ga.close()
     log(f"GameSheet: {n} games indexed, {failed} seasons failed, {time.time() - t:.0f}s")
