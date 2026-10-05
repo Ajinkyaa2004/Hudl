@@ -28,3 +28,4 @@ tests/RESULTS_*.md
 data/knowledge.b64
 data/roster_truth.json
 tests/roster_truth_*.json
+data/game-list.db*

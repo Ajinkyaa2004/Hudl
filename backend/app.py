@@ -95,15 +95,68 @@ def healthz():
     return dict(ok=True)
 
 
+GAME_LIST_URL = _os.environ.get("GAME_LIST_URL", "https://github.com/Ajinkyaa2004/Hudl/releases/download/game-list/game-list.db.gz")
+GAME_LIST = dict(at=None, games=0, error=None)
+
+
+async def load_game_list() -> int:
+    """Download the published game list (built on GitHub every 3 hours) and merge it into the local
+    index. Only the games table is touched: what the server learned (results, sources) stays."""
+    import asyncio, gzip, httpx, time
+    from . import gameindex
+    async with httpx.AsyncClient(follow_redirects=True, timeout=180) as c:
+        r = await c.get(GAME_LIST_URL)
+    if r.status_code != 200:
+        raise RuntimeError(f"game list download: HTTP {r.status_code}")
+    path = ROOT / "data" / "game-list.db"
+
+    def merge() -> int:
+        path.write_bytes(gzip.decompress(r.content))
+        con = gameindex.conn()
+        with gameindex._lock:
+            con.execute("attach database ? as gl", (str(path),))
+            try:
+                # games found live on this server since the list was built are kept when newer
+                con.execute("""insert or replace into games select g.* from gl.games g left join games l on l.url = g.url
+                               where l.url is null or ifnull(l.updated, 0) <= ifnull(g.updated, 0)""")
+                con.commit()
+                n = con.execute("select count(*) from gl.games").fetchone()[0]
+            finally:
+                con.execute("detach database gl")
+        path.unlink(missing_ok=True)
+        return n
+    n = await asyncio.to_thread(merge)
+    GAME_LIST.update(at=time.strftime("%Y-%m-%dT%H:%M:%S"), games=n, error=None)
+    print(f"[game list] {n} games merged", flush=True)
+    return n
+
+
+async def _game_list_loop():
+    import asyncio
+    await asyncio.sleep(5)
+    while True:
+        try:
+            await load_game_list()
+        except Exception as e:
+            GAME_LIST["error"] = str(e)[:200]
+            print("[game list] failed:", e, flush=True)
+        await asyncio.sleep(3 * 3600 if not GAME_LIST["error"] else 900)
+
+
 async def _daily_harvest():
     """Refresh the game index from the bulk sources once a day while the server runs."""
     import asyncio, json, time
     from . import harvest
     status = ROOT / "data" / "harvest_status.json"
+    await asyncio.sleep(90)            # the published game list loads first; a harvest only runs without it
     while True:
         try:
             last = json.loads(status.read_text()).get("at") if status.exists() else None
             age = time.time() - time.mktime(time.strptime(last, "%Y-%m-%dT%H:%M:%S")) if last else 1e9
+            # with the published game list loaded, the small server needs no harvest of its own
+            if GAME_LIST["at"] and _os.environ.get("HARVEST_WITH_LIST", "0") != "1":
+                await asyncio.sleep(3600)
+                continue
             if age > 20 * 3600:
                 # HARVEST_SOURCES picks the bulk sources (a small free server can't take them all);
                 # HEALTH_DAILY=0 skips the daily source check
@@ -120,6 +173,8 @@ async def _daily_harvest():
 @app.on_event("startup")
 async def _start_harvest():
     import asyncio
+    if _os.environ.get("GAME_LIST", "1") != "0":
+        asyncio.create_task(_game_list_loop())
     asyncio.create_task(_daily_harvest())
 
 
@@ -332,7 +387,9 @@ def learning_stats():
         harvest = _j.loads((ROOT / "data" / "harvest_status.json").read_text())
     except Exception:
         harvest = None
-    return dict(index=gameindex.stats(), learning=learning.stats(), harvest=harvest)
+    if GAME_LIST["at"] and (not harvest or GAME_LIST["at"] > str(harvest.get("at") or "")):
+        harvest = dict(harvest or {}, at=GAME_LIST["at"], source="published game list", games=GAME_LIST["games"])
+    return dict(index=gameindex.stats(), learning=learning.stats(), harvest=harvest, game_list=GAME_LIST)
 
 
 @app.get("/api/history")

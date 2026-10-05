@@ -1,0 +1,64 @@
+# Builds the full game list (every 2026-27 game from GameSheet, TimeToScore, HockeyTech, DEB,
+# Poland, Denmark and Sweden) on GitHub's runner and publishes it as the release asset
+# game-list/game-list.db.gz. The Render server downloads it at startup and every few hours, so
+# most headers are answered from the list in under a second and the small server never harvests.
+# Only the public games table is published: no knowledge base, no saved or learned answers.
+name: Game list
+on:
+  schedule:
+    - cron: "23 */3 * * *"
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: game-list
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt tzdata
+      - name: Restore page cache and scan progress
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            data/cache
+            data/deb_scan.json
+            data/poland_scan.json
+            data/swehockey_scan.json
+          key: game-list-${{ github.run_id }}
+          restore-keys: game-list-
+      - name: Start from the last published list
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp -n data/seed/*.json data/ || true
+          if gh release download game-list -p game-list.db.gz -D /tmp 2>/dev/null; then
+            gunzip -c /tmp/game-list.db.gz > data/games.db
+          fi
+      - name: Collect this season's games
+        run: python -m backend.harvest gamesheet timetoscore hockeytech deb poland sportsadmin swehockey
+      - name: Export the public games table
+        run: python -m backend.export_games
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view game-list >/dev/null 2>&1 || gh release create game-list --title "Game list" --notes "Public 2026-27 game schedules for PuckTrace, rebuilt every 3 hours." --latest=false
+          gh release upload game-list data/game-list.db.gz --clobber
+      - name: Save page cache and scan progress
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            data/cache
+            data/deb_scan.json
+            data/poland_scan.json
+            data/swehockey_scan.json
+          key: game-list-${{ github.run_id }}

@@ -140,6 +140,9 @@ async def run_all(parsed: dict, tm: dict, kb: dict) -> dict:
     results = []
     if tasks:
         budget = max([BUDGET_S] + [getattr(a, "budget_s", BUDGET_S) for a in tried])
+        from ..roster_pages import LIGHT
+        if LIGHT:
+            budget = min(budget, 35)      # small server: a slow site gets "Search again" instead of a long wait
         deadline = started + budget
         pending = set(tasks)
         # stop early once a finished source has a clear match: slow sources (GameSheet)
