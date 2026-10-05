@@ -111,6 +111,10 @@ def is_friendly(comp):
 # ------------------------------------------------------------ knowledge base
 
 SECRET_KB = Path("/etc/secrets/knowledge.b64")   # Render secret file (python -m backend.export_kb)
+for _p in (Path("/etc/secrets/knowledge.b64"), Path(__file__).resolve().parent.parent / "knowledge.b64", Path("/app/knowledge.b64")):
+    if _p.exists():
+        SECRET_KB = _p
+        break
 
 
 def load_kb():

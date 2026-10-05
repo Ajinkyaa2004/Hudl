@@ -324,7 +324,47 @@ async def harvest_poland(log=print) -> dict:
     return dict(games=n + len(found), competitions=len(lids))
 
 
-SOURCES = {"gamesheet": harvest_gamesheet, "poland": harvest_poland, "deb": harvest_deb, "sportsadmin": harvest_sportsadmin, "swehockey": harvest_swehockey, "timetoscore": harvest_timetoscore, "hockeytech": harvest_hockeytech}
+def _ramp_team(name: str, division: str) -> str:
+    """'Barrie Sharks #110 (2)' in 'Under 15 (U15) AA' -> 'Barrie Sharks U15 AA'."""
+    n = re.sub(r"\s*#\s*\d+", "", name or "")
+    n = re.sub(r"\s*\(\d+\)\s*$", "", n).strip()
+    m = re.search(r"\((U\d{1,2})\)\s*(.*)$", division or "")
+    if m and not re.search(r"\bU\d{1,2}\b|\b\d{1,2}U\b", n, re.I):
+        n = f"{n} {m.group(1)} {m.group(2)}".strip()
+    return re.sub(r"\s+", " ", n)
+
+
+async def harvest_owha(log=print) -> dict:
+    """RAMP associations (OWHA and any added to data/ramp_associations.json): every league game
+    and every exhibition of the 2026-27 season, from the site's own JSON."""
+    from .fetch import get_json
+    from .adapters.base import local_to_utc
+    cfg = json.loads((DATA / "ramp_associations.json").read_text())["associations"]
+    total = 0
+    for a in cfg:
+        rows = []
+        for kind, path in (("league", f"/api/leaguegame/get/{a['aid']}/{a['sid']}/0/0/0/0/"),
+                           ("exhibition", f"/api/portalgame/get/{a['aid']}/{a['sid']}/0/0/0/0/0")):
+            data = await get_json(a["host"] + path, ttl=3 * 3600, timeout=180)
+            for g in data or []:
+                d = (g.get("sDate") or "")[:10]
+                if not g.get("GID") or d < "2026-07-01":
+                    continue
+                div = g.get("HomeDivision") or g.get("AwayDivision") or ""
+                hhmm = (g.get("sDate") or "")[11:16] or None
+                done = g.get("completed")
+                rows.append(dict(url=f"{a['host']}/division/{g.get('homeCATID') or 0}/{g.get('homeDID') or 0}/gamesheet/{g['GID']}",
+                                 source="ramp", site=a["host"].split("//")[-1].replace("www.", ""), gid=str(g["GID"]), date=d, time=hhmm,
+                                 start_utc=local_to_utc(d, hhmm, a.get("tz", "America/Toronto")),
+                                 home=_ramp_team(g.get("HomeTeamName"), div), away=_ramp_team(g.get("AwayTeamName"), g.get("AwayDivision") or div),
+                                 league=f"{a['name']} {div} {g.get('GameTypeName') or ''}".strip(), status="final" if done else None,
+                                 score=f"{g.get('homeScore')}-{g.get('awayScore')}" if done and g.get("homeScore") is not None else None))
+        total += gameindex.add_games(rows)
+        log(f"{a['name']}: {len(rows)} games (league and exhibitions)")
+    return dict(games=total)
+
+
+SOURCES = {"gamesheet": harvest_gamesheet, "owha": harvest_owha, "poland": harvest_poland, "deb": harvest_deb, "sportsadmin": harvest_sportsadmin, "swehockey": harvest_swehockey, "timetoscore": harvest_timetoscore, "hockeytech": harvest_hockeytech}
 
 
 async def run(names=None, log=print) -> dict:

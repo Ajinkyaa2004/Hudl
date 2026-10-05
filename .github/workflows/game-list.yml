@@ -43,7 +43,7 @@ jobs:
             gunzip -c /tmp/game-list.db.gz > data/games.db
           fi
       - name: Collect this season's games
-        run: python -m backend.harvest gamesheet timetoscore hockeytech deb poland sportsadmin swehockey
+        run: python -m backend.harvest gamesheet timetoscore hockeytech deb poland sportsadmin swehockey owha
       - name: Export the public games table
         run: python -m backend.export_games
       - name: Publish
