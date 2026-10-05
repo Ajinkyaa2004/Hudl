@@ -27,3 +27,4 @@ tests/RESULTS_*.md
 .DS_Store
 data/knowledge.b64
 data/roster_truth.json
+tests/roster_truth_*.json

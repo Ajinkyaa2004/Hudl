@@ -333,7 +333,15 @@ async def run_in_thread(names=None, log=print, delay_s: float = 0) -> dict:
     the web server's requests (a small server has a fraction of one CPU)."""
     if delay_s:
         await asyncio.sleep(delay_s)
-    return await asyncio.to_thread(lambda: asyncio.run(run(names, log)))
+    async def _yielding():
+        from . import fetch
+        loop = asyncio.get_running_loop()
+        fetch._YIELD_LOOPS.add(id(loop))          # every fetch of the refresh waits while searches run
+        try:
+            return await run(names, log)
+        finally:
+            fetch._YIELD_LOOPS.discard(id(loop))
+    return await asyncio.to_thread(lambda: asyncio.run(_yielding()))
 
 
 if __name__ == "__main__":

@@ -94,6 +94,28 @@ def _client_for_loop(timeout: float) -> httpx.AsyncClient:
     return entry[1]
 
 
+_YIELD_LOOPS: set = set()     # event loops (the daily refresh) that give way while searches run
+
+
+def _searches_running() -> bool:
+    try:
+        from . import app as _app
+        return bool(_app.app_busy())
+    except Exception:
+        return False
+
+
+async def _give_way():
+    """In the refresh's loop, wait (up to 2 minutes) while a search or roster job is running,
+    so a small server's CPU goes to the person waiting."""
+    if id(asyncio.get_running_loop()) not in _YIELD_LOOPS:
+        return
+    waited = 0.0
+    while waited < 120 and _searches_running():
+        await asyncio.sleep(1.0)
+        waited += 1.0
+
+
 async def get_text(url: str, ttl: int = 600, timeout: float = 15.0, headers: dict | None = None) -> str | None:
     """Plain GET. Returns body text or None. Cached by URL."""
     global _client
@@ -105,6 +127,7 @@ async def get_text(url: str, ttl: int = 600, timeout: float = 15.0, headers: dic
         if d is not None:
             _store(("http", url), d)
             return d
+    await _give_way()
     client = _client_for_loop(timeout)
     try:
         r = await client.get(url, headers=headers or {})
