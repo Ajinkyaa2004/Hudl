@@ -18,6 +18,11 @@ except Exception:          # pragma: no cover
     BeautifulSoup = None
 
 TTL = 6 * 3600
+import os as _os
+# On a small server (Render Free: 0.1 CPU, 512 MB) a headless browser per roster page slows every
+# search and can run the server out of memory. LIGHT mode reads pages with plain requests only;
+# FULL_MODE=1 turns the browser back on (a paid instance or a local run).
+LIGHT = bool(_os.environ.get("RENDER")) and not _os.environ.get("FULL_MODE")
 
 NUM_H = re.compile(r"^(#|no\.?|num(ber)?|jersey|jersey\s*#|#\s*jersey|n°|nr\.?|č\.?|nro)$", re.I)
 NAME_H = re.compile(r"^(name|player|players|player\s*name|athlete|full\s*name|skater|nom|jméno|spelare|namn|nimi|spieler)$", re.I)
@@ -399,6 +404,8 @@ async def read(url: str, browser: bool | None = None) -> dict:
     """Load a roster page and extract its players. browser: None = only when the plain page has none."""
     raw = None
     if BROWSER_FIRST.search(url):
+        if LIGHT:
+            return dict(players=[], season=None, title="", heads="", how="none", via="page", blocked=True)
         html = await _paced_html(url)
         r = extract(html) if html else dict(players=[], season=None, title="", heads="", how="none")
         r["via"] = "browser"
@@ -413,7 +420,7 @@ async def read(url: str, browser: bool | None = None) -> dict:
         if raw is None and await _challenge(url):
             return dict(players=[], season=None, title="", heads="", how="none", via="page", blocked=True)
     r = extract(raw) if raw else dict(players=[], season=None, title="", how="none")
-    if browser is False or len(r["players"]) >= 8:
+    if browser is False or LIGHT or len(r["players"]) >= 8:
         r["via"] = "page"
         return r
     html = await browser_page(url, wait_ms=4500, ttl=TTL, js=EXPAND_JS, retries=0)
@@ -525,7 +532,7 @@ async def find_on_site(site: str, team_name: str, date: str, max_pages: int = 4)
     home = await get_text(site, ttl=24 * 3600, timeout=20)
     if not home and await _challenge(site):
         return []
-    if not home or len(home) < 3000:
+    if (not home or len(home) < 3000) and not LIGHT:
         home = await browser_page(site, wait_ms=3500, ttl=24 * 3600, js=HTML_JS, retries=0) or home
     if not home:
         return []

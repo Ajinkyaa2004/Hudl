@@ -189,7 +189,8 @@ async def rosters(inp: RostersIn):
     if not r["ok"]:
         raise HTTPException(400, r["error"])
     g = {k: inp.game.get(k) for k in ("url", "league", "home", "away", "date") if inp.game.get(k)} if inp.game else None
-    return await check_rosters(r["parsed"], r["teams"], games=dict(t1=g, t2=g) if g else None)
+    # with the report found, the game's own lineups are enough: no page checks or site searches
+    return await check_rosters(r["parsed"], r["teams"], games=dict(t1=g, t2=g) if g else None, quick=bool(g))
 
 
 # ---------------------------------------------------------------- background jobs
@@ -201,6 +202,11 @@ import asyncio as _aio, secrets as _secrets, time as _time
 _JOBS: dict = {}
 _JOB_KEYS: dict = {}
 _JOB_SEM = None          # at most 3 searches at once: the free server has 512 MB and little CPU
+
+
+def app_busy() -> bool:
+    """True while a search or roster job runs: background work (the daily refresh) can wait."""
+    return any(v["status"] == "running" for v in _JOBS.values())
 
 
 def _job_start(key: str, factory) -> dict:
@@ -235,12 +241,14 @@ def _job_start(key: str, factory) -> dict:
 async def _search_with_retry(header: str, rosters: bool) -> dict:
     """Sources that time out on a slow server are usually ready a moment later (their pages are
     cached by then), so a search with timed-out sources and no report runs once more."""
+    t0 = _time.time()
     r = await lookup.search_full(header, KB, rosters=rosters)
     if not r["ok"]:
         raise HTTPException(400, r["error"])
     a = r.get("auto") or {}
     timed_out = [x for x in a.get("adapters", []) if not x.get("ok") and "timed out" in str(x.get("error") or "")]
-    if a.get("verdict") != "found" and timed_out:
+    # a second pass helps when a site was briefly slow; on a slow server it only doubles the wait
+    if a.get("verdict") != "found" and timed_out and _time.time() - t0 < 25:
         r2 = await lookup.search_full(header, KB, rosters=rosters)
         a2 = r2.get("auto") or {}
         order = {"found": 2, "check": 1}
@@ -374,6 +382,9 @@ def delete_source(kind: str, key: str):
 NO_PREVIEW = ("eliteprospects.com", "google.com", "hudl.com", "khl.ru", "chl.ca", "hockeyslovakia.sk", "iihf.com", "hockeydb.com")
 
 
+_SHOT_SEM = None
+
+
 @app.get("/api/shot")
 async def shot(url: str):
     """Screenshot of a page for the preview panel (cached)."""
@@ -381,7 +392,11 @@ async def shot(url: str):
     d = lookup.domain(url)
     if not url.startswith("http") or any(d.endswith(b) for b in NO_PREVIEW):
         raise HTTPException(404, "This site blocks previews, open it in Chrome")
-    img = await screenshot(url)
+    global _SHOT_SEM
+    from .roster_pages import LIGHT
+    _SHOT_SEM = _SHOT_SEM or _aio.Semaphore(1 if LIGHT else 3)   # one preview at a time on a small server
+    async with _SHOT_SEM:
+        img = await screenshot(url)
     if not img:
         raise HTTPException(404, "Preview did not load, open it in Chrome")
     return Response(content=img, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=21600"})

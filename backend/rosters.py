@@ -133,6 +133,9 @@ async def check(url: str, date: str, header_team: str) -> dict:
     if not any(d.endswith(b) for b in BROWSER):
         raw = await get_text(url, ttl=6 * 3600, timeout=15)
     if raw is None or len(raw) < 3000:
+        from .roster_pages import LIGHT
+        if LIGHT:
+            return dict(base, status="blocked", note="opened in Chrome only on the small server: the page needs a browser")
         txt = await paced_browser(url, d)
         if not txt:
             return dict(base, status="unreachable", note="page did not load")
@@ -211,14 +214,14 @@ def effective_team(parsed: dict, key: str, game: dict | None = None) -> tuple[st
     return fixed, f"Header says {fmt(ha)}, but {src} {is_}, so rosters are checked for {fmt(target)}."
 
 
-async def team_rosters(team: dict | None, header_team: str, parsed: dict, game: dict | None = None, key: str | None = None) -> list[dict]:
+async def team_rosters(team: dict | None, header_team: str, parsed: dict, game: dict | None = None, key: str | None = None, quick: bool = False) -> list[dict]:
     """Current rosters from the data sources (EliteProspects data server, GameSheet, HockeyTech,
     TimeToScore, ...), then the Club Data pages; shaped for the app's roster box."""
     from .roster_sources import find_rosters
     from .lookup import load_kb
     if key:
         header_team, _ = effective_team(parsed, key, game)
-    rs = await find_rosters(header_team, parsed["date"], dict(team=team or {}, comp=parsed["comp"], kb=load_kb(), game=game or {}))
+    rs = await find_rosters(header_team, parsed["date"], dict(team=team or {}, comp=parsed["comp"], kb=load_kb(), game=game or {}, fallback=not quick))
     out = []
     for r in rs:
         pl = r.get("players")
@@ -229,10 +232,10 @@ async def team_rosters(team: dict | None, header_team: str, parsed: dict, game: 
     return out
 
 
-async def check_rosters(parsed: dict, teams: dict, budget: float = 30, games: dict | None = None) -> dict:
+async def check_rosters(parsed: dict, teams: dict, budget: float = 30, games: dict | None = None, quick: bool = False) -> dict:
     games = games or {}
-    t1 = asyncio.create_task(team_rosters(teams["t1n"]["best"], parsed["t1"], parsed, games.get("t1"), key="t1"))
-    t2 = asyncio.create_task(team_rosters(teams["t2n"]["best"], parsed["t2"], parsed, games.get("t2"), key="t2"))
+    t1 = asyncio.create_task(team_rosters(teams["t1n"]["best"], parsed["t1"], parsed, games.get("t1"), key="t1", quick=quick))
+    t2 = asyncio.create_task(team_rosters(teams["t2n"]["best"], parsed["t2"], parsed, games.get("t2"), key="t2", quick=quick))
     done, pending = await asyncio.wait([t1, t2], timeout=budget)
     for t in pending:
         t.cancel()
