@@ -1,5 +1,7 @@
 # PuckTrace
 
+Built and owned by **Actorix** (AI automation & custom software, Mumbai, India), a sole proprietorship of Ajinkya Dhumal. Contact: actorix.business@gmail.com · +91 91364 33771. See [LICENSE](LICENSE).
+
 PuckTrace (formerly RTT Finder) finds ice hockey match reports for RTT. Paste a match header, get the match report link or the roster links for both teams, in the RTT search order. Nothing is written to any sheet. You enter results into the Progress sheet yourself.
 
 ## Run
