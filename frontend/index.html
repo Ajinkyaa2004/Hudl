@@ -369,7 +369,8 @@ kbd{font:11px var(--mono);border:1px solid var(--line2);border-bottom-width:2px;
 
 .sitefoot{width:100%;max-width:1240px;margin:0 auto;padding:28px 32px 40px;border-top:1px solid var(--line);color:var(--mu);font-size:13px}
 .sitefoot .fg{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:24px}
-.sitefoot .fb{display:flex;align-items:center;gap:8px;font-weight:700;font-size:15px;color:var(--tx);letter-spacing:-.01em}
+.sitefoot .fb{display:inline-flex;text-decoration:none;align-items:center;gap:8px;font-weight:700;font-size:15px;color:var(--tx);letter-spacing:-.01em}
+.sitefoot a.fb{color:var(--tx)}.sitefoot a.fb:hover{color:var(--ac)}
 .sitefoot .fb i{width:22px;height:22px;border-radius:6px;background:linear-gradient(135deg,var(--ac),var(--ac-hi));display:inline-block}
 .sitefoot .tag{margin:4px 0 0;color:var(--mu)}
 .sitefoot h4{margin:0 0 8px;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--mu2)}
@@ -424,7 +425,7 @@ kbd{font:11px var(--mono);border:1px solid var(--line2);border-bottom-width:2px;
     </nav>
     <div class="foot">
       <div class="kpis-mini" id="sidestats"></div>
-      <div class="by" style="display:flex;align-items:center;gap:7px"><span class="axlogo" role="img" aria-label="Actorix logo" style="width:18px;height:18px"></span><span>Built by <a href="mailto:actorix.business@gmail.com">Actorix</a> · Ajinkya Dhumal</span></div>
+      <div class="by" style="display:flex;align-items:center;gap:7px"><a href="https://actorix.in" target="_blank" rel="noopener" title="Actorix website" style="display:inline-flex"><span class="axlogo" role="img" aria-label="Actorix logo" style="width:18px;height:18px"></span></a><span>Built by <a href="https://actorix.in" target="_blank" rel="noopener">Actorix</a> · Ajinkya Dhumal</span></div>
       <button class="theme" id="theme" data-theme-toggle aria-label="Switch light or dark mode"><svg class="ic sm moon"><use href="#i-moon"/></svg><svg class="ic sm sun"><use href="#i-sun"/></svg><span class="tlabel">Theme</span></button>
     </div>
   </aside>
@@ -501,9 +502,9 @@ kbd{font:11px var(--mono);border:1px solid var(--line2);border-bottom-width:2px;
     <footer class="sitefoot" aria-label="About">
       <div class="fg">
         <div>
-          <div class="fb"><span class="axlogo" role="img" aria-label="Actorix logo" style="width:28px;height:28px"></span>Actorix</div>
+          <a class="fb" href="https://actorix.in" target="_blank" rel="noopener" title="Actorix website"><span class="axlogo" role="img" aria-label="Actorix logo" style="width:28px;height:28px"></span>Actorix</a>
           <p class="tag">AI automation &amp; custom software · Mumbai, India</p>
-          <p class="tag" style="margin-top:10px">PuckTrace is designed, built and run by Actorix.</p>
+          <p class="tag" style="margin-top:10px">PuckTrace is designed, built and run by <a href="https://actorix.in" target="_blank" rel="noopener">Actorix</a>.</p>
         </div>
         <div>
           <h4>Address</h4>
@@ -512,6 +513,7 @@ kbd{font:11px var(--mono);border:1px solid var(--line2);border-bottom-width:2px;
         <div>
           <h4>Contact</h4>
           <div class="cl">
+            <a href="https://actorix.in" target="_blank" rel="noopener">actorix.in</a>
             <a href="mailto:actorix.business@gmail.com">actorix.business@gmail.com</a>
             <a href="tel:+919136433771">+91 91364 33771</a>
             <a href="https://wa.me/919136433771" target="_blank" rel="noopener">WhatsApp</a>
@@ -558,7 +560,7 @@ kbd{font:11px var(--mono);border:1px solid var(--line2);border-bottom-width:2px;
   <input class="f" id="lpw" type="password" placeholder="Team password" autocomplete="current-password">
   <button class="btn" type="submit" style="width:100%;margin-top:12px">Sign in</button>
   <div class="msg err" id="lmsg" style="margin-top:10px;text-align:center"></div>
-  <div class="lby"><span style="display:inline-flex;align-items:center;gap:6px"><span class="axlogo" role="img" aria-label="Actorix logo" style="width:18px;height:18px"></span>Built by <b>Actorix</b> · Mumbai, India</span><br><a href="mailto:actorix.business@gmail.com">actorix.business@gmail.com</a> · <a href="tel:+919136433771">+91 91364 33771</a></div>
+  <div class="lby"><a href="https://actorix.in" target="_blank" rel="noopener" title="Actorix website" style="display:inline-flex;align-items:center;gap:6px"><span class="axlogo" role="img" aria-label="Actorix logo" style="width:18px;height:18px"></span>Built by <b>Actorix</b> · Mumbai, India</a><br><a href="mailto:actorix.business@gmail.com">actorix.business@gmail.com</a> · <a href="tel:+919136433771">+91 91364 33771</a></div>
 </form></div>
 
 <script>
