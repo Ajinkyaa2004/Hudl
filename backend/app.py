@@ -90,7 +90,7 @@ async def admin_upload(name: str, request: Request):
     return dict(ok=True, bytes=len(body))
 
 
-@app.get("/api/healthz")
+@app.api_route("/api/healthz", methods=["GET", "HEAD"])   # uptime monitors check with HEAD
 def healthz():
     # open (no sign-in): only whether the published game list is loaded, no names or headers
     gl = globals().get("GAME_LIST") or {}
