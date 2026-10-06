@@ -75,10 +75,11 @@ def canonical(url: str):
         m = re.search(pat, url, re.I)
         if m:
             return system, m.group(1)
-    if d in SITES:
-        m = re.search(r"/stats/game-center/(\d+)", url)
-        if m:
-            return "hockeytech", m.group(1)
+    # every HockeyTech league site (ajhl.ca, hjhl.ca, csshl.ca, u18aaa.ca, nwjhl.com, ...) uses the
+    # same /stats/game-center/{id} and /stats/game-summary/{id} pages for the feed's game id
+    m = re.search(r"/stats/game-(?:center|summary)/(\d+)", url)
+    if m:
+        return "hockeytech", m.group(1)
     gid = game_id(url)                   # any other site: same site and same game number
     if gid:
         return d, gid
@@ -103,6 +104,7 @@ def load_games(start: str, end: str):
     wb = openpyxl.load_workbook(PROGRESS, read_only=True, data_only=True)
     games = []
     for r in wb["Progress"].iter_rows(values_only=True):
+        r = tuple(r) + (None,) * max(0, 15 - len(r))      # some exported rows are short
         h = r[2]
         if not (isinstance(h, str) and h.startswith("[")):
             continue
@@ -142,6 +144,9 @@ def _corrections():
         return {}
 
 
+_DONE = 0
+
+
 async def phase2(g, row, kb, sem):
     async with sem:
         t0 = time.time()
@@ -152,6 +157,10 @@ async def phase2(g, row, kb, sem):
                auto_url=best["url"] if best else "", auto_conf=best["confidence"] if best else "",
                auto_adapters=";".join(f"{x['name']}:{'ok' if x['ok'] else x.get('error')}" for x in a.get("adapters", [])),
                outcome_p2=r["outcome"])
+    global _DONE
+    _DONE += 1
+    if _DONE % 250 == 0:
+        print(f"  ... {_DONE} games searched", flush=True)
     exp = canonical(g["link"])
     row["expected_system"] = exp[0] if exp else ""
     corr = _corrections()

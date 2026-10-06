@@ -190,6 +190,8 @@ def _exact_enough(parsed: dict, c: dict) -> bool:
     answers alone only when the game's start time matches the header, or, with no usable
     header time, the game is on the date its source expects. Otherwise the live sources run too."""
     from .base import TIME_MATCH
+    if "home and away are swapped on the site" in c.get("reasons", []):
+        return False          # the same pair may have played twice at that time (NHL split squads)
     if TIME_MATCH in c.get("reasons", []):
         return True
     if header_utc(parsed) and c.get("start_utc"):
@@ -228,15 +230,31 @@ def decide(parsed: dict, cands: list) -> dict:
                 same_time = (max(ts) - min(ts)).total_seconds() <= 300
             except Exception:
                 pass
-        if same_id or same_time:
+        # both sources must also agree on who is at home: split-squad games (NHL pre-season)
+        # are the same pair at the same minute in two arenas
+        one_way = len({"home and away are swapped on the site" in c.get("reasons", []) for c in strong_ones}) == 1
+        # or: each of two or more sources lists exactly one such game on the same date, same home team
+        srcs = [c.get("adapter") or c.get("source") for c in strong_ones]
+        one_each = len(set(srcs)) == len(srcs) and len({c.get("date") for c in strong_ones}) == 1
+        if same_id or (same_time and one_way) or (one_each and one_way):
             # keep the league's own page (a live source) over the bulk copy in the game list
-            strong_ones = sorted(strong_ones, key=lambda c: (c.get("via") == "index", -c["confidence"]))[:1]
+            # the league's or federation's own page first; aggregators (onlajny) and the game list after
+            weak = {"onlajny", "web search"}
+            strong_ones = sorted(strong_ones, key=lambda c: ((c.get("adapter") or c.get("source")) in weak, c.get("via") == "index", -c["confidence"]))[:1]
     # a game of these teams far from the header's time loses to another game of one of the
     # teams that starts right at the header's time (the pair's other game of a weekend)
     from .base import TIME_MATCH
     at_time = [c for c in cands if TIME_MATCH in c.get("reasons", []) and max(c["team_scores"]) >= 0.9]
     if at_time:
         strong_ones = [c for c in strong_ones if not any("h away from the header time" in r for r in c.get("reasons", []))]
+    # tournaments sometimes list placeholder copies of a game that were never played: when
+    # exactly one of the look-alikes has a result, that is the game (the header comes after it)
+    if len(strong_ones) > 1:
+        def _played(c):
+            return bool(c.get("score")) or str(c.get("status") or "").lower() in ("final", "completed", "final/so", "final/ot")
+        played = [c for c in strong_ones if _played(c)]
+        if len(played) == 1 and len(played) < len(strong_ones):
+            strong_ones = played
     # Back-to-back games of the same pair: the header's time (Moscow time) decides when the
     # sources give start times; keep the one game starting within 100 minutes of it.
     hu = header_utc(parsed)
@@ -295,6 +313,18 @@ def decide(parsed: dict, cands: list) -> dict:
         if len(anch) == 1:
             anch[0]["reasons"] = anch[0]["reasons"] + ["one team and the exact start time match; the other team's name is written differently"]
             strong_ones = anch
+    if not strong_ones and not any(strong(c) for c in cands):
+        # one game, and only one, starting at the header's minute with both teams reasonably like
+        # the header's names ("Jets" for "Chicago Jets 2012"): the time pins it down
+        from .base import TIME_MATCH as _TM
+        pair = [c for c in cands if _TM in c.get("reasons", []) and abs(c.get("time_diff_min", 999)) <= 10
+                and min(c["team_scores"]) >= 0.7 and c.get("kind", "protocol") == "protocol"]
+        # a game one age group off (the club's other team, or a team playing up) is shown as an
+        # option to pick, never chosen on its own
+        pair = [c for c in pair if not any("plays in the" in r for r in c.get("reasons", []))]
+        if len(pair) == 1:
+            pair[0]["reasons"] = pair[0]["reasons"] + ["the only game starting at the header's time; both names are close, check them"]
+            strong_ones = pair
     if len(strong_ones) == 1:
         verdict = "found"
     elif cands:

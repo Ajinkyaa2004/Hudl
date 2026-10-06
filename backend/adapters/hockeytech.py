@@ -93,8 +93,21 @@ class HockeyTech(Adapter):
         """Season ids that belong to the current year: regular season, pre-season, playoffs."""
         data = await get_json(self._feed("seasons", code, cfg), ttl=24 * 3600, timeout=30)
         seasons = ((data or {}).get("SiteKit") or {}).get("Seasons") or []
-        ids = [(s["season_id"], s.get("season_name", "")) for s in seasons if str(year) in s.get("season_name", "") or f"{year-1}-{str(year)[2:]}" in s.get("season_name", "")]
-        return ids[:14] or [("", "")]
+        yy = [f"{year-1}-{str(year)[2:]}", f"{str(year-1)[2:]}-{str(year)[2:]}", f"{str(year)[2:]}-{str(year+1)[2:]}", f"{str(year-1)[2:]}/{str(year)[2:]}", f"{str(year)[2:]}/{str(year+1)[2:]}"]
+        ids = [(s["season_id"], s.get("season_name", "")) for s in seasons
+               if str(year) in s.get("season_name", "") or any(y in s.get("season_name", "") for y in yy)]
+        # a league can run a season it hasn't listed yet (OJHL 2026-27 regular season = 82 while
+        # the list stops at 81): also read the next two numbers; an empty one costs one request
+        try:
+            top = max(int(s["season_id"]) for s in seasons)
+            # seasons newer than this year's named ones, even when the name has no year ("Regular Season")
+            newest_named = max([int(i) for i, _ in ids] or [0])
+            ids += [(s["season_id"], s.get("season_name", "")) for s in seasons
+                    if newest_named and int(s["season_id"]) > newest_named and (s["season_id"], s.get("season_name", "")) not in ids]
+            ids += [(str(top + k), "") for k in (1, 2)]
+        except Exception:
+            pass
+        return ids[:16] or [("", "")]
 
     async def _league_games(self, code, cfg, year):
         games = []

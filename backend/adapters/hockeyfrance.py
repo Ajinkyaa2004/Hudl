@@ -73,9 +73,15 @@ def season_label(date: str) -> str:
 def clean(name: str) -> str:
     """'72001 - ANGLET HORMADI U18 LIGUE ESPOIR' -> 'Anglet Hormadi U18'."""
     n = re.sub(r"^\s*[A-Z]?\d{3,6}[A-Z]?\s*-\s*(?:\d{3,6}\s+)?", "", name or "")
-    n = re.sub(r"\b(ligue espoir|championnat de france|elite|excellence)\b", " ", n, flags=re.I)
+    n = re.sub(r"\b(ligue espoir|championnat de france|elite|excellence|division\s*\d|d\d)\b", " ", n, flags=re.I)
     n = re.sub(r"\s+", " ", n).strip(" -")
     return n.title() if n.isupper() else n
+
+
+def short_name(t: dict) -> str:
+    """The registered name without division tags: 'Orléans Division 2' -> 'Orléans', 'D1 Meudon' -> 'Meudon'."""
+    n = re.sub(r"\b(division\s*\d|d\d)\b", " ", clean(t.get("libelle") or ""), flags=re.I)
+    return re.sub(r"\s+", " ", n).strip(" -")
 
 
 def team_name(t: dict) -> str:
@@ -115,7 +121,7 @@ class HockeyFrance(Adapter):
     def applies(self, parsed, tm, kb):
         from ..lookup import is_friendly
         c = parsed["comp"].lower()
-        if any(w in c for w in ("ffhg", "ligue magnus", "synerglace", "france", "coupe de france")):
+        if any(w in c for w in ("ffhg", "ligue magnus", "synerglace", "france", "french", "coupe de france")):
             return True
         if is_friendly(parsed["comp"]):
             from ..lookup import strip_accents
@@ -167,6 +173,11 @@ class HockeyFrance(Adapter):
                             kind="protocol", adapter=self.name, url=REPORT.format(id=g["id"]),
                             start_utc=local_to_utc(date, hhmm, "Europe/Paris"))
                 score_candidate(cand, parsed, pick[cid])
+                # also try the short registered names ("Orléans" for "Orléans Division 2 Renards d'Orléans")
+                alt = dict(cand, home=short_name(rec) or home, away=short_name(vis) or away)
+                score_candidate(alt, parsed, pick[cid])
+                if alt["confidence"] > cand["confidence"]:
+                    cand = dict(alt, home_full=home, away_full=away)
                 if min(cand["team_scores"]) >= 0.6:
                     out.append(cand)
         return out

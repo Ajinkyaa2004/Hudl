@@ -64,10 +64,14 @@ STATES = {"ct": "connecticut", "nj": "new jersey", "ny": "new york", "nyc": "new
           "mn": "minnesota", "mi": "michigan", "il": "illinois", "oh": "ohio", "va": "virginia", "md": "maryland", "nh": "new hampshire",
           "ri": "rhode island", "vt": "vermont", "me": "maine", "de": "delaware", "dc": "washington", "la": "los angeles", "sj": "san jose",
           "ne": "new england", "li": "long island", "wny": "western new york", "stl": "st louis", "kc": "kansas city", "ab": "alberta",
-          "bc": "british columbia", "on": "ontario", "qc": "quebec", "sk": "saskatchewan", "mb": "manitoba", "ns": "nova scotia"}
+          "bc": "british columbia", "on": "ontario", "qc": "quebec", "sk": "saskatchewan", "mb": "manitoba", "ns": "nova scotia",
+          "az": "arizona", "co": "colorado", "tx": "texas", "fl": "florida", "wi": "wisconsin", "mo": "missouri", "ks": "kansas",
+          "ga": "georgia", "nc": "north carolina", "sc": "south carolina", "tn": "tennessee", "in": "indiana", "ia": "iowa",
+          "nd": "north dakota", "sd": "south dakota", "ne": "nebraska", "ut": "utah", "nv": "nevada", "ak": "alaska", "ct": "connecticut"}
+GENERIC_INITIALS = set("HACSMYFIEL")      # Hockey, Association, Club, Society, Minor, Youth, Federation, Inc, Elite, League
 
 
-WORD_SYN = {"indy": "Indiana", "philly": "Philadelphia", "nova": "Northern Virginia", "socal": "Southern California",
+WORD_SYN = {"pens": "Penguins", "hb": "Honeybaked", "honeybaked": "HB", "nyc": "New York City", "jrs": "Juniors", "indy": "Indiana", "philly": "Philadelphia", "nova": "Northern Virginia", "socal": "Southern California",
             "norcal": "Northern California", "vegas": "Las Vegas", "jrs": "Juniors", "mtl": "Montreal", "tor": "Toronto"}
 
 
@@ -86,9 +90,21 @@ def expand_acronyms(short: str, full: str) -> str:
                 if "".join(x[0] for x in fw[i:i + n]).upper() == bare and all(len(x) > 1 for x in fw[i:i + n]):
                     rep = " ".join(fw[i:i + n])
                     break
+            if not rep:
+                # an association code: initials of the club words, then generic words ("PHA" =
+                # Pittsburgh + Hockey Association, "CNHA" = Calgary Northstars + Hockey Association)
+                for k in range(n - 1, 0, -1):
+                    if not set(bare[k:]) <= GENERIC_INITIALS:
+                        continue
+                    for i in range(len(fw) - k + 1):
+                        if "".join(x[0] for x in fw[i:i + k]).upper() == bare[:k] and all(len(x) > 2 for x in fw[i:i + k]):
+                            rep = " ".join(fw[i:i + k])
+                            break
+                    if rep:
+                        break
             if not rep and bare.lower() in STATES:
                 rep = STATES[bare.lower()].title()
-        if not rep and bare.lower() in WORD_SYN and WORD_SYN[bare.lower()].split()[0].lower() in (full or "").lower():
+        if not rep and bare.lower() in WORD_SYN and WORD_SYN[bare.lower()].split()[0].lower() in (full or "").lower().replace(" ", ""):
             rep = WORD_SYN[bare.lower()]
         out.append(rep or w)
     return " ".join(out)
@@ -131,7 +147,8 @@ def _colours(name: str) -> set:
 def _team_similarity(header_name: str, site_name: str, context: str = "") -> tuple[float, str]:
     s, r = __team_similarity(header_name, site_name, context)
     # colour words that both names share are part of the club name ("Red Bank", "PAL Blue Knights")
-    both = _colours(header_name) & _colours(site_name)
+    # ... and so are tier words that name the league itself ("Dells Ducks Premier" in "Premier Junior")
+    both = _colours(header_name) & (_colours(site_name) | _colours(context))
     hc, sc = _colours(header_name) - both, _colours(site_name) - both
     if hc and sc:
         return s * 0.3, f"team colour or tier differs: header {sorted(hc)} vs site {sorted(sc)}"
@@ -157,7 +174,7 @@ def __team_similarity(header_name: str, site_name: str, context: str = "") -> tu
     hw, sw = _words(header_name), _words(site_name)
     # sponsor or city words on one side: "Red Deer Chiefs" vs "Red Deer Sutter Fund Chiefs",
     # "University of Korea" vs "Korea University". Needs two words and the same nickname.
-    if s < 0.9 and len(hw) >= 2 and len(sw) >= 2 and not r.startswith(("age group differs", "level differs", "league is for")):
+    if s < 0.9 and len(hw) >= 2 and len(sw) >= 2 and not r.startswith(("age group differs", "level differs", "league is for", "plays in the")):
         if set(hw) <= set(sw) and hw[-1] in sw:
             return max(s, 0.9 * (0.85 if "not shown on site" in r else 1.0)), r + "; site adds words"
         if set(sw) <= set(hw) and sw[-1] in hw:
@@ -165,12 +182,12 @@ def __team_similarity(header_name: str, site_name: str, context: str = "") -> tu
     # the same words in another order, allowing word endings: "Ice Dragons Herford" / "Herforder Ice Dragons"
     def _wm(a, b):
         return a == b or (len(a) >= 5 and len(b) >= 5 and (a.startswith(b) or b.startswith(a)))
-    if s < 0.9 and len(hw) >= 2 and len(sw) >= 2 and not r.startswith(("age group differs", "level differs", "league is for")):
+    if s < 0.9 and len(hw) >= 2 and len(sw) >= 2 and not r.startswith(("age group differs", "level differs", "league is for", "plays in the")):
         if all(any(_wm(x, y) for y in sw) for x in hw) and all(any(_wm(y, x) for x in hw) for y in sw):
             return max(s, 0.95 * (0.85 if "not shown on site" in r else 1.0)), r + "; same words in another order"
     # a one-word club name that is the site's last word, after a sponsor: "Plzen" / "HC Skoda Plzen"
     if s < 0.85 and len(hw) == 1 and len(hw[0]) >= 5 and 2 <= len(sw) <= 3 and sw[-1] == hw[0] \
-            and not r.startswith(("age group differs", "level differs", "league is for")):
+            and not r.startswith(("age group differs", "level differs", "league is for", "plays in the")):
         return 0.85 * (0.85 if "not shown on site" in r else 1.0), r + "; site adds a sponsor word"
     return s, r
 
@@ -218,6 +235,10 @@ def ___team_similarity(header_name: str, site_name: str, context: str = "") -> t
         if ha & ca or (ca and _same_age(ha, ca)):
             reason = "age group confirmed by league name"
         elif ca:
+            # a team playing one age group up or down in a tournament division (13U in "14U")
+            two = lambda x: {int(a) for a in x if len(a) <= 2}
+            if any(abs(a - b) == 1 for a in two(ha) for b in two(ca)):
+                return base * 0.78, f"plays in the {sorted(ca)[0]}U division, header says {sorted(ha)[0]}U"
             return base * 0.3, f"league is for age group {sorted(ca)}, header {sorted(ha)}"
         else:
             base *= 0.85

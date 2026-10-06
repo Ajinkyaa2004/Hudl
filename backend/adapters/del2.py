@@ -8,7 +8,8 @@ from .base import Adapter, score_candidate, days_apart
 
 LIST = "https://www.del-2.org/spielplan/?round={r}"
 GAME = "https://www.del-2.org/spiel/{slug}_{gid}"
-ROUND_RE = re.compile(r'value="/spielplan/\?round=(\d+)"[^>]*>\s*(\d{4})/(\d{4})\s*-\s*([^<]+)<')
+# "2026/27 – Hauptrunde" (current site) or "2026/2027 - Hauptrunde" (older markup)
+ROUND_RE = re.compile(r'round=(\d+)"[^>]*>\s*(\d{4})/(\d{2,4})\s*[-–—]\s*([^<]+)<')
 
 
 def parse_list(page: str):

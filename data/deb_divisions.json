@@ -341,7 +341,7 @@
    "season": "",
    "first": "2026-08-15",
    "last": "2026-10-09",
-   "games": 39,
+   "games": 40,
    "teams": [
     "Adendorfer EC",
     "Bayreuth Tigers",
@@ -351,7 +351,6 @@
     "EJ Kassel U15",
     "ERSC Amberg",
     "ESC Dresden",
-    "ESC Halle 1b",
     "ESC Haßfurt",
     "ESG Hannover",
     "Eisadler Dortmund",
@@ -376,10 +375,10 @@
     "SCC Adler Berlin",
     "SG Weserstars Bremen/TuS Harsefeld",
     "SG Weserstars Bremen/TuS harsefeld",
+    "Saale Bulls Halle 1b",
     "Schönheider Wölfe",
     "TAG Salzgitter Icefighters",
     "TuS Harsefeld",
-    "U23 EC Hannover Indians",
     "Weserstars Bremen",
     "Young Grizzlys Wolfsburg U13",
     "Young Grizzlys Wolfsburg U15"
@@ -450,7 +449,7 @@
    "season": "273847",
    "first": "2026-08-22",
    "last": "2026-10-03",
-   "games": 22,
+   "games": 24,
    "teams": [
     "1. CfR Pforzheim",
     "Darmstadt Dukes",
@@ -463,6 +462,8 @@
     "EKU Mannheim 1b",
     "EKU Mannheim Frauen Ib",
     "ESC Hügelsheim 09",
+    "ESG Esslingen",
+    "ESG Esslingen e.V",
     "HC Seetal (SUI)",
     "Heilbronner Eish. Eisbären",
     "Heilbronner Eishockeyclub Eisbären e.V.",
@@ -925,10 +926,11 @@
    "division": "FS U20 Nachwuchs",
    "season": "273847",
    "first": "2026-09-20",
-   "last": "2026-09-20",
-   "games": 1,
+   "last": "2026-10-03",
+   "games": 2,
    "teams": [
     "EKU Mannheim",
+    "ESG Esslingen",
     "Stuttgarter EC"
    ]
   },
@@ -2494,7 +2496,7 @@
    "season": "273847",
    "first": "2026-08-29",
    "last": "2026-10-03",
-   "games": 12,
+   "games": 13,
    "teams": [
     "1. CfR Pforzheim",
     "Darmstadt Dukes",
@@ -2505,6 +2507,7 @@
     "EKU Mannheim 1b",
     "EKU Mannheim Frauen Ib",
     "ESC Hügelsheim 09",
+    "ESG Esslingen e.V",
     "Heilbronner Eish. Eisbären",
     "Heilbronner Eishockeyclub Eisbären e.V.",
     "Kölner EC - Frauen",
@@ -4047,7 +4050,7 @@
     "MET Photovoltaik Hornets Spittal",
     "TSV Trostberg",
     "UECR Eisbären Huben",
-    "USC Pirates Velden",
+    "USC HostProfis Pirates Velden",
     "VF1-A",
     "VF1-B",
     "VF2-A",
@@ -4073,7 +4076,7 @@
     "LE Kings",
     "MET Photovoltaik Hornets Spittal",
     "UECR Eisbären Huben",
-    "USC Pirates Velden"
+    "USC HostProfis Pirates Velden"
    ]
   },
   "21336": {
@@ -4727,7 +4730,7 @@
    "division": "2026/27",
    "season": "273847",
    "first": "2026-09-04",
-   "last": "2027-02-07",
+   "last": "2027-04-30",
    "games": 306,
    "teams": [
     "Alps Ice Academy",
@@ -4809,7 +4812,7 @@
    "division": "2026/27",
    "season": "",
    "first": "2026-10-03",
-   "last": "2027-03-24",
+   "last": "2027-04-18",
    "games": 123,
    "teams": [
     "HC Everest",
@@ -4832,7 +4835,7 @@
    "division": "2026/27",
    "season": "",
    "first": "2026-11-07",
-   "last": "2026-11-28",
+   "last": "2027-01-23",
    "games": 132,
    "teams": [
     "HC Everest",
@@ -5577,7 +5580,7 @@
    "division": "U8",
    "season": "",
    "first": "2026-11-07",
-   "last": "2026-11-28",
+   "last": "2027-01-23",
    "games": 132,
    "teams": [
     "HC Everest",
@@ -5667,7 +5670,7 @@
    "division": "2026/27",
    "season": "",
    "first": "2026-09-23",
-   "last": "2027-04-11",
+   "last": "2027-04-17",
    "games": 116,
    "teams": [
     "HC Everest",
@@ -5689,8 +5692,8 @@
    "league": "EESTI Noored U10 Liiga",
    "division": "U10-2",
    "season": "",
-   "first": "2026-11-16",
-   "last": "2026-11-16",
+   "first": "2026-10-18",
+   "last": "2027-04-18",
    "games": 60,
    "teams": [
     "HC Everest",
@@ -5706,7 +5709,7 @@
    "division": "U12-2",
    "season": "",
    "first": "2026-10-11",
-   "last": "2027-03-02",
+   "last": "2027-04-17",
    "games": 56,
    "teams": [
     "HC Everest",
@@ -7620,7 +7623,7 @@
    "division": "ÖEHV U20i Regular Season 2026/27",
    "season": "273847",
    "first": "2026-09-04",
-   "last": "2027-02-07",
+   "last": "2027-04-30",
    "games": 306,
    "teams": [
     "Alps Ice Academy",
@@ -7882,7 +7885,7 @@
    "league": "OOEEHV",
    "division": "1. OÖ LIWEST EHL",
    "season": "",
-   "first": "2026-10-26",
+   "first": "2026-10-30",
    "last": "2027-01-15",
    "games": 30,
    "teams": [
@@ -7944,7 +7947,7 @@
    "season": "",
    "first": "2026-08-23",
    "last": "2026-10-09",
-   "games": 21,
+   "games": 22,
    "teams": [
     "Adendorfer EC",
     "Bayreuth Tigers",
@@ -7953,7 +7956,6 @@
     "Crocodiles im FTV Hamburg",
     "ERSC Amberg",
     "ESC Dresden",
-    "ESC Halle 1b",
     "ESC Haßfurt",
     "Eisadler Dortmund",
     "FASS Berlin",
@@ -7968,10 +7970,10 @@
     "KSW Icefighters Leipzig",
     "Luchse Lauterbach",
     "Piranhas Rostock",
+    "Saale Bulls Halle 1b",
     "Schönheider Wölfe",
     "TAG Salzgitter Icefighters",
     "TuS Harsefeld",
-    "U23 EC Hannover Indians",
     "Weserstars Bremen"
    ]
   },
@@ -8287,16 +8289,22 @@
    "league": "VEHV",
    "division": "Saison 2026/27",
    "season": "",
-   "first": "2026-10-24",
-   "last": "2026-11-26",
-   "games": 45,
+   "first": "2026-10-22",
+   "last": "2027-01-31",
+   "games": 75,
    "teams": [
+    "EC Riedsee",
     "EHC Eurojobs Montafon",
+    "EHC Göfis",
     "EHC Hard",
+    "EHC Hard II",
     "EHC Ice Tigers Dornbirn",
+    "EHC Skorpions 1999 Lustenau",
     "HC Walter Buaba Rankweil",
+    "HC Walter Buaba Rankweil 2",
     "Lindenberg Chiefs",
-    "SC Samina Hohenems 2"
+    "SC Samina Hohenems 2",
+    "SC Samina Hohenems 3"
    ]
   },
   "21981": {
@@ -13169,7 +13177,7 @@
     "MET Photovoltaik Hornets Spittal",
     "TSV Trostberg",
     "UECR Eisbären Huben",
-    "USC Pirates Velden"
+    "USC HostProfis Pirates Velden"
    ]
   },
   "22542": {
@@ -13509,7 +13517,7 @@
    "division": "Vehl 1",
    "season": "",
    "first": "2026-10-24",
-   "last": "2026-11-26",
+   "last": "2027-01-31",
    "games": 45,
    "teams": [
     "EHC Eurojobs Montafon",
@@ -13608,7 +13616,7 @@
    "division": "2026/27",
    "season": "273847",
    "first": "2026-10-11",
-   "last": "2027-02-07",
+   "last": "2027-02-11",
    "games": 40,
    "teams": [
     "EV Zeltweg",
@@ -13624,8 +13632,8 @@
    "league": "STEHV",
    "division": "STEHV U14",
    "season": "273847",
-   "first": "2026-11-30",
-   "last": "2026-11-30",
+   "first": "2026-11-01",
+   "last": "2027-02-11",
    "games": 20,
    "teams": [
     "EV Zeltweg",

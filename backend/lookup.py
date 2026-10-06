@@ -73,12 +73,13 @@ def tokens(name):
 def _tokens(name):
     s = strip_accents(name).lower()
     s = re.sub(r",?\s*\b(a\.\s?s\.|z\.\s?s\.|s\.\s?r\.\s?o\.|o\.\s?s\.|e\.\s?v\.|gmbh|ry)\s*$", "", s)   # company suffixes
+    s = re.sub(r"\bacha\s*(?:[1-3]|i{1,3})?\b|^\s*[mw]d\s?[1-3]\b", " ", s)   # ACHA division tags: "ACHA II", "MD2 ..."
     ages = {next(g for g in m.groups() if g) for m in AGE_RE.finditer(s)}
     if any(len(a) <= 2 for a in ages):          # "San Jose Jr Sharks 2014 12U": the age group wins
         ages = {a for a in ages if len(a) <= 2}
     levels = {x.strip("()") for x in LEVEL_RE.findall(s)}
     base = LEVEL_RE.sub(" ", AGE_RE.sub(" ", s))
-    base = re.sub(r"\b(hc|hk|sk|if|ifk|ik|bk|hf|ec|ehc|ev|hcm|mhk|hkm|jr\.?|hockey|club|team|ishockeyklubb|ishockeyklub|ishockeylag|ishockey|eishockey|hockeyklubb|hockeyclub|jaakiekko|idrettslag|sportsklubb)\b", " ", base)
+    base = re.sub(r"\b(hc|hk|sk|if|ifk|ik|bk|hf|ec|ehc|ev|hcm|mhk|hkm|jr\.?|junior|juniors|ncdc|hockey|club|team|ishockeyklubb|ishockeyklub|ishockeylag|ishockey|eishockey|hockeyklubb|hockeyclub|jaakiekko|idrettslag|sportsklubb)\b", " ", base)
     return re.sub(r"[^a-z0-9]", "", base), frozenset(ages), frozenset(levels)
 
 
