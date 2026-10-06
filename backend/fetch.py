@@ -136,7 +136,7 @@ async def get_text(url: str, ttl: int = 600, timeout: float = 15.0, headers: dic
     if hit is not None:
         return hit
     if ttl >= 3600:
-        d = _disk_get(url, ttl)
+        d = await asyncio.to_thread(_disk_get, url, ttl)     # big pages; a slow disk shouldn't stall others
         if d is not None:
             _store(("http", url), d)
             return d
@@ -160,7 +160,7 @@ async def _fetch(url, ttl, timeout, headers, sem):
             return None
         _store(("http", url), r.text)
         if ttl >= 3600:
-            _disk_put(url, r.text)
+            await asyncio.to_thread(_disk_put, url, r.text)
         return r.text
     except Exception:
         return None

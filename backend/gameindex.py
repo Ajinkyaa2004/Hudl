@@ -48,6 +48,17 @@ def add_games(games: list[dict], source: str | None = None) -> int:
     return len(rows)
 
 
+_local = threading.local()
+
+
+def _reader() -> sqlite3.Connection:
+    c = getattr(_local, "conn", None)
+    if c is None:
+        conn()                                      # creates the tables on first use
+        c = _local.conn = sqlite3.connect(DB, check_same_thread=False)
+    return c
+
+
 _DAY_CACHE: dict = {}        # date -> (time read, games): every search reads the same few days
 
 
@@ -60,9 +71,10 @@ def games_on(dates: list[str]) -> list[dict]:
         else:
             need.append(d)
     if need:
-        with _lock:
-            cur = conn().execute(f"select {','.join(COLS)} from games where date in ({','.join('?' * len(need))})", need)
-            rows = [dict(zip(COLS, r)) for r in cur.fetchall()]
+        # each thread reads through its own connection (WAL allows readers alongside the writer), so a
+        # search scanning the game list in a thread never holds the lock the web server waits on
+        cur = _reader().execute(f"select {','.join(COLS)} from games where date in ({','.join('?' * len(need))})", need)
+        rows = [dict(zip(COLS, r)) for r in cur.fetchall()]
         by = {d: [] for d in need}
         for g in rows:
             by.setdefault(g["date"], []).append(g)
