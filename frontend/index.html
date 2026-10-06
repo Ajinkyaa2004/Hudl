@@ -594,7 +594,7 @@ function wake(on){$('#wake').classList.toggle('on',!!on)}
    main one doesn't answer, the page switches to the backup for 5 minutes, then tries main again */
 let API_BASE='/api',API_BACKUP_UNTIL=0;
 function apiBase(){if(API_BASE!=='/api'&&Date.now()>API_BACKUP_UNTIL)API_BASE='/api';return API_BASE}
-function useBackup(){if(API_BASE==='/api'){API_BASE='/api-backup';API_BACKUP_UNTIL=Date.now()+300000;setTimeout(checkServers,500);return true}return false}
+function useBackup(){if(API_BASE==='/api'){API_BASE='/api-backup';API_BACKUP_UNTIL=Date.now()+300000;setTimeout(()=>checkServers(),500);return true}return false}
 /* footer status: ask both servers every minute and say in plain words where results come from */
 async function ping(base,ms){
   const ctl=new AbortController(),t=setTimeout(()=>ctl.abort(),ms);
@@ -602,8 +602,8 @@ async function ping(base,ms){
     if(!r.ok||!(r.headers.get('content-type')||'').includes('json'))return null;return await r.json()}
   catch(e){return null}finally{clearTimeout(t)}
 }
-async function checkServers(){
-  const [nas,bk]=await Promise.all([ping('/api',6000),ping('/api-backup',45000)]);
+async function checkServers(nasKnown){
+  const [nas,bk]=await Promise.all([nasKnown!==undefined?nasKnown:ping('/api',6000),ping('/api-backup',45000)]);
   const nasOk=!!(nas&&nas.ok),nasReady=nasOk&&nas.knowledge_base,bkOk=!!(bk&&bk.ok&&bk.knowledge_base);
   if(nasReady&&API_BASE!=='/api'){API_BASE='/api';API_BACKUP_UNTIL=0}   // the NAS is back: use it straight away
   else if(!nasReady&&bkOk&&API_BASE==='/api'){API_BASE='/api-backup';API_BACKUP_UNTIL=Date.now()+300000}   // NAS down: no search waits on it
@@ -618,7 +618,7 @@ async function checkServers(){
   const tm=new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
   $('#sst-det').textContent=`Home NAS: ${nasReady?'online':nasOk?'starting':'offline'} · Backup: ${bkOk?'ready':'not answering'} · checked ${tm}`;
 }
-setInterval(checkServers,60000);
+setInterval(()=>checkServers(),60000);
 async function api(p,o={},tries=5){
   for(let i=0;;i++){
     let r;
@@ -674,7 +674,7 @@ const Q0=null;
 const _wt=setTimeout(()=>wake(1),2500);   // a slow first answer: say so
 /* before anything else, a quick look at the home NAS: when it is off, the page starts on the backup
    instead of waiting on it; the full status (both servers) follows in the footer */
-ping('/api',5000).then(n=>{if(!(n&&n.ok&&n.knowledge_base)){API_BASE='/api-backup';API_BACKUP_UNTIL=Date.now()+300000}}).then(()=>{checkServers();return api('/session')}).then(s=>{clearTimeout(_wt);wake(0);if(s.required&&!s.ok)showLogin();else if(Q0){q.value=Q0;chips(Q0);find()}}).catch(()=>{clearTimeout(_wt);wake(0)});
+ping('/api',5000).then(n=>{if(!(n&&n.ok&&n.knowledge_base)){API_BASE='/api-backup';API_BACKUP_UNTIL=Date.now()+300000}checkServers(n);return api('/session')}).then(s=>{clearTimeout(_wt);wake(0);if(s.required&&!s.ok)showLogin();else if(Q0){q.value=Q0;chips(Q0);find()}}).catch(()=>{clearTimeout(_wt);wake(0)});
 
 /* ---------- theme ---------- */
 function themeLabel(){$$('.tlabel').forEach(l=>l.textContent=document.documentElement.dataset.theme==='dark'?'Dark':'Light')}
