@@ -360,8 +360,9 @@ async def _search_with_retry(header: str, rosters: bool) -> dict:
         raise HTTPException(400, r["error"])
     a = r.get("auto") or {}
     timed_out = [x for x in a.get("adapters", []) if not x.get("ok") and "timed out" in str(x.get("error") or "")]
-    # a second pass helps when a site was briefly slow; on a slow server it only doubles the wait
-    if a.get("verdict") != "found" and timed_out and _time.time() - t0 < 25:
+    # a second pass helps when a site was slow or the server busy (many searches at once): pages the
+    # first pass fetched are cached by then, so it is quick
+    if a.get("verdict") != "found" and timed_out and _time.time() - t0 < 60:
         r2 = await lookup.search_full(header, KB, rosters=rosters)
         a2 = r2.get("auto") or {}
         order = {"found": 2, "check": 1}
