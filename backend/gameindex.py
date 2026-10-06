@@ -40,6 +40,7 @@ def add_games(games: list[dict], source: str | None = None) -> int:
         rows.append(tuple([g.get(c) if c != "source" else (source or g.get("source")) for c in COLS]) + (now,))
     if not rows:
         return 0
+    _DAY_CACHE.clear()
     with _lock:
         c = conn()
         c.executemany(f"insert or replace into games({','.join(COLS)},updated) values ({','.join('?' * (len(COLS) + 1))})", rows)
@@ -47,10 +48,30 @@ def add_games(games: list[dict], source: str | None = None) -> int:
     return len(rows)
 
 
+_DAY_CACHE: dict = {}        # date -> (time read, games): every search reads the same few days
+
+
 def games_on(dates: list[str]) -> list[dict]:
-    with _lock:
-        cur = conn().execute(f"select {','.join(COLS)} from games where date in ({','.join('?' * len(dates))})", dates)
-        return [dict(zip(COLS, r)) for r in cur.fetchall()]
+    now, out, need = time.time(), [], []
+    for d in dates:
+        hit = _DAY_CACHE.get(d)
+        if hit and now - hit[0] < 120:
+            out += hit[1]
+        else:
+            need.append(d)
+    if need:
+        with _lock:
+            cur = conn().execute(f"select {','.join(COLS)} from games where date in ({','.join('?' * len(need))})", need)
+            rows = [dict(zip(COLS, r)) for r in cur.fetchall()]
+        by = {d: [] for d in need}
+        for g in rows:
+            by.setdefault(g["date"], []).append(g)
+        if len(_DAY_CACHE) > 20:         # a few MB a day; the NAS has 2 GB
+            _DAY_CACHE.clear()
+        for d, gs in by.items():
+            _DAY_CACHE[d] = (now, gs)
+        out += rows
+    return [dict(g) for g in out]
 
 
 def around(date: str, before: int = 1, after: int = 1) -> list[str]:
@@ -75,12 +96,15 @@ def delete_source(source: str, before_updated: float | None = None) -> int:
         else:
             n = c.execute("delete from games where source=?", (source,)).rowcount
         c.commit()
+    _DAY_CACHE.clear()
     return n
 
 
+import functools
 _WORD = re.compile(r"[a-z]{4,}")
 
 
-def words(name: str) -> set:
+@functools.lru_cache(maxsize=200000)
+def words(name: str) -> frozenset:
     from .lookup import strip_accents
-    return set(_WORD.findall(strip_accents(str(name or "")).lower())) - {"hockey", "club", "team", "junior", "elite", "academy", "white", "black", "blue", "gold"}
+    return frozenset(_WORD.findall(strip_accents(str(name or "")).lower())) - {"hockey", "club", "team", "junior", "elite", "academy", "white", "black", "blue", "gold"}

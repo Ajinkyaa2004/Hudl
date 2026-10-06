@@ -13,6 +13,12 @@ class Index(Adapter):
         return True
 
     async def find(self, parsed, tm, kb):
+        # scoring a few thousand games is CPU work: done in a thread so other people's searches
+        # keep moving while it runs
+        import asyncio
+        return await asyncio.to_thread(self._scan, parsed)
+
+    def _scan(self, parsed):
         from .. import gameindex
         want1, want2 = gameindex.words(parsed["t1"]), gameindex.words(parsed["t2"])
         out = []

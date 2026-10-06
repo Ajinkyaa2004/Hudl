@@ -38,7 +38,7 @@ so nobody sees an error when the NAS is off.
 3. Copy the private data from the Mac: `data/knowledge.json` and `data/aliases_learned.json`, plus `data/games.db` to save the first download.
 4. In Container Manager, choose **Project > Create**, name it `pucktrace`, set the path to `/volume2/docker/pucktrace`, and use `deploy/docker-compose.nas.yml`. Set `APP_PASSWORD` and `APP_SECRET` to **the same values as on Render**, so one sign-in works on both servers.
 5. Publish it: DSM Task Scheduler, triggered task "PuckTrace Funnel" (user root, event Boot-up) running `/var/packages/Tailscale/target/bin/tailscale funnel --bg 8000`. The tailnet policy needs `"nodeAttrs": [{"target": ["autogroup:member"], "attr": ["funnel"]}]`. Address: https://home-nas.tailfff30a.ts.net
-6. In `vercel.json`, point `/api/:path*` at `https://<nas-name>.<tailnet>.ts.net/api/:path*`, keep `/api-backup` on Render, then commit.
+6. In `vercel.json`, point `/api/:path*` at `https://home-nas.tailfff30a.ts.net/api/:path*` (done), keep `/api-backup` on Render, then commit.
 7. Test:
    - `https://pucktrace.actorix.in/api/healthz` shows `knowledge_base: true` and the game list is loaded;
    - 20 searches at once all finish without errors;
@@ -46,4 +46,12 @@ so nobody sees an error when the NAS is off.
 
 ## Updating
 
-Pushing to `main` builds a new image. On the NAS, in Container Manager, open **Project > pucktrace**, choose **Action > Build**, or run `docker compose pull && docker compose up -d`.
+Pushing to `main` builds a new image (about 10 minutes). The NAS picks it up through a DSM Task Scheduler task:
+**Create > Scheduled Task > User-defined script**, name "PuckTrace Update", user **root**, schedule daily at 07:00, script:
+
+```bash
+cd /volume2/docker/pucktrace && (docker compose pull -q && docker compose up -d || (docker-compose pull -q && docker-compose up -d))
+```
+
+Select the task and click **Run** to update straight away. The container restarts only when the image changed;
+a search running at that moment is started again by the page on its own.

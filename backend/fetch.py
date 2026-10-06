@@ -89,7 +89,8 @@ def _client_for_loop(timeout: float) -> httpx.AsyncClient:
         for k in [k for k, (lp, _) in _clients.items() if lp.is_closed()]:
             _clients.pop(k, None)
         entry = _clients[id(loop)] = (loop, httpx.AsyncClient(headers={"User-Agent": UA, "Accept-Language": "en-US,en;q=0.8"},
-                                                              follow_redirects=True, timeout=timeout))
+                                                              follow_redirects=True, timeout=timeout,
+                                                              limits=httpx.Limits(max_connections=MAX_OUT + 8, max_keepalive_connections=24)))
     _client = entry[1]
     return entry[1]
 
@@ -116,9 +117,21 @@ async def _give_way():
         waited += 1.0
 
 
+_LIMITS: dict = {}            # per event loop: (semaphore, requests in flight by URL)
+MAX_OUT = 32                 # requests on the wire at once; beyond that the pool's bookkeeping eats the CPU
+
+
+def _limits():
+    loop = asyncio.get_running_loop()
+    e = _LIMITS.get(id(loop))
+    if e is None or e[0] is not loop:
+        e = _LIMITS[id(loop)] = (loop, asyncio.Semaphore(MAX_OUT), {})
+    return e[1], e[2]
+
+
 async def get_text(url: str, ttl: int = 600, timeout: float = 15.0, headers: dict | None = None) -> str | None:
-    """Plain GET. Returns body text or None. Cached by URL."""
-    global _client
+    """Plain GET. Returns body text or None. Cached by URL. When several searches want the
+    same page at once, it is fetched once and shared."""
     hit = _cached(("http", url), ttl)
     if hit is not None:
         return hit
@@ -127,10 +140,22 @@ async def get_text(url: str, ttl: int = 600, timeout: float = 15.0, headers: dic
         if d is not None:
             _store(("http", url), d)
             return d
-    await _give_way()
-    client = _client_for_loop(timeout)
+    sem, inflight = _limits()
+    key = (url, tuple(sorted((headers or {}).items())))
+    task = inflight.get(key)
+    if task is None:
+        task = inflight[key] = asyncio.ensure_future(_fetch(url, ttl, timeout, headers, sem))
+        task.add_done_callback(lambda _t: inflight.pop(key, None))
+    # shielded: a search that gives up does not cancel the page for the others waiting on it
+    return await asyncio.shield(task)
+
+
+async def _fetch(url, ttl, timeout, headers, sem):
     try:
-        r = await client.get(url, headers=headers or {})
+        await _give_way()
+        client = _client_for_loop(timeout)
+        async with sem:
+            r = await client.get(url, headers=headers or {}, timeout=timeout)
         if r.status_code != 200:
             return None
         _store(("http", url), r.text)
