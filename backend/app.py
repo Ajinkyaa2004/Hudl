@@ -35,11 +35,19 @@ def _signed_in(request: Request) -> bool:
     return not PASSWORD or _hm.compare_digest(request.cookies.get("pt_session", ""), _token())
 
 
+# which server answered, shown on the page: the home NAS (the Docker image sets APP_VERSION) or the Render backup
+SERVER = "render" if _os.environ.get("RENDER") else ("nas" if _os.environ.get("APP_VERSION") else "local")
+
+
 @app.middleware("http")
 async def _guard(request: Request, call_next):
     if PASSWORD and request.url.path.startswith("/api/") and request.url.path not in OPEN and not _signed_in(request):
-        return JSONResponse({"detail": "Sign in required"}, status_code=401)
-    return await call_next(request)
+        r = JSONResponse({"detail": "Sign in required"}, status_code=401)
+    else:
+        r = await call_next(request)
+    r.headers["x-pt-server"] = SERVER
+    r.headers["access-control-expose-headers"] = "x-pt-server"
+    return r
 
 
 class LoginIn(BaseModel):
@@ -139,7 +147,7 @@ async def _data_sync_loop():
 def healthz():
     # open (no sign-in): only whether the published game list is loaded, no names or headers
     gl = globals().get("GAME_LIST") or {}
-    return dict(ok=True, game_list=gl.get("games", 0), game_list_at=gl.get("at"), knowledge_base=len(KB.get("teams") or {}) > 0,
+    return dict(ok=True, server=SERVER, game_list=gl.get("games", 0), game_list_at=gl.get("at"), knowledge_base=len(KB.get("teams") or {}) > 0,
                 version=(_os.environ.get("APP_VERSION") or _os.environ.get("RENDER_GIT_COMMIT", ""))[:7] or None)
 
 

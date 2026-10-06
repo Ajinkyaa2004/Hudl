@@ -356,6 +356,10 @@ kbd{font:11px var(--mono);border:1px solid var(--line2);border-bottom-width:2px;
 /* server waking up */
 .wake{position:fixed;top:12px;left:50%;transform:translate(-50%,-140%);display:flex;align-items:center;gap:10px;max-width:calc(100% - 32px);background:var(--s1);border:1px solid var(--line2);box-shadow:var(--sh3);padding:10px 16px;border-radius:12px;font-size:13px;color:var(--tx);z-index:95;transition:transform .25s var(--ease)}
 .wake.on{transform:translate(-50%,0)}
+/* which server answered: the home NAS, or the Render backup while the NAS is off */
+.srv{position:fixed;right:16px;bottom:16px;z-index:30;display:none;align-items:center;gap:7px;padding:6px 11px;border-radius:999px;background:var(--s1);border:1px solid var(--line2);box-shadow:var(--sh1);font-size:12px;color:var(--mu)}
+.srv.on{display:flex}.srv i{width:8px;height:8px;border-radius:50%;background:var(--ok)}.srv.bk i{background:var(--wa)}.srv b{color:var(--tx);font-weight:600}
+@media (max-width:719px){.srv{bottom:calc(var(--tabbar) + var(--safe-b) + 10px);right:12px}}
 
 /* sign in */
 .login{position:fixed;inset:0;z-index:100;display:none;align-items:center;justify-content:center;background:var(--bg);padding:16px}
@@ -553,6 +557,7 @@ kbd{font:11px var(--mono);border:1px solid var(--line2);border-bottom-width:2px;
   <div class="df"><button class="btn2" id="dcopy2"><svg class="ic sm"><use href="#i-copy"/></svg>Copy link</button><a class="btn2 pri" id="dopen2" target="_blank" rel="noopener"><svg class="ic sm"><use href="#i-ext"/></svg>Open site</a></div>
 </aside>
 <div class="toast" id="toast"></div>
+<div class="srv" id="srv" title="The server that answered the last request"><i></i><span>Server: <b id="srvname"></b></span></div>
 <div class="wake" id="wake"><span class="spin"></span><span>Waking up the server… the first search after a break can take up to a minute.</span></div>
 <div class="login" id="login"><form class="lcard" id="lform">
   <div class="brand" style="justify-content:center;padding:0 0 6px;font-size:22px"><svg width="34" height="34"><use href="#i-puck"/></svg><span>Puck<b>Trace</b></span></div>
@@ -570,6 +575,9 @@ const ic=(n,c='sm')=>`<svg class="ic ${c}"><use href="#i-${n}"/></svg>`;
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 /* the server sleeps on the free plan and can be briefly unreachable while it wakes or restarts:
    502/503/504 and network errors are retried with a "waking up" banner instead of failing */
+function showServer(k){if(!k)return;const e=$('#srv');e.classList.add('on');e.classList.toggle('bk',k==='render');
+  $('#srvname').textContent=k==='nas'?'Home NAS':k==='render'?'Backup (Render)':'This computer';
+  e.title=k==='render'?'The home NAS is off or not answering, so the backup server is answering. Results are the same.':'The home NAS is answering.'}
 function wake(on){$('#wake').classList.toggle('on',!!on)}
 /* two servers: the main one (home NAS) at /api and a backup (Render) at /api-backup. When the
    main one doesn't answer, the page switches to the backup for 5 minutes, then tries main again */
@@ -590,7 +598,7 @@ async function api(p,o={},tries=5){
     const down=[502,503,504].includes(r.status)||(r.status>=400&&!(r.headers.get('content-type')||'').includes('json'));
     if(down&&useBackup())continue;
     if(down&&i<tries-1){wake(1);await sleep(Math.min(2000*2**i,10000));continue}
-    wake(0);
+    wake(0);showServer(r.headers.get('x-pt-server'));
     if(r.status===401&&p!=='/login'){showLogin();throw new Error('Sign in required')}
     if(!r.ok){let m=r.statusText;try{m=(await r.json()).detail||m}catch(e){}const err=new Error(m||('Server error '+r.status));err.status=r.status;throw err}
     return r.json();
