@@ -571,7 +571,7 @@ kbd{font:11px var(--mono);border:1px solid var(--line2);border-bottom-width:2px;
   <div class="df"><button class="btn2" id="dcopy2"><svg class="ic sm"><use href="#i-copy"/></svg>Copy link</button><a class="btn2 pri" id="dopen2" target="_blank" rel="noopener"><svg class="ic sm"><use href="#i-ext"/></svg>Open site</a></div>
 </aside>
 <div class="toast" id="toast"></div>
-<div class="wake" id="wake"><span class="spin"></span><span>Waking up the server… the first search after a break can take up to a minute.</span></div>
+<div class="wake" id="wake"><span class="spin"></span><span>Connecting… if the home NAS doesn't answer, the backup server takes over.</span></div>
 <div class="login" id="login"><form class="lcard" id="lform">
   <div class="brand" style="justify-content:center;padding:0 0 6px;font-size:22px"><svg width="34" height="34"><use href="#i-puck"/></svg><span>Puck<b>Trace</b></span></div>
   <div class="mu small" style="text-align:center;margin-bottom:20px">Match reports and rosters for RTT</div>
@@ -603,7 +603,7 @@ async function ping(base,ms){
   catch(e){return null}finally{clearTimeout(t)}
 }
 async function checkServers(){
-  const [nas,bk]=await Promise.all([ping('/api',10000),ping('/api-backup',45000)]);
+  const [nas,bk]=await Promise.all([ping('/api',6000),ping('/api-backup',45000)]);
   const nasOk=!!(nas&&nas.ok),nasReady=nasOk&&nas.knowledge_base,bkOk=!!(bk&&bk.ok&&bk.knowledge_base);
   if(nasReady&&API_BASE!=='/api'){API_BASE='/api';API_BACKUP_UNTIL=0}   // the NAS is back: use it straight away
   else if(!nasReady&&bkOk&&API_BASE==='/api'){API_BASE='/api-backup';API_BACKUP_UNTIL=Date.now()+300000}   // NAS down: no search waits on it
@@ -618,13 +618,13 @@ async function checkServers(){
   const tm=new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
   $('#sst-det').textContent=`Home NAS: ${nasReady?'online':nasOk?'starting':'offline'} · Backup: ${bkOk?'ready':'not answering'} · checked ${tm}`;
 }
-setTimeout(checkServers,300);setInterval(checkServers,60000);
+setInterval(checkServers,60000);
 async function api(p,o={},tries=5){
   for(let i=0;;i++){
     let r;
-    /* a server that hangs counts as down: 20 s on the main one (it answers in well under a second),
+    /* a server that hangs counts as down: 10 s on the main one (it answers in well under a second),
        60 s on the backup (it may be waking up); o.timeout=0 for the slow source check */
-    const {timeout,...opts}=o,ms=timeout!==undefined?timeout:(apiBase()==='/api'?20000:60000);
+    const {timeout,...opts}=o,ms=timeout!==undefined?timeout:(apiBase()==='/api'?10000:60000);
     const ctl=new AbortController(),tm=ms?setTimeout(()=>ctl.abort(),ms):0;
     try{r=await fetch(apiBase()+p,{headers:{'content-type':'application/json'},credentials:'same-origin',cache:'no-store',signal:ctl.signal,...opts})}
     catch(e){clearTimeout(tm);if(useBackup())continue;if(i<tries-1){wake(1);await sleep(Math.min(2000*2**i,10000));continue}wake(0);throw new Error("Can't reach the server. Check the internet connection and try again.")}
@@ -671,8 +671,10 @@ $('#lform').onsubmit=async e=>{e.preventDefault();$('#lmsg').textContent='';try{
 // a refresh starts clean: no header is restored or searched again
 try{if(location.search){history.replaceState(null,'',location.pathname)}}catch(e){}
 const Q0=null;
-const _wt=setTimeout(()=>wake(1),2500);   // a sleeping server answers the first call slowly: say so
-api('/session').then(s=>{clearTimeout(_wt);wake(0);if(s.required&&!s.ok)showLogin();else if(Q0){q.value=Q0;chips(Q0);find()}}).catch(()=>{clearTimeout(_wt);wake(0)});
+const _wt=setTimeout(()=>wake(1),2500);   // a slow first answer: say so
+/* before anything else, a quick look at the home NAS: when it is off, the page starts on the backup
+   instead of waiting on it; the full status (both servers) follows in the footer */
+ping('/api',5000).then(n=>{if(!(n&&n.ok&&n.knowledge_base)){API_BASE='/api-backup';API_BACKUP_UNTIL=Date.now()+300000}}).then(()=>{checkServers();return api('/session')}).then(s=>{clearTimeout(_wt);wake(0);if(s.required&&!s.ok)showLogin();else if(Q0){q.value=Q0;chips(Q0);find()}}).catch(()=>{clearTimeout(_wt);wake(0)});
 
 /* ---------- theme ---------- */
 function themeLabel(){$$('.tlabel').forEach(l=>l.textContent=document.documentElement.dataset.theme==='dark'?'Dark':'Light')}
