@@ -44,14 +44,25 @@ so nobody sees an error when the NAS is off.
    - 20 searches at once all finish without errors;
    - with the container stopped, searches still work through Render.
 
+## Everyday use
+
+Switch the NAS on and leave. Nothing else is needed:
+
+- at boot, the **PuckTrace Funnel** task (triggered task, Boot-up, root) publishes the NAS and then fetches the newest version:
+
+  ```bash
+  /var/packages/Tailscale/target/bin/tailscale funnel --bg 8000
+  sleep 120
+  export PATH=$PATH:/usr/local/bin; cd /volume2/docker/pucktrace && (docker compose pull -q && docker compose up -d || (docker-compose pull -q && docker-compose up -d))
+  ```
+- the container starts by itself (`restart: unless-stopped`);
+- while the NAS is off, starting, or not answering within 20 s, the page uses Render, and a search lost on the way is started again there;
+- Render copies the knowledge base and learned spellings from the NAS every 30 minutes, so its answers match the NAS's.
+
+`https://pucktrace.actorix.in/api/healthz` shows the version the NAS runs; `https://pucktrace-api-8u5i.onrender.com/api/healthz` the backup's.
+
 ## Updating
 
-Pushing to `main` builds a new image (about 10 minutes). The NAS picks it up through a DSM Task Scheduler task:
-**Create > Scheduled Task > User-defined script**, name "PuckTrace Update", user **root**, schedule daily at 07:00, script:
-
-```bash
-cd /volume2/docker/pucktrace && (docker compose pull -q && docker compose up -d || (docker-compose pull -q && docker-compose up -d))
-```
-
-Select the task and click **Run** to update straight away. The container restarts only when the image changed;
-a search running at that moment is started again by the page on its own.
+Pushing to `main` builds a new image (about 10 minutes). The NAS takes it at the next boot, or straight away with
+**Task Scheduler > PuckTrace Funnel > Run**. The optional daily **PuckTrace Update** task (scheduled, root) runs the same update
+for days when the NAS stays on.
