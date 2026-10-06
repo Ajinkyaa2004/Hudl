@@ -34,10 +34,10 @@ so nobody sees an error when the NAS is off.
 ## Part 2: install (done from the Mac over Tailscale)
 
 1. Make the GitHub package `pucktrace` public: GitHub > Packages > pucktrace > Package settings > Change visibility > Public. The image holds only the public code.
-2. On the NAS, create the folder `/volume1/docker/pucktrace/data`.
+2. On the NAS, create the folder `/volume2/docker/pucktrace/data` (volume 2; volume 1 holds personal files and is never used).
 3. Copy the private data from the Mac: `data/knowledge.json` and `data/aliases_learned.json`, plus `data/games.db` to save the first download.
-4. In Container Manager, choose **Project > Create**, name it `pucktrace`, set the path to `/volume1/docker/pucktrace`, and use `deploy/docker-compose.nas.yml`. Set `APP_PASSWORD` and `APP_SECRET` to **the same values as on Render**, so one sign-in works on both servers.
-5. Publish it with `sudo tailscale funnel --bg 8000`. This gives `https://<nas-name>.<tailnet>.ts.net`.
+4. In Container Manager, choose **Project > Create**, name it `pucktrace`, set the path to `/volume2/docker/pucktrace`, and use `deploy/docker-compose.nas.yml`. Set `APP_PASSWORD` and `APP_SECRET` to **the same values as on Render**, so one sign-in works on both servers.
+5. Publish it: DSM Task Scheduler, triggered task "PuckTrace Funnel" (user root, event Boot-up) running `/var/packages/Tailscale/target/bin/tailscale funnel --bg 8000`. The tailnet policy needs `"nodeAttrs": [{"target": ["autogroup:member"], "attr": ["funnel"]}]`. Address: https://home-nas.tailfff30a.ts.net
 6. In `vercel.json`, point `/api/:path*` at `https://<nas-name>.<tailnet>.ts.net/api/:path*`, keep `/api-backup` on Render, then commit.
 7. Test:
    - `https://pucktrace.actorix.in/api/healthz` shows `knowledge_base: true` and the game list is loaded;

@@ -1,5 +1,5 @@
 # PuckTrace on the home NAS. In Synology Container Manager: Project > Create > upload this file,
-# path /volume1/docker/pucktrace. Fill APP_PASSWORD and APP_SECRET with the same values as on
+# path /volume2/docker/pucktrace. Fill APP_PASSWORD and APP_SECRET with the same values as on
 # Render, so one sign-in works on both servers.
 services:
   pucktrace:
@@ -16,5 +16,5 @@ services:
       GAME_LIST: "1"                 # load the published game list, every 3 hours
       HEALTH_DAILY: "0"
     volumes:
-      - /volume1/docker/pucktrace/data:/app/data   # game list, knowledge base, learning: kept on the NAS disk
+      - /volume2/docker/pucktrace/data:/app/data   # game list, knowledge base, learning: kept on the NAS disk
     mem_limit: 1200m                 # leaves room for DSM on a 2 GB NAS
