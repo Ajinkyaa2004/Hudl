@@ -90,11 +90,57 @@ async def admin_upload(name: str, request: Request):
     return dict(ok=True, bytes=len(body))
 
 
+@app.get("/api/admin/data")
+def admin_data(name: str):
+    """The private data files, for the backup server to copy (signed in: the backup sends the same
+    session token, as both servers share APP_PASSWORD and APP_SECRET)."""
+    if name not in {"knowledge.json", "aliases_learned.json"}:
+        raise HTTPException(400, "Not a data file")
+    f = ROOT / "data" / name
+    if not f.exists():
+        raise HTTPException(404, "No such file here")
+    return Response(f.read_bytes(), media_type="application/json")
+
+
+# the backup (Render, no disk) copies the knowledge base and learned spellings from the main server
+DATA_FROM = _os.environ.get("DATA_FROM") or ("https://home-nas.tailfff30a.ts.net" if _os.environ.get("RENDER") else "")
+
+
+async def _data_sync_loop():
+    import asyncio, httpx, json as _j
+    from .adapters import base as _base
+    global KB
+    await asyncio.sleep(20)
+    while True:
+        try:
+            async with httpx.AsyncClient(timeout=60, cookies={"pt_session": _token()}) as c:
+                for name in ("knowledge.json", "aliases_learned.json"):
+                    r = await c.get(f"{DATA_FROM}/api/admin/data", params={"name": name})
+                    if r.status_code != 200:
+                        continue
+                    _j.loads(r.content)                       # only valid JSON replaces what is here
+                    f = ROOT / "data" / name
+                    if f.exists() and f.read_bytes() == r.content:
+                        continue
+                    f.write_bytes(r.content)
+                    if name == "knowledge.json":
+                        KB = lookup.load_kb()
+                    else:
+                        _base._ALIASES = None
+                        _base.team_similarity.cache_clear()
+                    print(f"[data sync] {name} updated from {DATA_FROM}", flush=True)
+        except Exception as e:
+            print("[data sync] failed:", e, flush=True)
+        # while it has no knowledge base yet, try again soon (the main server may be switched off)
+        await asyncio.sleep(1800 if KB.get("teams") else 300)
+
+
 @app.api_route("/api/healthz", methods=["GET", "HEAD"])   # uptime monitors check with HEAD
 def healthz():
     # open (no sign-in): only whether the published game list is loaded, no names or headers
     gl = globals().get("GAME_LIST") or {}
-    return dict(ok=True, game_list=gl.get("games", 0), game_list_at=gl.get("at"), knowledge_base=len(KB.get("teams") or {}) > 0)
+    return dict(ok=True, game_list=gl.get("games", 0), game_list_at=gl.get("at"), knowledge_base=len(KB.get("teams") or {}) > 0,
+                version=(_os.environ.get("APP_VERSION") or _os.environ.get("RENDER_GIT_COMMIT", ""))[:7] or None)
 
 
 GAME_LIST_URL = _os.environ.get("GAME_LIST_URL", "https://github.com/Ajinkyaa2004/Hudl/releases/download/game-list/game-list.db.gz")
@@ -178,6 +224,8 @@ async def _start_harvest():
     if _os.environ.get("GAME_LIST", "1") != "0":
         asyncio.create_task(_game_list_loop())
     asyncio.create_task(_daily_harvest())
+    if DATA_FROM:
+        asyncio.create_task(_data_sync_loop())
 
 
 class SearchIn(BaseModel):

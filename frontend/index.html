@@ -579,10 +579,17 @@ function useBackup(){if(API_BASE==='/api'){API_BASE='/api-backup';API_BACKUP_UNT
 async function api(p,o={},tries=5){
   for(let i=0;;i++){
     let r;
-    try{r=await fetch(apiBase()+p,{headers:{'content-type':'application/json'},credentials:'same-origin',cache:'no-store',...o})}
-    catch(e){if(useBackup())continue;if(i<tries-1){wake(1);await sleep(Math.min(2000*2**i,10000));continue}wake(0);throw new Error("Can't reach the server. Check the internet connection and try again.")}
-    if([502,503,504].includes(r.status)&&useBackup())continue;
-    if([502,503,504].includes(r.status)&&i<tries-1){wake(1);await sleep(Math.min(2000*2**i,10000));continue}
+    /* a server that hangs counts as down: 20 s on the main one (it answers in well under a second),
+       60 s on the backup (it may be waking up); o.timeout=0 for the slow source check */
+    const {timeout,...opts}=o,ms=timeout!==undefined?timeout:(apiBase()==='/api'?20000:60000);
+    const ctl=new AbortController(),tm=ms?setTimeout(()=>ctl.abort(),ms):0;
+    try{r=await fetch(apiBase()+p,{headers:{'content-type':'application/json'},credentials:'same-origin',cache:'no-store',signal:ctl.signal,...opts})}
+    catch(e){clearTimeout(tm);if(useBackup())continue;if(i<tries-1){wake(1);await sleep(Math.min(2000*2**i,10000));continue}wake(0);throw new Error("Can't reach the server. Check the internet connection and try again.")}
+    clearTimeout(tm);
+    /* our server always answers in JSON; any other error page comes from the way there (the NAS is off or starting) */
+    const down=[502,503,504].includes(r.status)||(r.status>=400&&!(r.headers.get('content-type')||'').includes('json'));
+    if(down&&useBackup())continue;
+    if(down&&i<tries-1){wake(1);await sleep(Math.min(2000*2**i,10000));continue}
     wake(0);
     if(r.status===401&&p!=='/login'){showLogin();throw new Error('Sign in required')}
     if(!r.ok){let m=r.statusText;try{m=(await r.json()).detail||m}catch(e){}const err=new Error(m||('Server error '+r.status));err.status=r.status;throw err}
@@ -651,7 +658,7 @@ async function loadStatus(){
     $('#sttable tbody').innerHTML=cs.map(c=>`<tr><td data-l="Source"><b style="font-weight:600">${esc(c.source)}</b></td><td data-l="Result"><span class="badge ${c.ok?'ok':'no'}">${c.ok?ic('check','xs')+'Working':ic('alert','xs')+'Failing'}</span>${c.ok?'':` <span class="mu small">${esc(c.error||'')}</span>`}</td><td data-l="How" class="mu small">${c.how==='live'?'site read live':c.how==='game list'?'from the daily game list':''}</td><td data-l="Time" class="mu small mono">${c.seconds}s</td></tr>`).join('')||'<tr><td colspan=4 class="mu">No checks yet. Press "Check sources now".</td></tr>';
   }catch(e){$('#stwhen').textContent='Could not load status: '+e.message}
 }
-$('#strun').onclick=async()=>{const b=$('#strun'),t=b.querySelector('span');b.disabled=true;t.textContent='Checking… about a minute';try{await post('/health/run',{})}catch(e){}b.disabled=false;t.textContent='Check sources now';loadStatus()};
+$('#strun').onclick=async()=>{const b=$('#strun'),t=b.querySelector('span');b.disabled=true;t.textContent='Checking… about a minute';try{await post('/health/run',{},{timeout:0})}catch(e){}b.disabled=false;t.textContent='Check sources now';loadStatus()};
 
 async function stats(){try{const c=await api('/config');
   $('#stats').textContent=`${c.teams.toLocaleString()} teams · ${c.tournaments} competitions · ${c.saved} saved`;
