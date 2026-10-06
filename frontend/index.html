@@ -571,11 +571,17 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 /* the server sleeps on the free plan and can be briefly unreachable while it wakes or restarts:
    502/503/504 and network errors are retried with a "waking up" banner instead of failing */
 function wake(on){$('#wake').classList.toggle('on',!!on)}
+/* two servers: the main one (home NAS) at /api and a backup (Render) at /api-backup. When the
+   main one doesn't answer, the page switches to the backup for 5 minutes, then tries main again */
+let API_BASE='/api',API_BACKUP_UNTIL=0;
+function apiBase(){if(API_BASE!=='/api'&&Date.now()>API_BACKUP_UNTIL)API_BASE='/api';return API_BASE}
+function useBackup(){if(API_BASE==='/api'){API_BASE='/api-backup';API_BACKUP_UNTIL=Date.now()+300000;return true}return false}
 async function api(p,o={},tries=5){
   for(let i=0;;i++){
     let r;
-    try{r=await fetch('/api'+p,{headers:{'content-type':'application/json'},credentials:'same-origin',cache:'no-store',...o})}
-    catch(e){if(i<tries-1){wake(1);await sleep(Math.min(2000*2**i,10000));continue}wake(0);throw new Error("Can't reach the server. Check the internet connection and try again.")}
+    try{r=await fetch(apiBase()+p,{headers:{'content-type':'application/json'},credentials:'same-origin',cache:'no-store',...o})}
+    catch(e){if(useBackup())continue;if(i<tries-1){wake(1);await sleep(Math.min(2000*2**i,10000));continue}wake(0);throw new Error("Can't reach the server. Check the internet connection and try again.")}
+    if([502,503,504].includes(r.status)&&useBackup())continue;
     if([502,503,504].includes(r.status)&&i<tries-1){wake(1);await sleep(Math.min(2000*2**i,10000));continue}
     wake(0);
     if(r.status===401&&p!=='/login'){showLogin();throw new Error('Sign in required')}
@@ -605,7 +611,7 @@ async function job(path,body){
 }
 const post=(p,b,o)=>api(p,{method:'POST',body:JSON.stringify(b),...o});
 const host=u=>{try{return new URL(u).hostname.replace(/^www\./,'')}catch(e){return ''}};
-const shotUrl=u=>'/api/shot?url='+encodeURIComponent(u);
+const shotUrl=u=>apiBase()+'/shot?url='+encodeURIComponent(u);
 function toast(t){const e=$('#toast');e.innerHTML=ic('check')+esc(t);e.classList.add('on');clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove('on'),1700)}
 async function copy(t){try{await navigator.clipboard.writeText(t);toast('Link copied')}catch(e){toast('Copy failed')}}
 
@@ -889,7 +895,7 @@ function editSource(r){
   $('#scancel').onclick=()=>$('#sedit').style.display='none';
   $('#ssave').onclick=async()=>{const body=Object.fromEntries($$('#sform2 input').map(i=>[i.dataset.f,i.value.trim()]));
     try{await post(kind==='teams'?'/sources/team':'/sources/tournament',body);$('#sedit').style.display='none';loadSources();stats();toast('Saved')}catch(e){$('#smsg').className='msg err';$('#smsg').textContent=e.message}};
-  if(r.key)$('#sdel').onclick=async()=>{if(!confirm(`Delete ${r.name}?`))return;await fetch(`/api/sources/${kind==='teams'?'team':'tournament'}/${encodeURIComponent(r.key)}`,{method:'DELETE'});$('#sedit').style.display='none';loadSources();stats()};
+  if(r.key)$('#sdel').onclick=async()=>{if(!confirm(`Delete ${r.name}?`))return;await fetch(apiBase()+`/sources/${kind==='teams'?'team':'tournament'}/${encodeURIComponent(r.key)}`,{method:'DELETE'});$('#sedit').style.display='none';loadSources();stats()};
   window.scrollTo({top:0,behavior:'smooth'});setTimeout(()=>$('#sform2 input'+(r.key?':not([readonly])':'')).focus(),200);
 }
 

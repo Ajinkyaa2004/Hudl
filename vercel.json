@@ -10,6 +10,10 @@
       "destination": "https://pucktrace-api-8u5i.onrender.com/api/:path*"
     },
     {
+      "source": "/api-backup/:path*",
+      "destination": "https://pucktrace-api-8u5i.onrender.com/api/:path*"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

@@ -22,7 +22,7 @@ import os as _os
 # On a small server (Render Free: 0.1 CPU, 512 MB) a headless browser per roster page slows every
 # search and can run the server out of memory. LIGHT mode reads pages with plain requests only;
 # FULL_MODE=1 turns the browser back on (a paid instance or a local run).
-LIGHT = bool(_os.environ.get("RENDER")) and not _os.environ.get("FULL_MODE")
+LIGHT = bool(_os.environ.get("RENDER") or _os.environ.get("LIGHT_MODE")) and not _os.environ.get("FULL_MODE")
 
 NUM_H = re.compile(r"^(#|no\.?|num(ber)?|jersey|jersey\s*#|#\s*jersey|n°|nr\.?|č\.?|nro)$", re.I)
 NAME_H = re.compile(r"^(name|player|players|player\s*name|athlete|full\s*name|skater|nom|jméno|spelare|namn|nimi|spieler)$", re.I)

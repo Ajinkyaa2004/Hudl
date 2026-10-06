@@ -280,7 +280,7 @@ def _job_start(key: str, factory) -> dict:
 
     async def run():
         global _JOB_SEM
-        _JOB_SEM = _JOB_SEM or _aio.Semaphore(3)
+        _JOB_SEM = _JOB_SEM or _aio.Semaphore(int(_os.environ.get("MAX_SEARCHES", "3")))   # 3 on Render Free, 8 on the NAS
         j = _JOBS[jid]
         try:
             async with _JOB_SEM:
