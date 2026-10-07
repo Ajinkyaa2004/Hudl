@@ -77,7 +77,8 @@ def _tokens(name):
     ages = {next(g for g in m.groups() if g) for m in AGE_RE.finditer(s)}
     if any(len(a) <= 2 for a in ages):          # "San Jose Jr Sharks 2014 12U": the age group wins
         ages = {a for a in ages if len(a) <= 2}
-    levels = {x.strip("()") for x in LEVEL_RE.findall(s)}
+    # Women's, Female, Girls and the (G)/(W) tags all mean the same: a girls' or women's team
+    levels = {"female" if x.strip("()") in ("women", "girl", "girls", "g", "w") else x.strip("()") for x in LEVEL_RE.findall(s)}
     base = LEVEL_RE.sub(" ", AGE_RE.sub(" ", s))
     base = re.sub(r"\b(hc|hk|sk|if|ifk|ik|bk|hf|ec|ehc|ev|hcm|mhk|hkm|jr\.?|junior|juniors|ncdc|hockey|club|team|ishockeyklubb|ishockeyklub|ishockeylag|ishockey|eishockey|hockeyklubb|hockeyclub|jaakiekko|idrettslag|sportsklubb)\b", " ", base)
     return re.sub(r"[^a-z0-9]", "", base), frozenset(ages), frozenset(levels)

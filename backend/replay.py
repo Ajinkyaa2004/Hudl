@@ -68,6 +68,7 @@ def canonical(url: str):
         ("tts-usphl", r"usphl\.com/.*game_id=(\d+)"),
         ("tts-blackbear", r"atlanticgirlshockeyfederation\.com/.*[?&]game=(\d+)"),
         ("tts-caha", r"stats\.caha\.timetoscore\.com/.*game_id=(\d+)"),
+        ("tts-caha", r"norcalpuck\.com/live/(\d+)"),           # NorCalPuck shows CAHA Time To Score games by the same id
         ("tts-asec", r"stats\.asec\.timetoscore\.com/.*game_id=(\d+)"),
         ("tts-cna", r"stats\.cna\.timetoscore\.com/.*game_id=(\d+)"),
     ]

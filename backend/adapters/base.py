@@ -72,7 +72,8 @@ GENERIC_INITIALS = set("HACSMYFIEL")      # Hockey, Association, Club, Society, 
 
 
 WORD_SYN = {"pens": "Penguins", "hb": "Honeybaked", "honeybaked": "HB", "nyc": "New York City", "jrs": "Juniors", "indy": "Indiana", "philly": "Philadelphia", "nova": "Northern Virginia", "socal": "Southern California",
-            "norcal": "Northern California", "vegas": "Las Vegas", "jrs": "Juniors", "mtl": "Montreal", "tor": "Toronto"}
+            "norcal": "Northern California", "vegas": "Las Vegas", "jrs": "Juniors", "mtl": "Montreal", "tor": "Toronto",
+            "sask": "Saskatchewan", "acad": "Academy"}
 
 
 def expand_acronyms(short: str, full: str) -> str:
@@ -113,8 +114,29 @@ def expand_acronyms(short: str, full: str) -> str:
 import functools as _ft
 
 
+# national teams: a site team that is just a country only matches a header that names that country
+# ("Czechia" is not "CIH Academy", "Finland" is not "FEIA Falcons")
+NATIONS = {"czechia", "czech republic", "finland", "sweden", "norway", "denmark", "germany", "switzerland", "austria",
+           "slovakia", "slovenia", "latvia", "lithuania", "estonia", "poland", "hungary", "france", "italy", "great britain",
+           "united kingdom", "netherlands", "belgium", "kazakhstan", "belarus", "russia", "ukraine", "canada", "usa",
+           "united states", "japan", "korea", "china", "romania", "croatia", "serbia", "spain"}
+_NATION_RE = re.compile(r"^(?:team\s+)?(" + "|".join(sorted(NATIONS, key=len, reverse=True)) + r")(?:\s+(?:u\s?\d{2}|\d{2}\s?u|women|w|men|junior|juniors))*$")
+
+
+_ANY_NATION = re.compile(r"\b(?:" + "|".join(sorted(NATIONS | {"czech", "slovak", "swiss", "gb", "us", "team usa", "suomi", "sverige", "norge", "deutschland", "cesko", "slovensko",
+                           "kanada", "schweiz", "tschechien", "finnland", "schweden", "norwegen", "danemark", "osterreich", "slowakei",
+                           "lettland", "polen", "ungarn", "frankreich", "italien", "rossiya", "belarus",
+                           "estonian", "latvian", "lithuanian", "finnish", "swedish", "norwegian", "danish", "german", "austrian",
+                           "polish", "hungarian", "french", "italian", "british", "dutch", "belgian", "slovenian", "croatian",
+                           "serbian", "romanian", "spanish", "kazakh", "ukrainian", "belarusian", "canadian", "american",
+                           "japanese", "korean", "chinese"}, key=len, reverse=True)) + r")\b")
+
+
 @_ft.lru_cache(maxsize=200000)
 def team_similarity(header_name: str, site_name: str, context: str = "") -> tuple[float, str]:
+    from ..lookup import strip_accents
+    if _NATION_RE.match(strip_accents(site_name or "").lower().strip()) and not _ANY_NATION.search(strip_accents(header_name or "").lower()):
+        return 0.0, "site team is a national team"
     return _team_similarity_all(header_name or "", site_name or "", context or "")
 
 

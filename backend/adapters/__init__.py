@@ -240,7 +240,9 @@ def decide(parsed: dict, cands: list) -> dict:
             # keep the league's own page (a live source) over the bulk copy in the game list
             # the league's or federation's own page first; aggregators (onlajny) and the game list after
             weak = {"onlajny", "web search"}
-            strong_ones = sorted(strong_ones, key=lambda c: ((c.get("adapter") or c.get("source")) in weak, c.get("via") == "index", -c["confidence"]))[:1]
+            # a copy with a result beats an unplayed placeholder of the same game
+            played = lambda c: bool(c.get("score")) or str(c.get("status") or "").lower() in ("final", "completed", "final/so", "final/ot")
+            strong_ones = sorted(strong_ones, key=lambda c: (not played(c), (c.get("adapter") or c.get("source")) in weak, c.get("via") == "index", -c["confidence"]))[:1]
     # a game of these teams far from the header's time loses to another game of one of the
     # teams that starts right at the header's time (the pair's other game of a weekend)
     from .base import TIME_MATCH
