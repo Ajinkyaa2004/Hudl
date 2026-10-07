@@ -76,6 +76,19 @@ WORD_SYN = {"pens": "Penguins", "hb": "Honeybaked", "honeybaked": "HB", "nyc": "
             "sask": "Saskatchewan", "acad": "Academy"}
 
 
+# levels and school tags written in capitals, never initials of words
+NOT_ACRONYMS = {"aa", "aaa", "jv", "hs", "ii", "iii", "iv", "ot", "so"}
+# names a schedule uses before the teams are known
+PLACEHOLDERS = re.compile(r"^(?:away|home|tbd|tba|tbc|bye|unknown|team\s?\d*|(?:winner|loser|w|l)\s+(?:of\s+)?(?:game|g|#)?\s*\d+.*|\d+(?:st|nd|rd|th)\s+.*)$", re.I)
+
+
+def _rest_shared(short: str, code: str, fw: list) -> bool:
+    """A one-letter guess at a two-letter code counts only when the name's other words also
+    appear in the other name."""
+    rest = {x.lower() for x in re.findall(r"[A-Za-z']{3,}", short or "") if x != code.replace(".", "")}
+    return bool(rest & {x.lower() for x in fw if len(x) >= 3})
+
+
 def expand_acronyms(short: str, full: str) -> str:
     """'PTL Black 14U' against 'Princeton Tiger Lilies Black 14U' -> 'Princeton Tiger Lilies Black 14U':
     an upper-case word of 2-4 letters (dots allowed) becomes the run of words in the other name
@@ -85,7 +98,7 @@ def expand_acronyms(short: str, full: str) -> str:
     for w in (short or "").split():
         bare = w.replace(".", "")
         rep = None
-        if re.fullmatch(r"[A-Z]{2,4}", bare):
+        if re.fullmatch(r"[A-Z]{2,4}", bare) and bare.lower() not in NOT_ACRONYMS:
             n = len(bare)
             for i in range(len(fw) - n + 1):
                 if "".join(x[0] for x in fw[i:i + n]).upper() == bare and all(len(x) > 1 for x in fw[i:i + n]):
@@ -97,6 +110,8 @@ def expand_acronyms(short: str, full: str) -> str:
                 for k in range(n - 1, 0, -1):
                     if not set(bare[k:]) <= GENERIC_INITIALS:
                         continue
+                    if k == 1 and n < 3 and not _rest_shared(short, w, fw):
+                        continue          # "HS Regis Raiders" is not "Hawkeye"; "AC Avalanche" is "Airdrie Avalanche"
                     for i in range(len(fw) - k + 1):
                         if "".join(x[0] for x in fw[i:i + k]).upper() == bare[:k] and all(len(x) > 2 for x in fw[i:i + k]):
                             rep = " ".join(fw[i:i + k])
@@ -137,6 +152,8 @@ def team_similarity(header_name: str, site_name: str, context: str = "") -> tupl
     from ..lookup import strip_accents
     if _NATION_RE.match(strip_accents(site_name or "").lower().strip()) and not _ANY_NATION.search(strip_accents(header_name or "").lower()):
         return 0.0, "site team is a national team"
+    if PLACEHOLDERS.match((site_name or "").strip()):
+        return 0.0, "site lists a placeholder, not a team"
     return _team_similarity_all(header_name or "", site_name or "", context or "")
 
 
@@ -376,9 +393,21 @@ def anchored(c: dict) -> bool:
             and max(c["team_scores"]) >= 0.9 and min(c["team_scores"]) >= 0.3)
 
 
+def at_header_time(c: dict) -> bool:
+    """One header team clearly matching, its age group confirmed, at the header's exact start time,
+    whatever the opponent."""
+    if not (TIME_MATCH in c.get("reasons", []) and abs(c.get("time_diff_min", 999)) <= 20 and max(c["team_scores"]) >= 0.85):
+        return False
+    i = 0 if c["team_scores"][0] >= c["team_scores"][1] else 1
+    why = next((r for r in c.get("reasons", []) if r.startswith(f"team {i + 1}:")), "")
+    return "not shown" not in why and "header has none" not in why
+
+
 def keep(c: dict) -> bool:
-    """Worth showing: both teams plausible, or anchored by the start time."""
-    return min(c["team_scores"]) >= 0.6 or anchored(c)
+    """Worth showing: both teams plausible, or anchored by the start time. A game of one header team
+    at the header's exact time is kept too, even against another opponent: when the header's teams
+    point at one game and its time at another, both are shown (decide())."""
+    return min(c["team_scores"]) >= 0.6 or anchored(c) or at_header_time(c)
 
 
 class Adapter:

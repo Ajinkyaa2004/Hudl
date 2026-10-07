@@ -327,6 +327,19 @@ def decide(parsed: dict, cands: list) -> dict:
         if len(pair) == 1:
             pair[0]["reasons"] = pair[0]["reasons"] + ["the only game starting at the header's time; both names are close, check them"]
             strong_ones = pair
+    # The header's teams and its time point at different games (the header names the wrong
+    # opponent, or the wrong day): a game of both teams hours away from the header's time, and a
+    # game of one of them at the header's exact time against someone else. Show both, choose neither.
+    if len(strong_ones) == 1:
+        from .base import at_header_time
+        s = strong_ones[0]
+        far = any("h away from the header time" in r for r in s.get("reasons", []))
+        if far and any(c is not s and at_header_time(c) for c in cands):
+            strong_ones = []
+        elif min(s["team_scores"]) < 0.6 and any(
+                c is not s and min(c["team_scores"]) >= 0.9 and any("h away from the header time" in r for r in c.get("reasons", []))
+                for c in cands):
+            strong_ones = []
     if len(strong_ones) == 1:
         verdict = "found"
     elif cands:
