@@ -99,19 +99,26 @@ async def admin_upload(name: str, request: Request):
 
 
 @app.get("/api/admin/data")
-def admin_data(name: str):
-    """The private data files, for the backup server to copy (signed in: the backup sends the same
-    session token, as both servers share APP_PASSWORD and APP_SECRET)."""
+def admin_data(name: str, since: float = 0):
+    """The private data files, for the other server to copy (signed in: both servers share
+    APP_PASSWORD and APP_SECRET, so each can send the other a valid session token). With `since`,
+    answers 204 unless this copy is newer, so the regular check costs nothing."""
     if name not in {"knowledge.json", "aliases_learned.json"}:
         raise HTTPException(400, "Not a data file")
     f = ROOT / "data" / name
     if not f.exists():
         raise HTTPException(404, "No such file here")
-    return Response(f.read_bytes(), media_type="application/json")
+    t = f.stat().st_mtime
+    if since and t <= since + 1:
+        return Response(status_code=204)
+    return Response(f.read_bytes(), media_type="application/json", headers={"x-data-time": str(t)})
 
 
-# the backup (Render, no disk) copies the knowledge base and learned spellings from the main server
-DATA_FROM = _os.environ.get("DATA_FROM") or ("https://home-nas.tailfff30a.ts.net" if _os.environ.get("RENDER") else "")
+# the two servers keep the same knowledge base and learned spellings: each checks the other every
+# 5 minutes and takes its copy when it is newer (a save on the NAS reaches Render; an update loaded
+# on Render while the NAS is off reaches the NAS when it starts)
+NAS_URL, RENDER_URL = "https://home-nas.tailfff30a.ts.net", "https://pucktrace-api-8u5i.onrender.com"
+DATA_FROM = _os.environ.get("DATA_FROM") or (NAS_URL if SERVER == "render" else RENDER_URL if SERVER == "nas" else "")
 
 
 async def _data_sync_loop():
@@ -121,26 +128,29 @@ async def _data_sync_loop():
     await asyncio.sleep(20)
     while True:
         try:
-            async with httpx.AsyncClient(timeout=60, cookies={"pt_session": _token()}) as c:
+            async with httpx.AsyncClient(timeout=90, cookies={"pt_session": _token()}) as c:
                 for name in ("knowledge.json", "aliases_learned.json"):
-                    r = await c.get(f"{DATA_FROM}/api/admin/data", params={"name": name})
+                    f = ROOT / "data" / name
+                    mine = f.stat().st_mtime if f.exists() else 0
+                    r = await c.get(f"{DATA_FROM}/api/admin/data", params={"name": name, "since": mine})
                     if r.status_code != 200:
                         continue
+                    theirs = float(r.headers.get("x-data-time") or 0)
+                    if theirs <= mine + 1:
+                        continue                              # an older server that doesn't know `since`
                     _j.loads(r.content)                       # only valid JSON replaces what is here
-                    f = ROOT / "data" / name
-                    if f.exists() and f.read_bytes() == r.content:
-                        continue
-                    f.write_bytes(r.content)
-                    if name == "knowledge.json":
-                        KB = lookup.load_kb()
-                    else:
-                        _base._ALIASES = None
-                        _base.team_similarity.cache_clear()
-                    print(f"[data sync] {name} updated from {DATA_FROM}", flush=True)
+                    if not (f.exists() and f.read_bytes() == r.content):
+                        f.write_bytes(r.content)
+                        if name == "knowledge.json":
+                            KB = lookup.load_kb()
+                        else:
+                            _base._ALIASES = None
+                            _base.team_similarity.cache_clear()
+                        print(f"[data sync] {name} updated from {DATA_FROM}", flush=True)
+                    _os.utime(f, (theirs, theirs))            # same time on both: no copying back and forth
         except Exception as e:
             print("[data sync] failed:", e, flush=True)
-        # while it has no knowledge base yet, try again soon (the main server may be switched off)
-        await asyncio.sleep(1800 if KB.get("teams") else 300)
+        await asyncio.sleep(int(_os.environ.get("SYNC_EVERY", "300")))
 
 
 @app.api_route("/api/healthz", methods=["GET", "HEAD"])   # uptime monitors check with HEAD
