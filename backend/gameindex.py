@@ -83,7 +83,7 @@ def games_on(dates: list[str]) -> list[dict]:
         for d, gs in by.items():
             _DAY_CACHE[d] = (now, gs)
         out += rows
-    return [dict(g) for g in out]
+    return out          # the cached dicts themselves: callers copy before changing (index.py does)
 
 
 def around(date: str, before: int = 1, after: int = 1) -> list[str]:

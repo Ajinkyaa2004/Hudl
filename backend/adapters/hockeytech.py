@@ -27,6 +27,30 @@ LEAGUES = {
 }
 import json as _json
 from pathlib import Path as _Path
+import asyncio as _asyncio, time as _time
+
+# A league's season schedule is up to 10 MB of JSON; every search used to parse all of them again.
+# Each one is now parsed once and kept for 6 hours with only the fields matching needs.
+_SLIM: dict = {}
+_SLIM_LOCKS: dict = {}
+_SLIM_KEYS = ("date_played", "home_team_name", "visiting_team_name", "home_goal_count", "visiting_goal_count",
+              "final", "game_status", "game_id", "GameDateISO8601")
+
+
+async def _schedule(url: str) -> list:
+    hit = _SLIM.get(url)
+    if hit and _time.time() - hit[0] < 6 * 3600:
+        return hit[1]
+    lock = _SLIM_LOCKS.setdefault((id(_asyncio.get_running_loop()), url), _asyncio.Lock())
+    async with lock:                                  # several searches at once parse it only once
+        hit = _SLIM.get(url)
+        if hit and _time.time() - hit[0] < 6 * 3600:
+            return hit[1]
+        data = await get_json(url, ttl=6 * 3600, timeout=40, keep=False)
+        games = [{k: g.get(k) for k in _SLIM_KEYS} for g in ((data or {}).get("SiteKit") or {}).get("Schedule") or []]
+        if data is not None:
+            _SLIM[url] = (_time.time(), games)
+        return games
 _CLIENTS = _Path(__file__).resolve().parent.parent.parent / "data" / "hockeytech_clients.json"
 try:
     for _code, _v in _json.loads(_CLIENTS.read_text()).items():
@@ -112,10 +136,8 @@ class HockeyTech(Adapter):
     async def _league_games(self, code, cfg, year):
         games = []
         for sid, sname in await self._seasons(code, cfg, year):
-            data = await get_json(self._feed("schedule", code, cfg).replace("season_id=&", f"season_id={sid}&"), ttl=6 * 3600, timeout=40)
-            for g in ((data or {}).get("SiteKit") or {}).get("Schedule") or []:
-                g["_season"] = sname
-                games.append(g)
+            for g in await _schedule(self._feed("schedule", code, cfg).replace("season_id=&", f"season_id={sid}&")):
+                games.append(dict(g, _season=sname))
         return code, cfg, games
 
     async def find(self, parsed, tm, kb):

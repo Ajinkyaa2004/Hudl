@@ -68,12 +68,30 @@ import threading as _th
 _cache_lock = _th.Lock()
 
 
+import os as _os
+# pages kept in memory: at most 500, and at most this many MB of text (Render Free has 512 MB in all)
+_CACHE_MB = int(_os.environ.get("FETCH_CACHE_MB") or (40 if _os.environ.get("RENDER") else 120))
+_cache_bytes = [0]
+
+
+def _size(v) -> int:
+    return len(v) if isinstance(v, (str, bytes)) else 2000
+
+
 def _store(key, val):
     with _cache_lock:                     # the daily refresh writes from its own thread
+        old = _cache.get(key)
+        if old:
+            _cache_bytes[0] -= _size(old[1])
         _cache[key] = (time.time(), val)
-        if len(_cache) > 500:
-            for k in sorted(_cache, key=lambda k: _cache[k][0])[:100]:
-                _cache.pop(k, None)
+        _cache_bytes[0] += _size(val)
+        if len(_cache) > 500 or _cache_bytes[0] > _CACHE_MB * 1048576:
+            for k in sorted(_cache, key=lambda k: _cache[k][0]):
+                if len(_cache) <= 400 and _cache_bytes[0] <= _CACHE_MB * 1048576 * 0.8:
+                    break
+                v = _cache.pop(k, None)
+                if v:
+                    _cache_bytes[0] -= _size(v[1])
 
 
 _clients: dict = {}
@@ -129,7 +147,7 @@ def _limits():
     return e[1], e[2]
 
 
-async def get_text(url: str, ttl: int = 600, timeout: float = 15.0, headers: dict | None = None) -> str | None:
+async def get_text(url: str, ttl: int = 600, timeout: float = 15.0, headers: dict | None = None, keep: bool = True) -> str | None:
     """Plain GET. Returns body text or None. Cached by URL. When several searches want the
     same page at once, it is fetched once and shared."""
     hit = _cached(("http", url), ttl)
@@ -144,13 +162,13 @@ async def get_text(url: str, ttl: int = 600, timeout: float = 15.0, headers: dic
     key = (url, tuple(sorted((headers or {}).items())))
     task = inflight.get(key)
     if task is None:
-        task = inflight[key] = asyncio.ensure_future(_fetch(url, ttl, timeout, headers, sem))
+        task = inflight[key] = asyncio.ensure_future(_fetch(url, ttl, timeout, headers, sem, keep))
         task.add_done_callback(lambda _t: inflight.pop(key, None))
     # shielded: a search that gives up does not cancel the page for the others waiting on it
     return await asyncio.shield(task)
 
 
-async def _fetch(url, ttl, timeout, headers, sem):
+async def _fetch(url, ttl, timeout, headers, sem, keep=True):
     try:
         await _give_way()
         client = _client_for_loop(timeout)
@@ -158,7 +176,8 @@ async def _fetch(url, ttl, timeout, headers, sem):
             r = await client.get(url, headers=headers or {}, timeout=timeout)
         if r.status_code != 200:
             return None
-        _store(("http", url), r.text)
+        if keep:                           # big pages a caller keeps in a slimmer form stay out of memory
+            _store(("http", url), r.text)
         if ttl >= 3600:
             await asyncio.to_thread(_disk_put, url, r.text)
         return r.text
@@ -166,9 +185,9 @@ async def _fetch(url, ttl, timeout, headers, sem):
         return None
 
 
-async def get_json(url: str, ttl: int = 600, timeout: float = 20.0):
+async def get_json(url: str, ttl: int = 600, timeout: float = 20.0, keep: bool = True):
     import json
-    t = await get_text(url, ttl, timeout)
+    t = await get_text(url, ttl, timeout, keep=keep)
     if not t:
         return None
     try:
