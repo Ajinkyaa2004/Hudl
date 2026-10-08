@@ -22,6 +22,40 @@ def _disk_get(url, ttl):
     return None
 
 
+def prune_disk_cache(max_age_days: int = 30, max_mb: int = 400, keep_mb: int = 300) -> dict:
+    """Keep the page cache small: pages older than the longest reuse time (30 days) are never read
+    again, and above max_mb the oldest pages go until keep_mb, never anything from the last day.
+    Removing a page only means it is fetched again when needed."""
+    now = time.time()
+    files = []
+    for f in DISK.glob("*.txt"):
+        try:
+            st = f.stat()
+            files.append((st.st_mtime, st.st_size, f))
+        except Exception:
+            pass
+    removed = freed = 0
+    keep = []
+    for mt, size, f in files:
+        if now - mt > max_age_days * 86400:
+            try:
+                f.unlink(); removed += 1; freed += size
+            except Exception:
+                pass
+        else:
+            keep.append((mt, size, f))
+    total = sum(x[1] for x in keep)
+    if total > max_mb * 1048576:
+        for mt, size, f in sorted(keep):
+            if total <= keep_mb * 1048576 or now - mt < 86400:
+                break
+            try:
+                f.unlink(); removed += 1; freed += size; total -= size
+            except Exception:
+                pass
+    return dict(removed=removed, freed_mb=round(freed / 1048576), left_mb=round(total / 1048576))
+
+
 def _disk_put(url, text):
     try:
         (DISK / (hashlib.sha1(url.encode()).hexdigest() + ".txt")).write_text(text)

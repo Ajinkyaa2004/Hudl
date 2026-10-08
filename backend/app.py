@@ -236,12 +236,26 @@ async def _daily_harvest():
         await asyncio.sleep(3600)
 
 
+async def _cache_cleanup_loop():
+    """Old cached pages are removed a minute after start and then once a day."""
+    import asyncio
+    from . import fetch
+    await asyncio.sleep(60)
+    while True:
+        try:
+            print("[cache] cleaned:", await asyncio.to_thread(fetch.prune_disk_cache), flush=True)
+        except Exception as e:
+            print("[cache] cleanup failed:", e, flush=True)
+        await asyncio.sleep(24 * 3600)
+
+
 @app.on_event("startup")
 async def _start_harvest():
     import asyncio
     if _os.environ.get("GAME_LIST", "1") != "0":
         asyncio.create_task(_game_list_loop())
     asyncio.create_task(_daily_harvest())
+    asyncio.create_task(_cache_cleanup_loop())
     if DATA_FROM:
         asyncio.create_task(_data_sync_loop())
 
