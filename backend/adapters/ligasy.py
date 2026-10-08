@@ -30,9 +30,22 @@ def learn(url: str, home: str, away: str):
     CODES.write_text(json.dumps(c, ensure_ascii=False, indent=1))
 
 
+CARD_RE = re.compile(r'<a[^>]*href="[^"]*/game/(\d+)-([a-z]+)-([a-z]+)"[^>]*>(.*?)</a>', re.S)
+DATE_RE = re.compile(r"\b(\d{1,2})\.\s?(\d{1,2})\.\s?(20\d\d)\b")
+
+
 def parse(page: str):
-    last, games = None, {}
-    for m in re.finditer(r'\b(\d{1,2})\.\s?(\d{1,2})\.\s?(20\d\d)\b|href="[^"]*/game/(\d+)-([a-z]+)-([a-z]+)"', page):
+    """game id -> (date, home code, away code). The page has a strip of game cards, each holding its
+    own date after the link, and a schedule list where a date line comes before its games."""
+    games = {}
+    rest = page
+    for m in CARD_RE.finditer(page):
+        d = DATE_RE.search(m.group(4))
+        if d:
+            games.setdefault(m.group(1), (f"{d.group(3)}-{int(d.group(2)):02d}-{int(d.group(1)):02d}", m.group(2), m.group(3)))
+            rest = rest.replace(m.group(0), " ", 1)          # its date must not label the next game
+    last = None
+    for m in re.finditer(r'\b(\d{1,2})\.\s?(\d{1,2})\.\s?(20\d\d)\b|href="[^"]*/game/(\d+)-([a-z]+)-([a-z]+)"', rest):
         if m.group(1):
             last = f"{m.group(3)}-{int(m.group(2)):02d}-{int(m.group(1)):02d}"
         elif m.group(4) not in games:
@@ -43,9 +56,8 @@ def parse(page: str):
 class Ligasy(Adapter):
     name = "ligasy"
     site = "pro.ligasy.kz"
-    # the schedule page mixes a strip where the date follows the game with a list where it
-    # precedes it, and game pages do not show their own date: never pick between days
-    ambiguous_dates = True
+    # each game's date is read from its own card or list line (parse()), so the header's date
+    # picks between the two games of a back-to-back pair
 
     def applies(self, parsed, tm, kb):
         c = parsed["comp"].lower()

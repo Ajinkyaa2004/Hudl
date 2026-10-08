@@ -56,8 +56,31 @@ class Lhf(Adapter):
             idx = await get_text(f"{BASE}/lv/turniri/{slug}", ttl=24 * 3600)
             ids = sorted(set(re.findall(rf"/lv/turniri/{slug}/{season}/(\d+)", idx or "")))
             pages = await asyncio.gather(*[get_text(f"{BASE}/lv/turniri/{slug}/{season}/{tid}/speles", ttl=1800) for tid in ids])
-            for page in pages:
-                for g in parse(page):
+            games = [g for page in pages for g in parse(page)]
+            # the schedule page drops games after about a week; each team page lists its whole season
+            # as /speles/<home code>-<away code>/<yyyymmdd>/<id> links: past games come from there,
+            # their team codes read off the schedule page's rows
+            codes = {}
+            for g in games:
+                m = re.search(r"/speles/([a-z0-9]+)-([a-z0-9]+)/", g["url"])
+                if m:
+                    codes.setdefault(m.group(1), g["home"])
+                    codes.setdefault(m.group(2), g["away"])
+            known = {g["gid"] for g in games}
+            for tid, page in zip(ids, pages):
+                base = f"{BASE}/lv/turniri/{slug}/{season}/{tid}"
+                tindex = await get_text(f"{base}/komandas", ttl=24 * 3600)
+                teams = sorted(set(re.findall(rf'{re.escape(base[len(BASE):])}/komandas/([a-z0-9-]+)"', tindex or "")))
+                tpages = await asyncio.gather(*[get_text(f"{base}/komandas/{t}", ttl=1800) for t in teams])
+                for tp in tpages:
+                    for a, b, ymd, gid in re.findall(r'/speles/([a-z0-9]+)-([a-z0-9]+)/(\d{8})/(\d+)', tp or ""):
+                        if gid in known or a not in codes or b not in codes:
+                            continue
+                        known.add(gid)
+                        games.append(dict(url=f"{base}/speles/{a}-{b}/{ymd}/{gid}", gid=gid, date=f"{ymd[:4]}-{ymd[4:6]}-{ymd[6:]}",
+                                          time=None, home=codes[a], away=codes[b], score=None))
+            for page in [None]:
+                for g in games:
                     if g["gid"] in seen or days_apart(parsed["date"], g["date"]) not in (0, 1):
                         continue
                     seen.add(g["gid"])

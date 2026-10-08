@@ -73,7 +73,7 @@ GENERIC_INITIALS = set("HACSMYFIEL")      # Hockey, Association, Club, Society, 
 
 WORD_SYN = {"pens": "Penguins", "hb": "Honeybaked", "honeybaked": "HB", "nyc": "New York City", "jrs": "Juniors", "indy": "Indiana", "philly": "Philadelphia", "nova": "Northern Virginia", "socal": "Southern California",
             "norcal": "Northern California", "vegas": "Las Vegas", "jrs": "Juniors", "mtl": "Montreal", "tor": "Toronto",
-            "sask": "Saskatchewan", "acad": "Academy"}
+            "sask": "Saskatchewan", "acad": "Academy", "slovensko": "Slovakia", "cesko": "Czechia", "česko": "Czechia"}
 
 
 # levels and school tags written in capitals, never initials of words

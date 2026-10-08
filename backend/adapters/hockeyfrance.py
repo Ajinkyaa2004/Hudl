@@ -73,9 +73,16 @@ def season_label(date: str) -> str:
 def clean(name: str) -> str:
     """'72001 - ANGLET HORMADI U18 LIGUE ESPOIR' -> 'Anglet Hormadi U18'."""
     n = re.sub(r"^\s*[A-Z]?\d{3,6}[A-Z]?\s*-\s*(?:\d{3,6}\s+)?", "", name or "")
-    n = re.sub(r"\b(ligue espoir|championnat de france|elite|excellence|division\s*\d|d\d)\b", " ", n, flags=re.I)
+    n = re.sub(r"\b(ligue espoir|championnat de france|elite|excellence|division\s*\d|d\d|ligue magnus|magnus seniors|slm|sasp)\b", " ", n, flags=re.I)
     n = re.sub(r"\s+", " ", n).strip(" -")
     return n.title() if n.isupper() else n
+
+
+def town(name: str) -> str:
+    """'Roanne Renards de Roanne' -> 'Roanne'; 'Hcma Pingouins de Morzine-Avoriaz' -> 'Morzine-Avoriaz'.
+    Age groups stay: 'Angers U20 Ducs d'Angers U20' -> 'Angers U20'."""
+    m = re.search(r"\s(?:de|des|du|d')\s?([A-ZÀ-Ý][\w\-' ]+?)(\s+U\d{2})?\s*$", name or "")
+    return (m.group(1) + (m.group(2) or "")).strip() if m else name
 
 
 def short_name(t: dict) -> str:
@@ -178,6 +185,13 @@ class HockeyFrance(Adapter):
                 score_candidate(alt, parsed, pick[cid])
                 if alt["confidence"] > cand["confidence"]:
                     cand = dict(alt, home_full=home, away_full=away)
+                # and the town alone: "Roanne Renards de Roanne" is "CH Roanne", "Montpellier Vipers de
+                # Montpellier" is "Montpellier AHC" (headers write the club's code, the site its nickname)
+                alt2 = dict(cand, home=town(home), away=town(away))
+                if (alt2["home"], alt2["away"]) != (cand["home"], cand["away"]):
+                    score_candidate(alt2, parsed, pick[cid])
+                    if alt2["confidence"] > cand["confidence"]:
+                        cand = dict(alt2, home_full=home, away_full=away)
                 if min(cand["team_scores"]) >= 0.6:
                     out.append(cand)
         return out

@@ -49,6 +49,41 @@
     "texas hockey tournament"
    ],
    "names": {}
+  },
+  {
+   "site": "https://www.texashockeyleague.com",
+   "client_service_id": "1675f3a2-4980-426a-bdfa-163eb32ffb18",
+   "league": 536,
+   "name": "Texas Hockey League",
+   "context": "",
+   "tz": "America/Chicago",
+   "comp": [
+    "texas hockey league",
+    "thl"
+   ],
+   "names": {},
+   "teams": [
+    "texas heat",
+    "houston jr aeros",
+    "texas jr brahmas",
+    "austin capitals",
+    "texas warriors",
+    "mckinney north stars",
+    "texas tigers",
+    "dallas stars elite",
+    "oklahoma city blazers",
+    "dallas penguins",
+    "tulsa jr oilers",
+    "allen bandits",
+    "san antonio jr rampage",
+    "odessa jr jacks",
+    "amarillo wranglers",
+    "texas outlaws",
+    "team dallas",
+    "htx storm"
+   ],
+   "all_seasons_of_year": true,
+   "strip": "\\s*-\\s*[A-Za-z' ]+\\**$|\\*+$"
   }
  ]
 }

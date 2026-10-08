@@ -61,6 +61,7 @@ def canonical(url: str):
         ("hockeydata-at", r"eishockey\.at/game-center/[^/]+/spiel/(\d+)"),
         ("hockeydata", r"alps\.hockey/.*gameId=([0-9a-f-]{36})"),
         ("hockeyfrance", r"hockeyfrance\.com/competitions/rencontre/(\d+)"),
+        ("hockeyfrance", r"liguemagnus\.com/rencontre/(\d+)"),     # the league site shows the federation's games by the same id
         ("onlajny", r"onlajny\.com/match/.*id/(\d+)"),
         ("tts-blackbear", r"stats\.blackbear\.timetoscore\.com/.*game_id=(\d+)"),
         ("tts-blackbear", r"(?:atlantichockeyfederation|tier1hockeyfederation|nghlhockey)\.com/.*[?&]game=(\d+)"),
@@ -68,7 +69,8 @@ def canonical(url: str):
         ("tts-usphl", r"usphl\.com/.*game_id=(\d+)"),
         ("tts-blackbear", r"atlanticgirlshockeyfederation\.com/.*[?&]game=(\d+)"),
         ("tts-caha", r"stats\.caha\.timetoscore\.com/.*game_id=(\d+)"),
-        ("tts-caha", r"norcalpuck\.com/live/(\d+)"),           # NorCalPuck shows CAHA Time To Score games by the same id
+        ("tts-caha", r"norcalpuck\.com/live/(\d+)"),
+        ("ncaa", r"ncaa\.com/game/(\d+)"),           # NorCalPuck shows CAHA Time To Score games by the same id
         ("tts-asec", r"stats\.asec\.timetoscore\.com/.*game_id=(\d+)"),
         ("tts-cna", r"stats\.cna\.timetoscore\.com/.*game_id=(\d+)"),
     ]

@@ -94,7 +94,10 @@ class DigitalShift(Adapter):
         for lg in _cfg():
             host = lg["site"].split("//", 1)[-1].replace("www.", "")
             linked = any(host in ((tm[k]["best"] or {}).get(f) or "") for k in ("t1n", "t2n") for f in ("site", "schedule", "roster"))
-            if linked or any(w in c for w in lg.get("comp", [])):
+            names = (parsed["t1"] + " | " + parsed["t2"]).lower().replace("junior", "jr").replace("jr.", "jr")
+            # leagues whose games come with generic headers ("USA Hockey 16U") are known by their clubs
+            club = any(t in names for t in lg.get("teams", []))
+            if linked or club or any(w in c for w in lg.get("comp", [])):
                 hits.append(lg)
         return hits
 
@@ -109,7 +112,19 @@ class DigitalShift(Adapter):
         f = await _get(client, lg, "partials/stats/filters", {"type": "league", "id": lg["league"]}, ttl=6 * 3600) or {}
         season = (f.get("season") or {}).get("selected_id")
         tours = [o["id"] for o in ((f.get("tournament") or {}).get("options") or []) if isinstance(o, dict)]
-        scopes = [{"tournament_id": t} for t in tours] or ([{"league_id": lg["league"], "season_id": season}] if season else [])
+        seasons = [season] if season else []
+        if lg.get("all_seasons_of_year"):
+            # the site's default can be a season without games yet (the post-season): read every
+            # season of the header's hockey year ("2026-27 Regular Season", "2026-27 Post Season")
+            y = datetime.date.fromisoformat(parsed["date"])
+            y = y.year if y.month >= 7 else y.year - 1
+            label = (f"{y}-{(y + 1) % 100:02d}", f"{y}-{y + 1}")
+            same = [o["id"] for o in ((f.get("season") or {}).get("options") or [])
+                    if isinstance(o, dict) and any(x in str(o.get("name", "")) for x in label)]
+            seasons = same or seasons
+        scopes = [{"tournament_id": t} for t in tours] or [{"league_id": lg["league"], "season_id": sid} for sid in seasons]
+        if lg.get("all_seasons_of_year"):         # a league with a post-season "tournament": read the seasons too
+            scopes = [{"league_id": lg["league"], "season_id": sid} for sid in seasons] + [{"tournament_id": t} for t in tours]
         out = []
         for sc in scopes:
             out += [(lg, g) for g in await schedule(client, lg, sc, until)]
