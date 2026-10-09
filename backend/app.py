@@ -18,7 +18,7 @@ KB = lookup.load_kb()
 # ---------------------------------------------------------------- access
 # Set APP_PASSWORD on a deployed server: every /api call then needs the session cookie that
 # /api/login gives for the right password. Locally (no APP_PASSWORD) everything is open.
-import hashlib as _hl, hmac as _hm, os as _os
+import hashlib as _hl, hmac as _hm, os as _os, time as _time
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
@@ -52,6 +52,37 @@ async def _guard(request: Request, call_next):
 
 class LoginIn(BaseModel):
     password: str
+    name: str = ""           # who is signing in (the team shares one password)
+
+
+# who is using the site right now: name -> last time their page said hello (kept in memory only)
+_PRESENT: dict = {}
+PRESENCE_S = 150             # a page says hello every minute; silence this long means gone
+
+
+class PresenceIn(BaseModel):
+    name: str
+
+
+def _clean_name(n: str) -> str:
+    import re as _re
+    return _re.sub(r"\s+", " ", (n or "").strip())[:40]
+
+
+def _online() -> list:
+    now = _time.time()
+    for k in [k for k, t in _PRESENT.items() if now - t > PRESENCE_S]:
+        _PRESENT.pop(k, None)
+    return sorted(_PRESENT, key=str.lower)
+
+
+@app.post("/api/presence")
+def presence(inp: PresenceIn):
+    """The page calls this every minute with the user's name; the answer is everyone online."""
+    n = _clean_name(inp.name)
+    if n:
+        _PRESENT[n] = _time.time()
+    return dict(online=_online())
 
 
 @app.post("/api/login")
