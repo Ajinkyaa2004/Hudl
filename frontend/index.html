@@ -53,6 +53,8 @@ svg{flex:none}
 .mono{font-family:var(--mono)}
 .mu{color:var(--mu)}.mu2{color:var(--mu2)}.small{font-size:12.5px}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.skip-link{position:absolute;top:-40px;left:50%;transform:translateX(-50%);background:var(--ac);color:var(--on-ac);padding:8px 16px;border-radius:0 0 var(--r2) var(--r2);font-weight:600;z-index:1000;transition:top .2s}
+.skip-link:focus{top:0}
 .ic{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .ic.sm{width:15px;height:15px}.ic.xs{width:13px;height:13px}
 
@@ -62,9 +64,12 @@ svg{flex:none}
 .brand{display:flex;align-items:center;gap:10px;font:700 17px var(--sans);letter-spacing:-.02em;white-space:nowrap;padding:4px 8px 16px}
 .brand b{color:var(--ac);font-weight:700}
 .navlist{display:flex;flex-direction:column;gap:2px}
-.navb{display:flex;align-items:center;gap:11px;width:100%;background:none;border:0;padding:9px 10px;border-radius:9px;color:var(--mu);cursor:pointer;font-weight:500;text-align:left;transition:background .15s,color .15s}
-.navb:hover{background:var(--s2);color:var(--tx)}
-.navb.on{background:var(--ac-bg);color:var(--ac)}
+.navb{display:flex;align-items:center;gap:11px;width:100%;background:none;border:0;padding:9px 10px;border-radius:9px;color:var(--mu);cursor:pointer;font-weight:500;text-align:left;transition:color .15s;position:relative;z-index:1}
+.navb::before{content:'';position:absolute;inset:0;background:var(--s2);border-radius:9px;opacity:0;z-index:-1;transition:opacity .15s, transform .2s var(--ease);transform:scale(0.95)}
+.navb:hover::before{opacity:1;transform:scale(1)}
+.navb:hover{color:var(--tx)}
+.navb.on{color:var(--ac)}
+.navb.on::before{background:var(--ac-bg);opacity:1;transform:scale(1);animation:fade .2s var(--ease)}
 .side .foot{margin-top:auto;display:flex;flex-direction:column;gap:12px;padding:12px 8px 0;border-top:1px solid var(--line)}
 .kpis-mini{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .kpis-mini div{background:var(--s2);border-radius:9px;padding:8px 10px}
@@ -72,7 +77,9 @@ svg{flex:none}
 .kpis-mini span{font-size:11px;color:var(--mu2)}
 .theme{display:inline-flex;align-items:center;gap:8px;background:var(--s2);border:1px solid var(--line);border-radius:999px;height:34px;padding:0 12px;cursor:pointer;color:var(--mu);font-size:12.5px;transition:color .15s,border-color .15s}
 .theme:hover{color:var(--ac);border-color:var(--ac)}
-.theme .sun{display:none}:root[data-theme="dark"] .theme .sun{display:block}:root[data-theme="dark"] .theme .moon{display:none}
+@keyframes spin-in { from { transform: rotate(-90deg) scale(0.5); opacity: 0; } to { transform: rotate(0) scale(1); opacity: 1; } }
+.theme .sun{display:none}:root[data-theme="dark"] .theme .sun{display:block;animation:spin-in .3s var(--ease)}:root[data-theme="dark"] .theme .moon{display:none}
+:root[data-theme="light"] .theme .moon{animation:spin-in .3s var(--ease)}
 .theme.round{width:36px;height:36px;padding:0;justify-content:center}
 
 .content{flex:1;min-width:0;display:flex;flex-direction:column}
@@ -85,6 +92,7 @@ main{width:100%;max-width:1240px;margin:0 auto;padding:28px 32px 64px}
 
 .tabbar{display:none;position:fixed;left:0;right:0;bottom:0;z-index:35;height:calc(var(--tabbar) + var(--safe-b));padding-bottom:var(--safe-b);background:var(--glass);backdrop-filter:saturate(1.5) blur(14px);-webkit-backdrop-filter:saturate(1.5) blur(14px);border-top:1px solid var(--line)}
 .tabbar .navb{flex:1;flex-direction:column;justify-content:center;gap:3px;padding:6px 2px;border-radius:0;font-size:11px;background:none}
+.tabbar .navb::before{display:none}
 .tabbar .navb.on{background:none;color:var(--ac)}
 .tabbar .navb .ic{width:21px;height:21px}
 
@@ -105,7 +113,13 @@ main{width:100%;max-width:1240px;margin:0 auto;padding:28px 32px 64px}
 
 /* ===================== page headings ===================== */
 .view{display:none;animation:fade .22s var(--ease)}.view.on{display:block}
-@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.stagger{animation:fade .3s var(--ease) both}
+.stagger:nth-child(1){animation-delay:0ms}
+.stagger:nth-child(2){animation-delay:50ms}
+.stagger:nth-child(3){animation-delay:100ms}
+.stagger:nth-child(4){animation-delay:150ms}
+.stagger:nth-child(5){animation-delay:200ms}
 .ph{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px}
 .ph h1{margin:0;font-size:22px;font-weight:650;letter-spacing:-.02em}
 .ph p{margin:4px 0 0;color:var(--mu);font-size:13.5px;max-width:60ch}
@@ -113,16 +127,17 @@ main{width:100%;max-width:1240px;margin:0 auto;padding:28px 32px 64px}
 
 /* ===================== buttons and inputs ===================== */
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;background:var(--ac);color:var(--on-ac);border:0;border-radius:10px;height:42px;padding:0 20px;font-weight:600;cursor:pointer;transition:background .15s,transform .08s;white-space:nowrap}
-.btn:hover{background:var(--ac-hi)}.btn:active{transform:scale(.98)}.btn:disabled{opacity:.5;cursor:default}
+.btn:hover{background:var(--ac-hi)}.btn:active{transform:scale(.97)}.btn:disabled{opacity:.5;cursor:default}
 .btn2{display:inline-flex;align-items:center;justify-content:center;gap:7px;background:var(--s1);border:1px solid var(--line2);border-radius:9px;height:36px;padding:0 13px;cursor:pointer;font-size:13px;font-weight:500;color:var(--tx);transition:background .15s,border-color .15s;white-space:nowrap}
-.btn2:hover{background:var(--s2);border-color:var(--mu2)}
+.btn2:hover{background:var(--s2);border-color:var(--mu2)}.btn2:active{transform:scale(.97)}
+.btn2.copied{color:var(--ok);border-color:var(--ok);background:var(--ok-bg)}
 a.btn2{color:var(--tx)}
 .btn2.pri{background:var(--ac);color:var(--on-ac);border-color:var(--ac);font-weight:600}
 .btn2.pri:hover{background:var(--ac-hi);border-color:var(--ac-hi)}
 .btn2.danger{color:var(--no);border-color:var(--no-bg)}
 .btn2:disabled{opacity:.55;cursor:default}
 .iconbtn{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:9px;border:1px solid var(--line2);background:var(--s1);color:var(--mu);cursor:pointer;transition:color .15s,border-color .15s,background .15s;flex:none}
-.iconbtn:hover{color:var(--tx);border-color:var(--mu2);background:var(--s2)}
+.iconbtn:hover{color:var(--tx);border-color:var(--mu2);background:var(--s2)}.iconbtn:active{transform:scale(.97)}
 input.f,select.f,textarea.f{width:100%;background:var(--s1);border:1px solid var(--line2);border-radius:9px;color:var(--tx);font:13.5px var(--sans);height:40px;padding:0 12px;outline:0;transition:border-color .15s,box-shadow .15s}
 textarea.f{height:auto;min-height:150px;padding:10px 12px;font-family:var(--mono);line-height:1.6;resize:vertical}
 input.f.mono{font-family:var(--mono);font-size:13px}
@@ -149,8 +164,17 @@ kbd{font:11px var(--mono);border:1px solid var(--line2);border-bottom-width:2px;
 
 /* ===================== search ===================== */
 .search{padding:18px;background:var(--s1);border:1px solid var(--line);border-radius:var(--r3);box-shadow:var(--sh2)}
-.sbox{display:flex;align-items:center;gap:10px;background:var(--bg);border:1px solid var(--line2);border-radius:12px;padding:6px 6px 6px 14px;transition:border-color .15s,box-shadow .15s}
+@keyframes shake{0%,100%{transform:translateX(0)}25%,75%{transform:translateX(-4px)}50%{transform:translateX(4px)}}
+.sbox{position:relative;display:flex;align-items:center;gap:10px;background:var(--bg);border:1px solid var(--line2);border-radius:12px;padding:6px 6px 6px 14px;transition:border-color .15s,box-shadow .15s}
 .sbox:focus-within{border-color:var(--ac);box-shadow:0 0 0 4px var(--ac-ring)}
+.sbox.invalid{border-color:var(--no);box-shadow:0 0 0 4px var(--no-bg);animation:shake .3s}
+.recents{position:absolute;top:calc(100% + 8px);left:0;right:0;background:var(--s1);border:1px solid var(--line);border-radius:var(--r2);box-shadow:var(--sh3);z-index:50;display:none;overflow:hidden}
+.recents.on{display:block;animation:fade .2s var(--ease)}
+.r-item{padding:10px 14px;cursor:pointer;display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:13px;color:var(--tx);transition:background .15s;border-bottom:1px solid var(--line)}
+.r-item:last-child{border-bottom:0}
+.r-item:hover,.r-item.act{background:var(--s2)}
+.r-item .ic{color:var(--mu2);flex:none}
+.r-item span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sbox .ic{color:var(--mu2)}
 .sbox input{flex:1;min-width:0;background:none;border:0;outline:0;color:var(--tx);font:14px var(--mono);height:42px}
 .sbox input::placeholder{color:var(--mu2);font-family:var(--sans)}
@@ -197,7 +221,7 @@ kbd{font:11px var(--mono);border:1px solid var(--line2);border-bottom-width:2px;
 .rep{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(280px,1fr);gap:22px;align-items:start}
 @media (max-width:959px){.rep{grid-template-columns:1fr;gap:16px}}
 .frame{background:var(--s2);border:1px solid var(--line);border-radius:var(--r2);padding:8px}
-.shot{position:relative;background:var(--s3);border-radius:8px;overflow:hidden;cursor:zoom-in;aspect-ratio:16/10}
+.shot{position:relative;background:var(--s3);border-radius:8px;overflow:hidden;cursor:zoom-in;aspect-ratio:16/11}
 .shot img{width:100%;height:100%;object-fit:cover;object-position:top center;display:block;opacity:0;transition:opacity .35s var(--ease);filter:var(--shot-dim);background:#fff}
 .shot img.in{opacity:1}
 .shot .ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;color:var(--mu2);font-size:12.5px;text-align:center;padding:14px}
@@ -325,7 +349,7 @@ kbd{font:11px var(--mono);border:1px solid var(--line2);border-bottom-width:2px;
 /* ===================== preview drawer ===================== */
 .scrim{position:fixed;inset:0;background:var(--scrim);opacity:0;pointer-events:none;transition:opacity .22s;z-index:60}
 .scrim.on{opacity:1;pointer-events:auto}
-.drawer{position:fixed;top:0;right:0;bottom:0;width:min(780px,52vw);background:var(--s1);border-left:1px solid var(--line);z-index:70;transform:translateX(102%);transition:transform .3s var(--ease);display:flex;flex-direction:column;box-shadow:var(--sh3);will-change:transform}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(880px,58vw);background:var(--s1);border-left:1px solid var(--line);z-index:70;transform:translateX(102%);transition:transform .3s var(--ease);display:flex;flex-direction:column;box-shadow:var(--sh3);will-change:transform}
 .drawer.on{transform:none}
 .drawer .grab{display:none}
 .drawer .hact{display:flex;gap:8px}
@@ -335,8 +359,10 @@ kbd{font:11px var(--mono);border:1px solid var(--line2);border-bottom-width:2px;
 .drawer .dh .tt b{display:block;font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .drawer .dh .tt span{font-size:12.5px;color:var(--mu);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .drawer .db{flex:1;overflow:auto;padding:18px;overscroll-behavior:contain;display:flex;flex-direction:column;gap:14px}
-.drawer .shot{aspect-ratio:1280/1300;cursor:default}
-.drawer .shot img{object-fit:contain;object-position:top}
+.drawer .shot{aspect-ratio:auto;cursor:zoom-in;min-height:400px}
+.drawer .shot img{object-fit:contain;object-position:top;transition:transform .3s var(--ease)}
+.drawer .shot.zoomed{cursor:zoom-out}
+.drawer .shot.zoomed img{transform:scale(1.5);transform-origin:top center}
 .drawer .df{display:none}
 @media (max-width:1099px){.drawer{width:min(720px,78vw)}}
 @media (max-width:719px){
@@ -349,8 +375,13 @@ kbd{font:11px var(--mono);border:1px solid var(--line2);border-bottom-width:2px;
   .drawer .df>*{flex:1;height:44px}
 }
 
-.toast{position:fixed;bottom:24px;left:50%;transform:translate(-50%,16px);display:flex;align-items:center;gap:8px;background:var(--tx);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:13px;font-weight:500;opacity:0;transition:all .22s var(--ease);z-index:90;pointer-events:none;box-shadow:var(--sh3)}
+.toast{position:fixed;bottom:24px;left:50%;transform:translate(-50%,16px);display:flex;align-items:center;gap:8px;background:var(--tx);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:13px;font-weight:500;opacity:0;transition:all .22s var(--ease);z-index:90;pointer-events:none;box-shadow:var(--sh3);overflow:hidden}
 .toast.on{opacity:1;transform:translate(-50%,0)}
+.toast.ok{background:var(--ok);color:#fff}
+.toast.err{background:var(--no);color:#fff}
+.toast.warn{background:var(--wa);color:#fff}
+.toast .t-prog{position:absolute;bottom:0;left:0;height:3px;background:rgba(255,255,255,0.4);animation:t-prog linear forwards}
+@keyframes t-prog{from{width:100%}to{width:0%}}
 @media (max-width:719px){.toast{bottom:calc(var(--tabbar) + var(--safe-b) + 14px)}}
 
 /* server waking up */
@@ -361,6 +392,15 @@ kbd{font:11px var(--mono);border:1px solid var(--line2);border-bottom-width:2px;
 .login{position:fixed;inset:0;z-index:100;display:none;align-items:center;justify-content:center;background:var(--bg);padding:16px}
 .login.on{display:flex}
 .lcard{width:min(380px,100%);background:var(--s1);border:1px solid var(--line);border-radius:18px;padding:32px 26px;box-shadow:var(--sh3)}
+
+/* Modal */
+.modal{margin:auto;padding:24px;background:var(--s1);border:1px solid var(--line);border-radius:var(--r3);box-shadow:var(--sh3);color:var(--tx);max-width:400px;width:calc(100% - 32px);opacity:0;transform:translateY(10px);transition:all .2s var(--ease)}
+.modal[open]{opacity:1;transform:none}
+.modal::backdrop{background:var(--scrim);backdrop-filter:blur(2px);opacity:0;transition:opacity .2s var(--ease)}
+.modal[open]::backdrop{opacity:1}
+.modal h3{margin:0 0 10px;font-size:18px;font-weight:600}
+.modal p{margin:0 0 20px;color:var(--mu);line-height:1.5}
+.modal-actions{display:flex;gap:10px;justify-content:flex-end}
 
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 
@@ -397,6 +437,7 @@ kbd{font:11px var(--mono);border:1px solid var(--line2);border-bottom-width:2px;
 </style>
 </head>
 <body>
+<a href="#main" class="skip-link">Skip to main content</a>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
   <symbol id="i-bookmark" viewBox="0 0 24 24"><path d="M6 4h12v17l-6-4-6 4z"/></symbol>
@@ -453,7 +494,7 @@ kbd{font:11px var(--mono);border:1px solid var(--line2);border-bottom-width:2px;
       <button class="theme round" data-theme-toggle aria-label="Switch light or dark mode"><svg class="ic sm moon"><use href="#i-moon"/></svg><svg class="ic sm sun"><use href="#i-sun"/></svg></button>
     </header>
 
-    <main>
+    <main id="main">
       <section class="view on" id="v-find">
         <div class="ph"><div><h1>Find a match</h1><p>Paste a HokReg header. PuckTrace looks for the match report first and checks both teams' rosters at the same time.</p></div><div class="mu2 small" id="stats"></div></div>
         <div class="search">
@@ -463,6 +504,7 @@ kbd{font:11px var(--mono);border:1px solid var(--line2);border-bottom-width:2px;
             <input id="q" placeholder="[2216771] Team 1 0 - 0 Team 2 | Competition | 2026-09-20" autocomplete="off" spellcheck="false" autofocus enterkeyhint="search">
             <button class="iconbtn" type="button" id="qclear" title="New search" aria-label="Clear the search" style="border:0;background:none"><svg class="ic sm"><use href="#i-x"/></svg></button>
             <button class="btn" type="submit" id="go">Find</button>
+            <div class="recents" id="recents"></div>
           </form>
           <div class="shelp"><div class="chips" id="chips"></div><div class="keys"><span><kbd>/</kbd> search</span><span><kbd>Esc</kbd> close preview</span><span><kbd>S</kbd> save</span></div></div>
         </div>
@@ -571,6 +613,14 @@ kbd{font:11px var(--mono);border:1px solid var(--line2);border-bottom-width:2px;
   <div class="df"><button class="btn2" id="dcopy2"><svg class="ic sm"><use href="#i-copy"/></svg>Copy link</button><a class="btn2 pri" id="dopen2" target="_blank" rel="noopener"><svg class="ic sm"><use href="#i-ext"/></svg>Open site</a></div>
 </aside>
 <div class="toast" id="toast"></div>
+<dialog class="modal" id="confirm-del">
+  <h3 id="cdel-title">Delete this source?</h3>
+  <p id="cdel-msg"></p>
+  <div class="modal-actions">
+    <button class="btn2" id="cdel-cancel">Cancel</button>
+    <button class="btn2 danger" id="cdel-ok">Delete</button>
+  </div>
+</dialog>
 <div class="wake" id="wake"><span class="spin"></span><span>Connecting… if the home NAS doesn't answer, the backup server takes over.</span></div>
 <div class="login" id="login"><form class="lcard" id="lform">
   <div class="brand" style="justify-content:center;padding:0 0 6px;font-size:22px"><svg width="34" height="34"><use href="#i-puck"/></svg><span>Puck<b>Trace</b></span></div>
@@ -662,8 +712,8 @@ async function job(path,body){
 const post=(p,b,o)=>api(p,{method:'POST',body:JSON.stringify(b),...o});
 const host=u=>{try{return new URL(u).hostname.replace(/^www\./,'')}catch(e){return ''}};
 const shotUrl=u=>apiBase()+'/shot?url='+encodeURIComponent(u);
-function toast(t){const e=$('#toast');e.innerHTML=ic('check')+esc(t);e.classList.add('on');clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove('on'),1700)}
-async function copy(t){try{await navigator.clipboard.writeText(t);toast('Link copied')}catch(e){toast('Copy failed')}}
+function toast(t,type=''){const e=$('#toast');e.className=`toast ${type}`;e.innerHTML=`${ic(type==='err'?'alert':type==='warn'?'help':'check')}<span>${esc(t)}</span><div class="t-prog" style="animation-duration:2.5s"></div>`;e.classList.add('on');clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove('on'),2500)}
+async function copy(t,btn){try{await navigator.clipboard.writeText(t);toast('Link copied','ok');if(btn){const o=btn.innerHTML;btn.innerHTML=`${ic('check')}Copied`;btn.classList.add('copied');setTimeout(()=>{btn.innerHTML=o;btn.classList.remove('copied')},2000)}}catch(e){toast('Copy failed','err')}}
 
 /* ---------- sign in (only when the server has a password) ---------- */
 function showLogin(){$('#login').classList.add('on');setTimeout(()=>$('#lpw').focus(),50)}
@@ -731,7 +781,7 @@ function openPreview(i){
   const it=ITEMS[i];if(!it)return;
   $$('.row.act').forEach(r=>r.classList.remove('act'));$$(`.row[data-p="${i}"]`).forEach(r=>r.classList.add('act'));
   $('#dtitle').textContent=it.title;$('#dsub').textContent=host(it.url)+(it.sub?' · '+it.sub:'');
-  $('#dopen').href=it.url;$('#dopen2').href=it.url;$('#dcopy').onclick=$('#dcopy2').onclick=()=>copy(it.url);
+  $('#dopen').href=it.url;$('#dopen2').href=it.url;$('#dcopy').onclick=()=>copy(it.url, $('#dcopy'));$('#dcopy2').onclick=()=>copy(it.url, $('#dcopy2'));
   let h='';
   if(it.facts)h+=it.facts;
   if(it.players&&it.players.length>=5)h+=playersHtml(it.players);
@@ -739,8 +789,9 @@ function openPreview(i){
   $('#dbody').innerHTML=h;$('#dbody').scrollTop=0;wireShots($('#dbody'));
   $('#drawer').classList.add('on');$('#scrim').classList.add('on');$('#drawer').setAttribute('aria-hidden','false');
   document.body.style.overflow='hidden';
+  const sh=$('#dbody .shot');if(sh)sh.onclick=()=>sh.classList.toggle('zoomed');
 }
-function closePreview(){$('#drawer').classList.remove('on');$('#scrim').classList.remove('on');$('#drawer').setAttribute('aria-hidden','true');$$('.row.act').forEach(r=>r.classList.remove('act'));document.body.style.overflow=''}
+function closePreview(){$('#drawer').classList.remove('on');$('#scrim').classList.remove('on');$('#drawer').setAttribute('aria-hidden','true');$$('.row.act').forEach(r=>r.classList.remove('act'));document.body.style.overflow='';const sh=$('#dbody .shot');if(sh)sh.classList.remove('zoomed')}
 $('#scrim').onclick=closePreview;$('#dclose').onclick=closePreview;
 document.addEventListener('click',e=>{
   if(e.target.closest('a'))return;
@@ -759,23 +810,26 @@ const playersHtml=ps=>{const pos=ps.some(p=>p.pos);return `<div class="plist"><t
 
 /* ---------- find ---------- */
 const q=$('#q');
-q.addEventListener('input',()=>chips(q.value));
-// clicking the box after a search selects the old header, so pasting replaces it
-q.addEventListener('focus',()=>{if(CUR)setTimeout(()=>q.select(),0)});
-$('#qclear').onclick=()=>{RUN++;CUR=null;q.value='';chips('');closePreview();clearInterval(TIMER);$('#go').disabled=false;
-  $('#out').innerHTML=EMPTY;q.focus()};
+q.addEventListener('input',()=>{chips(q.value);q.closest('.sbox').classList.remove('invalid')});
+function loadRecents(){try{const rs=JSON.parse(localStorage.getItem('pt-recent')||'[]');if(!rs.length)return;$('#recents').innerHTML=rs.map((r,i)=>`<div class="r-item" data-i="${i}">${ic('search','xs')}<span>${esc(r)}</span></div>`).join('');$$('.r-item').forEach(el=>el.onmousedown=e=>{e.preventDefault();q.value=rs[el.dataset.i];chips(q.value);$('#recents').classList.remove('on');find()});$('#recents').classList.add('on')}catch(e){}}
+q.addEventListener('focus',()=>{if(CUR)setTimeout(()=>q.select(),0);if(!q.value.trim())loadRecents()});
+q.addEventListener('blur',()=>setTimeout(()=>$('#recents').classList.remove('on'),100));
+$('#qclear').onclick=()=>{RUN++;CUR=null;q.value='';chips('');closePreview();clearInterval(TIMER);$('#go').disabled=false;$('#out').innerHTML=EMPTY;q.focus();loadRecents()};
 const tok=n=>esc(n).replace(/\b((?:U|J)\s?\d{1,2}|\d{1,2}\s?U|20[01]\d|AAA|AA)\b/gi,'<b>$1</b>');
 const HRE=/^\s*(?:\[(\d+)\]\s*)?(.+?)\s+(?:\d+\s*-\s*\d+|vs\.?|v\.?|-|–)\s+(.+?)\s*\|\s*([^|]+?)\s*\|\s*(\d{4}-\d{2}-\d{2})/i;
 function chips(t){const m=t.match(HRE),c=$('#chips');
-  if(!m){c.innerHTML=t.trim()?`<span class="mu small">${ic('help','xs')} Format: Team 1 vs Team 2 | Competition | YYYY-MM-DD</span>`:'';return}
-  c.innerHTML=`<span class="chip"><i>Home</i><span>${tok(m[2])}</span></span><span class="chip"><i>Away</i><span>${tok(m[3])}</span></span><span class="chip"><span>${esc(m[4])}</span></span><span class="chip mono"><span>${m[5]}</span></span>${m[1]?`<span class="chip mono"><span>#${m[1]}</span></span>`:''}`}
+  if(!m){c.innerHTML=t.trim()?`<span class="mu small">${ic('help','xs')} Format: Team 1 vs Team 2 | Competition | YYYY-MM-DD</span>`:'';return false}
+  c.innerHTML=`<span class="chip"><i>Home</i><span>${tok(m[2])}</span></span><span class="chip"><i>Away</i><span>${tok(m[3])}</span></span><span class="chip"><span>${esc(m[4])}</span></span><span class="chip mono"><span>${m[5]}</span></span>${m[1]?`<span class="chip mono"><span>#${m[1]}</span></span>`:''}`;return true}
 $('#sform').addEventListener('submit',e=>{e.preventDefault();q.blur();find()});
 
 const EMPTY=$('#out').innerHTML;
 const errHtml=m=>`<div class="errbox">${ic('alert','')}<div style="flex:1"><b>Something went wrong</b><div class="small">${esc(m)}</div></div><button class="btn2" onclick="find()">${ic('refresh')}Try again</button></div>`;
 let CUR=null,RUN=0,TIMER=null;
 async function find(){
-  const h=q.value.trim();if(!h)return;const run=++RUN;closePreview();
+  const h=q.value.trim();if(!h)return;
+  if(!chips(h)){q.closest('.sbox').classList.remove('invalid');void q.closest('.sbox').offsetWidth;q.closest('.sbox').classList.add('invalid');return}
+  $('#recents').classList.remove('on');try{let rs=JSON.parse(localStorage.getItem('pt-recent')||'[]');rs=[h,...rs.filter(x=>x!==h)].slice(0,6);localStorage.setItem('pt-recent',JSON.stringify(rs))}catch(e){}
+  const run=++RUN;closePreview();
   $('#go').disabled=true;
   let quick=null;
   try{quick=await post('/search?auto=false',{header:h})}catch(e){if(run===RUN){$('#out').innerHTML=errHtml(e.message);$('#go').disabled=false}return}
@@ -809,11 +863,11 @@ function statusHtml(p,cls,label,why){
 function secHead(icon,cls,title,cnt,fold){return `<div class="hd"><span class="hic ${cls}">${ic(icon)}</span><h3>${title}</h3>${cnt?`<span class="cnt">· ${cnt}</span>`:''}${fold?`<svg class="ic sm chev"><use href="#i-chev"/></svg>`:''}</div>`}
 function renderLoading(r){
   ITEMS=[];const p=r.parsed;
-  $('#out').innerHTML=statusHtml(p,'wait','Searching','')+
-   `<div class="sec">${secHead('doc','','Match report','searching')}<div class="bd">
+  $('#out').innerHTML=`<div class="stagger">`+statusHtml(p,'wait','Searching','')+'</div>'+
+   `<div class="sec stagger">${secHead('doc','','Match report','searching')}<div class="bd">
      <div class="loadmsg"><span class="spin"></span>Checking memory, league, federation and stats sites… <b class="mono" id="elapsed">0s</b></div>
      <div class="prog"><i id="prog"></i></div><div class="mu2 small">Usually a few seconds. GameSheet games can take up to a minute.</div></div></div>
-   <div class="sec">${secHead('users','','Rosters','checking both teams')}<div class="bd"><div class="ros"><div class="team"><div class="skel" style="width:55%"></div><div class="skel" style="width:85%"></div><div class="skel" style="width:70%"></div></div><div class="team"><div class="skel" style="width:55%"></div><div class="skel" style="width:85%"></div><div class="skel" style="width:70%"></div></div></div></div></div>`}
+   <div class="sec stagger">${secHead('users','','Rosters','checking both teams')}<div class="bd"><div class="ros"><div class="team"><div class="skel" style="width:55%"></div><div class="skel" style="width:85%"></div><div class="skel" style="width:70%"></div></div><div class="team"><div class="skel" style="width:55%"></div><div class="skel" style="width:85%"></div><div class="skel" style="width:70%"></div></div></div></div></div>`}
 
 const RC={'wrong age group':['vi','Wrong age group'],'few players':['wa','Few players'],'old season':['mu','Old season'],verified:['ok','This season'],probable:['wa','Probably current'],check:['wa','Check it'],blocked:['vi','Open in Chrome'],unreachable:['mu','Did not load'],'not a roster':['mu','Not a roster'],'no roster':['mu','No roster posted'],'not found':['mu','Page gone']};
 function confBar(c){const v=Math.round(c*100),col=v>=85?'var(--ok)':v>=60?'var(--wa)':'var(--no)';return `<div class="conf"><span class="mono" style="min-width:38px">${v}%</span><span class="bar"><i style="width:${v}%;background:${col}"></i></span></div>`}
@@ -829,7 +883,7 @@ function rosterSection(r,state){
   const p=r.parsed;
   const rc=r.roster_check;
   const fold=state==='found'?'fold':'';
-  if(!rc&&r._rosLoading)return `<div class="sec ${fold}" id="ros-sec">${secHead('users','','Rosters','checking both teams…',fold)}<div class="bd"><div class="loadmsg" style="margin-bottom:10px"><span class="spin"></span>Opening each team's roster pages, checking season and age group</div><div class="ros"><div class="team"><div class="skel" style="width:55%"></div><div class="skel" style="width:85%"></div></div><div class="team"><div class="skel" style="width:55%"></div><div class="skel" style="width:85%"></div></div></div></div></div>`;
+  if(!rc&&r._rosLoading)return `<div class="sec stagger ${fold}" id="ros-sec">${secHead('users','','Rosters','checking both teams…',fold)}<div class="bd"><div class="loadmsg" style="margin-bottom:10px"><span class="spin"></span>Opening each team's roster pages, checking season and age group</div><div class="ros"><div class="team"><div class="skel" style="width:55%"></div><div class="skel" style="width:85%"></div></div><div class="team"><div class="skel" style="width:55%"></div><div class="skel" style="width:85%"></div></div></div></div></div>`;
   const rosterLinks=(r.steps.find(s=>s.step==='Rosters')||{links:[]}).links.filter(l=>l.kind==='roster');
   const teamCol=(name,list,key)=>{
     let body='';
@@ -855,7 +909,7 @@ function rosterSection(r,state){
   const rosOk=rc&&[rc.t1,rc.t2].filter(l=>l&&l[0]&&['verified','probable'].includes(l[0].status)).length;
   const cls=state==='found'?'':rosOk===2?'ok':rosOk?'wa':'no';
   const cnt=rc?`${rosOk} of 2 current${state==='found'?' · not needed, report found':''}`:state==='found'?'not needed, report found':'links on file';
-  return `<div class="sec ${fold}" id="ros-sec">${secHead('users',cls,'Rosters',cnt,fold)}<div class="bd">${ros}</div></div>`;
+  return `<div class="sec stagger ${fold}" id="ros-sec">${secHead('users',cls,'Rosters',cnt,fold)}<div class="bd">${ros}</div></div>`;
 }
 
 function render(r,header){
@@ -891,19 +945,20 @@ function render(r,header){
     rep=`<div class="note">${ic('alert')}<div><b>No report found automatically.</b><div style="margin-top:3px">${srcs.length?`Checked memory and ${srcs.length} site${srcs.length>1?'s':''} in ${auto.seconds}s: ${esc(ok.join(', '))}${bad.length?` · did not respond: ${esc(bad.map(a=>a.site).join(', '))}`:''}.`:'No automatic source covers these teams yet.'} Use the rosters below, or search by hand from the links further down.</div>${bad.length?`<button class="btn2" style="margin-top:10px" onclick="find()">${ic('refresh')}Search again</button>`:''}</div></div>`;
   }
   const rcls=state==='found'?'ok':state==='check'?'wa':'no';
-  h+=`<div class="sec">${secHead('doc',rcls,'Match report',state==='found'?'found':state==='check'?'pick one':'not found')}<div class="bd">${rep}</div></div>`;
+  h=`<div class="stagger">${h}</div>`;
+  h+=`<div class="sec stagger">${secHead('doc',rcls,'Match report',state==='found'?'found':state==='check'?'pick one':'not found')}<div class="bd">${rep}</div></div>`;
 
   h+=rosterSection(r,state);
 
   /* manual search section */
   const groups=r.steps.filter(s=>!['Saved before','Rosters'].includes(s.step)&&s.links.length);
-  h+=`<div class="sec fold ${state==='none'?'open':''}">${secHead('globe','','Search by hand',`${groups.reduce((a,s)=>a+s.links.length,0)} links, in search order`,1)}<div class="bd">${groups.map(s=>
+  h+=`<div class="sec fold stagger ${state==='none'?'open':''}">${secHead('globe','','Search by hand',`${groups.reduce((a,s)=>a+s.links.length,0)} links, in search order`,1)}<div class="bd">${groups.map(s=>
     `<div class="grp">${esc(s.step)}${s.manual?' · manual':''}</div><div class="rows">${s.links.map(l=>rowHtml({title:l.label,url:l.url,sub:l.note,icon:l.kind==='search'?'search':l.kind==='manual'?'bookmark':'globe',badge:(l.vpn?'<span class="badge vi">VPN</span>':'')},esc(l.domain)+(l.note?' · '+esc(l.note):''))).join('')}</div>`).join('')}</div></div>`;
 
   /* save section */
   const rc=r.roster_check;
   const pick=l=>((l||[]).find(x=>x.status==='verified'||x.status==='probable')||{}).url||'';
-  h+=`<div class="sec fold">${secHead('save','','Save for next time','optional · the next search for these teams is faster',1)}<div class="bd">
+  h+=`<div class="sec fold stagger">${secHead('save','','Save for next time','optional · the next search for these teams is faster',1)}<div class="bd">
     <div class="fgrid"><label for="sv_p">Report link</label><input class="f mono" id="sv_p" value="${esc(found?found.url:savedLink?savedLink.url:'')}" placeholder="https://…">
     <label for="sv_1" title="${esc(p.t1)}">${esc(p.t1)} roster</label><input class="f mono" id="sv_1" value="${esc(pick(rc&&rc.t1)||(r.teams.t1n.best||{}).roster||'')}" placeholder="https://…">
     <label for="sv_2" title="${esc(p.t2)}">${esc(p.t2)} roster</label><input class="f mono" id="sv_2" value="${esc(pick(rc&&rc.t2)||(r.teams.t2n.best||{}).roster||'')}" placeholder="https://…">
@@ -912,7 +967,7 @@ function render(r,header){
 
   $('#out').innerHTML=h;
   wireShots($('#out'));
-  $$('[data-copy]').forEach(b=>b.onclick=()=>copy(b.dataset.copy));
+  $$('[data-copy]').forEach(b=>b.onclick=()=>copy(b.dataset.copy, b));
   $$('.pick').forEach(b=>b.onclick=()=>{$$('.cand').forEach(c=>c.classList.toggle('sel',c.dataset.k===b.dataset.k));$('#sv_p').value=b.dataset.url;const s=$('#savebtn').closest('.sec');s.classList.add('open');toast('Selected. Save it below to remember it.')});
   $('#savebtn').onclick=async()=>{try{const s=await post('/save',{header,protocol:$('#sv_p').value,t1link:$('#sv_1').value,t2link:$('#sv_2').value,comp_site:$('#sv_c').value});$('#savemsg').className='msg ok';$('#savemsg').textContent=`Saved · next time this game is answered at once`+(s.learned&&s.learned.length?` · learned: ${s.learned.join('; ')}`:'');stats();toast('Saved')}
     catch(e){$('#savemsg').className='msg err';$('#savemsg').textContent=e.message}};
@@ -947,7 +1002,7 @@ function editSource(r){
   $('#scancel').onclick=()=>$('#sedit').style.display='none';
   $('#ssave').onclick=async()=>{const body=Object.fromEntries($$('#sform2 input').map(i=>[i.dataset.f,i.value.trim()]));
     try{await post(kind==='teams'?'/sources/team':'/sources/tournament',body);$('#sedit').style.display='none';loadSources();stats();toast('Saved')}catch(e){$('#smsg').className='msg err';$('#smsg').textContent=e.message}};
-  if(r.key)$('#sdel').onclick=async()=>{if(!confirm(`Delete ${r.name}?`))return;await fetch(apiBase()+`/sources/${kind==='teams'?'team':'tournament'}/${encodeURIComponent(r.key)}`,{method:'DELETE'});$('#sedit').style.display='none';loadSources();stats()};
+  if(r.key)$('#sdel').onclick=()=>{const m=$('#confirm-del');$('#cdel-msg').textContent=r.name;m.showModal();$('#cdel-cancel').onclick=()=>m.close();$('#cdel-ok').onclick=async()=>{m.close();await fetch(apiBase()+`/sources/${kind==='teams'?'team':'tournament'}/${encodeURIComponent(r.key)}`,{method:'DELETE'});$('#sedit').style.display='none';loadSources();stats();toast('Deleted')}};
   window.scrollTo({top:0,behavior:'smooth'});setTimeout(()=>$('#sform2 input'+(r.key?':not([readonly])':'')).focus(),200);
 }
 
