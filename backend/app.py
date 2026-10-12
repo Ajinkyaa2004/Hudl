@@ -300,7 +300,9 @@ async def load_game_list() -> int:
     path = ROOT / "data" / "game-list.db"
 
     def merge() -> int:
-        path.write_bytes(gzip.decompress(content))
+        import io, shutil
+        with gzip.GzipFile(fileobj=io.BytesIO(content)) as g, open(path, "wb") as out:
+            shutil.copyfileobj(g, out, 1 << 20)       # streamed: never the whole list in memory at once
         con = gameindex.conn()
         with gameindex._lock:
             con.execute("attach database ? as gl", (str(path),))
@@ -489,16 +491,8 @@ _JOB_KEYS: dict = {}
 _JOB_SEM = None          # searches at once, see _max_searches()
 
 
-def _mem_limit_mb() -> int:
-    """The container's memory limit (cgroup v2 or v1), or 0 when there is none."""
-    for p in ("/sys/fs/cgroup/memory.max", "/sys/fs/cgroup/memory/memory.limit_in_bytes"):
-        try:
-            v = open(p).read().strip()
-            if v.isdigit() and int(v) < 1 << 50:
-                return int(v) // 1048576
-        except Exception:
-            pass
-    return 0
+from . import box as _box
+_mem_limit_mb = _box.mem_limit_mb
 
 
 def _max_searches() -> int:
@@ -506,7 +500,7 @@ def _max_searches() -> int:
     must keep room for the game list, the caches and the system (a 2 GB NAS, Render's 512 MB)."""
     ceiling = int(_os.environ.get("MAX_SEARCHES", "3"))
     lim = _mem_limit_mb()
-    by_memory = 3 if lim and lim <= 600 else 4 if lim and lim <= 1600 else ceiling
+    by_memory = 2 if lim and lim <= 600 else 4 if lim and lim <= 1600 else ceiling
     return max(1, min(ceiling, by_memory))
 
 

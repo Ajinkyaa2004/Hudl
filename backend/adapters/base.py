@@ -147,7 +147,10 @@ _ANY_NATION = re.compile(r"\b(?:" + "|".join(sorted(NATIONS | {"czech", "slovak"
                            "japanese", "korean", "chinese"}, key=len, reverse=True)) + r")\b")
 
 
-@_ft.lru_cache(maxsize=200000)
+from .. import box as _box
+
+
+@_ft.lru_cache(maxsize=_box.cache_size(200000))
 def team_similarity(header_name: str, site_name: str, context: str = "") -> tuple[float, str]:
     from ..lookup import strip_accents
     if _NATION_RE.match(strip_accents(site_name or "").lower().strip()) and not _ANY_NATION.search(strip_accents(header_name or "").lower()):

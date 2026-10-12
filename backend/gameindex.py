@@ -116,7 +116,10 @@ import functools
 _WORD = re.compile(r"[a-z]{4,}")
 
 
-@functools.lru_cache(maxsize=200000)
+from . import box as _box
+
+
+@functools.lru_cache(maxsize=_box.cache_size(200000))
 def words(name: str) -> frozenset:
     from .lookup import strip_accents
     return frozenset(_WORD.findall(strip_accents(str(name or "")).lower())) - {"hockey", "club", "team", "junior", "elite", "academy", "white", "black", "blue", "gold"}

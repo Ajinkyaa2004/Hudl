@@ -50,6 +50,11 @@ async def _schedule(url: str) -> list:
         games = [{k: g.get(k) for k in _SLIM_KEYS} for g in ((data or {}).get("SiteKit") or {}).get("Schedule") or []]
         if data is not None:
             _SLIM[url] = (_time.time(), games)
+            # a small box keeps only the schedules used lately (each can be thousands of games)
+            from .. import box as _box
+            limit = _box.cache_size(400)
+            while len(_SLIM) > limit:
+                _SLIM.pop(min(_SLIM, key=lambda k: _SLIM[k][0]), None)
         return games
 _CLIENTS = _Path(__file__).resolve().parent.parent.parent / "data" / "hockeytech_clients.json"
 try:

@@ -69,7 +69,10 @@ def tokens(name):
     return _tokens(str(name or ""))
 
 
-@functools.lru_cache(maxsize=300000)
+from . import box as _box
+
+
+@functools.lru_cache(maxsize=_box.cache_size(300000))
 def _tokens(name):
     s = strip_accents(name).lower()
     s = re.sub(r",?\s*\b(a\.\s?s\.|z\.\s?s\.|s\.\s?r\.\s?o\.|o\.\s?s\.|e\.\s?v\.|gmbh|ry)\s*$", "", s)   # company suffixes
