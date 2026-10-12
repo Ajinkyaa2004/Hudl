@@ -233,18 +233,44 @@ async def get_json(url: str, ttl: int = 600, timeout: float = 20.0, keep: bool =
 _ctx = None
 
 
+_browser_broken_until = 0.0
+
+
+def cached_screenshot(url: str, ttl: int = 6 * 3600) -> bytes | None:
+    """A preview made earlier, if any; never starts a browser."""
+    f = SHOTS / (hashlib.sha1(url.encode()).hexdigest() + ".jpg")
+    try:
+        if f.exists() and time.time() - f.stat().st_mtime < ttl:
+            return f.read_bytes()
+    except Exception:
+        pass
+    return None
+
+
 async def _context():
     """One persistent browser context so Cloudflare clearance cookies are reused."""
-    global _pw, _browser, _ctx, _pw_loop
+    global _pw, _browser, _ctx, _pw_loop, _browser_broken_until
     async with _pw_lock:
         loop = asyncio.get_running_loop()
         if _browser is not None and _pw_loop is not loop:     # a new asyncio.run: the old browser is gone
             _pw = _browser = _ctx = None
         _pw_loop = loop
         if _browser is None:
+            if time.time() < _browser_broken_until:
+                raise RuntimeError("no browser on this server")
             from playwright.async_api import async_playwright
             _pw = await async_playwright().start()
-            _browser = await _pw.chromium.launch(headless=True, args=["--disable-blink-features=AutomationControlled"])
+            try:
+                _browser = await _pw.chromium.launch(headless=True, args=["--disable-blink-features=AutomationControlled"])
+            except Exception:
+                # the helper process started by start() must not be left behind on failure
+                try:
+                    await _pw.stop()
+                except Exception:
+                    pass
+                _pw = None
+                _browser_broken_until = time.time() + 600
+                raise
         if _ctx is None:
             _ctx = await _browser.new_context(user_agent=UA, locale="en-US", viewport={"width": 1400, "height": 8000})
     return _ctx

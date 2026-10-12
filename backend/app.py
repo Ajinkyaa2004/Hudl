@@ -474,8 +474,9 @@ def index():
 
 @app.get("/api/config")
 def config():
+    from .roster_pages import LIGHT
     return dict(teams=len(KB["teams"]), tournaments=len(KB["tournaments"]), saved=len(KB.get("history", [])),
-                vpn_sites=lookup.load_vpn(), upload_sessions=lookup.UPLOAD_SESSIONS)
+                vpn_sites=lookup.load_vpn(), upload_sessions=lookup.UPLOAD_SESSIONS, previews=not LIGHT)
 
 
 @app.post("/api/search")
@@ -714,13 +715,21 @@ _SHOT_SEM = None
 @app.get("/api/shot")
 async def shot(url: str):
     """Screenshot of a page for the preview panel (cached)."""
-    from .fetch import screenshot
+    from .fetch import screenshot, cached_screenshot
     d = lookup.domain(url)
     if not url.startswith("http") or any(d.endswith(b) for b in NO_PREVIEW):
         raise HTTPException(404, "This site blocks previews, open it in Chrome")
-    global _SHOT_SEM
     from .roster_pages import LIGHT
-    _SHOT_SEM = _SHOT_SEM or _aio.Semaphore(1 if LIGHT else 3)   # one preview at a time on a small server
+    if LIGHT:
+        # no browser on a small server: a preview made earlier is served, nothing else is tried.
+        # (Trying used to start a browser helper per request that was never cleaned up, until the
+        # container ran out of memory and was killed.)
+        img = cached_screenshot(url)
+        if not img:
+            raise HTTPException(404, "No preview on this server, open it in Chrome")
+        return Response(content=img, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=21600"})
+    global _SHOT_SEM
+    _SHOT_SEM = _SHOT_SEM or _aio.Semaphore(3)
     async with _SHOT_SEM:
         img = await screenshot(url)
     if not img:

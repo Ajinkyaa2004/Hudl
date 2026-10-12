@@ -710,6 +710,7 @@ async function job(path,body){
 const post=(p,b,o)=>api(p,{method:'POST',body:JSON.stringify(b),...o});
 const host=u=>{try{return new URL(u).hostname.replace(/^www\./,'')}catch(e){return ''}};
 const shotUrl=u=>apiBase()+'/shot?url='+encodeURIComponent(u);
+let PREVIEWS=true;   // false on a server without a browser: the page then never asks for screenshots
 function toast(t,type=''){const e=$('#toast');e.className=`toast ${type}`;e.innerHTML=`${ic(type==='err'?'alert':type==='warn'?'help':'check')}<span>${esc(t)}</span><div class="t-prog" style="animation-duration:2.5s"></div>`;e.classList.add('on');clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove('on'),2500)}
 async function copy(t,btn){try{await navigator.clipboard.writeText(t);toast('Link copied','ok');if(btn){const o=btn.innerHTML;btn.innerHTML=`${ic('check')}Copied`;btn.classList.add('copied');setTimeout(()=>{btn.innerHTML=o;btn.classList.remove('copied')},2000)}}catch(e){toast('Copy failed','err')}}
 
@@ -765,7 +766,7 @@ async function loadStatus(){
 }
 $('#strun').onclick=async()=>{const b=$('#strun'),t=b.querySelector('span');b.disabled=true;t.textContent='Checking… about a minute';try{await post('/health/run',{},{timeout:0})}catch(e){}b.disabled=false;t.textContent='Check sources now';loadStatus()};
 
-async function stats(){try{const c=await api('/config');
+async function stats(){try{const c=await api('/config');PREVIEWS=c.previews!==false;
   $('#stats').textContent=`${c.teams.toLocaleString()} teams · ${c.tournaments} competitions · ${c.saved} saved`;
   $('#sidestats').innerHTML=`<div><b>${c.teams.toLocaleString()}</b><span>teams</span></div><div><b>${c.saved}</b><span>saved</span></div>`}catch(e){}}
 stats();
@@ -778,6 +779,7 @@ function shotHtml(url,cls=''){
 function wireShots(root){
   root.querySelectorAll('.shot[data-shot]').forEach(el=>{
     if(el._w)return;el._w=1;const img=el.querySelector('img'),u=el.dataset.shot;
+    if(!PREVIEWS){el.classList.add('failed');el.querySelector('.ph').innerHTML=`${ic('globe','')}<div>No preview on this server</div><a href="${esc(u)}" target="_blank" rel="noopener" class="btn2">${ic('ext')}Open ${esc(host(u))}</a>`;return}
     img.onload=()=>{el.classList.add('loaded');img.classList.add('in')};
     img.onerror=async()=>{el.classList.add('failed');let m='Preview not available';try{const r=await fetch(shotUrl(u));m=(await r.json()).detail||m}catch(e){}
       el.querySelector('.ph').innerHTML=`${ic('globe','')}<div>${esc(m)}</div><a href="${esc(u)}" target="_blank" rel="noopener" class="btn2">${ic('ext')}Open ${esc(host(u))}</a>`};
@@ -815,7 +817,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.matches('.r
 /* warm the preview while the pointer rests on a row */
 const warmed=new Set();
 document.addEventListener('pointerover',e=>{const r=e.target.closest('.row[data-p]');if(!r)return;const it=ITEMS[+r.dataset.p];if(!it||warmed.has(it.url))return;
-  clearTimeout(r._w);r._w=setTimeout(()=>{warmed.add(it.url);fetch(shotUrl(it.url)).catch(()=>{})},150)});
+  if(!PREVIEWS)return;clearTimeout(r._w);r._w=setTimeout(()=>{warmed.add(it.url);fetch(shotUrl(it.url)).catch(()=>{})},150)});
 const playersHtml=ps=>{const pos=ps.some(p=>p.pos);return `<div class="plist"><table><thead><tr><th class="n">#</th><th>Player</th>${pos?'<th class="p">Pos</th>':''}<th class="b">Born</th></tr></thead><tbody>${ps.map(p=>`<tr><td class="n">${esc(p.n)}</td><td>${esc(p.name)}</td>${pos?`<td class="p">${esc(p.pos||'')}</td>`:''}<td class="b">${esc(p.born||'')}</td></tr>`).join('')}</tbody></table></div>`};
 
 /* ---------- find ---------- */
