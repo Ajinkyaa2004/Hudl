@@ -61,6 +61,13 @@ Switch the NAS on and leave. Nothing else is needed:
 
 `https://pucktrace.actorix.in/api/healthz` shows the version the NAS runs; `https://pucktrace-api-8u5i.onrender.com/api/healthz` the backup's.
 
+## If the GitHub repository is private
+
+The 3-hourly game list is published as a release file of the repository. With the repository private, the servers cannot
+download it: the NAS then keeps the games it has (and harvests the light sources itself), Render copies the list from the NAS.
+To restore the download, either make the repository public again (it holds code only), or create a fine-grained GitHub token
+with read access to the repository's contents and set it as `GAME_LIST_TOKEN` in Render's environment and in the NAS compose file.
+
 ## Updating
 
 Pushing to `main` builds a new image (about 10 minutes). The NAS takes it at the next boot, or straight away with

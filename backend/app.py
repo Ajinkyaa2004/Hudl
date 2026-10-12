@@ -371,6 +371,10 @@ async def _daily_harvest():
                 # HARVEST_SOURCES picks the bulk sources (a small free server can't take them all);
                 # HEALTH_DAILY=0 skips the daily source check
                 names = [x.strip() for x in _os.environ.get("HARVEST_SOURCES", "").split(",") if x.strip()] or None
+                if names is None and _mem_limit_mb() and _mem_limit_mb() <= 1600:
+                    # a small box (the 2 GB NAS) harvests only the light sources; GameSheet's hundreds of
+                    # seasons and the rest come with the published game list
+                    names = ["timetoscore", "hockeytech", "poland"]
                 await harvest.run_in_thread(names, log=lambda m: print("[harvest]", m, flush=True), delay_s=180)
                 if _os.environ.get("HEALTH_DAILY", "1") != "0":
                     from . import health
