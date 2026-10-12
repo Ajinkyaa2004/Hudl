@@ -648,27 +648,30 @@ let API_BASE='/api',API_BACKUP_UNTIL=0;
 function apiBase(){if(API_BASE!=='/api'&&Date.now()>API_BACKUP_UNTIL)API_BASE='/api';return API_BASE}
 function useBackup(){if(API_BASE==='/api'){API_BASE='/api-backup';API_BACKUP_UNTIL=Date.now()+300000;setTimeout(()=>checkServers(),500);return true}return false}
 /* footer status: ask both servers every minute and say in plain words where results come from */
-async function ping(base,ms){
+/* one try at the server's health; the way there (Vercel -> Tailscale) drops about one request in
+   twelve with an instant 502, so ping() asks up to three times before calling a server silent */
+async function ping1(base,ms){
   const ctl=new AbortController(),t=setTimeout(()=>ctl.abort(),ms);
   try{const r=await fetch(base+'/healthz',{cache:'no-store',signal:ctl.signal});
     if(!r.ok||!(r.headers.get('content-type')||'').includes('json'))return null;return await r.json()}
-  catch(e){return null}finally{clearTimeout(t)}
+  catch(e){return null}finally{clearTimeout(t)}}
+async function ping(base,ms){for(let i=0;i<3;i++){const r=await ping1(base,ms);if(r)return r;await sleep(400)}return null
 }
 async function checkServers(nasKnown){
-  const [nas,bk]=await Promise.all([nasKnown!==undefined?nasKnown:ping('/api',6000),ping('/api-backup',45000)]);
-  const nasOk=!!(nas&&nas.ok),nasReady=nasOk&&nas.knowledge_base,bkOk=!!(bk&&bk.ok&&bk.knowledge_base);
+  const [nas,bk]=await Promise.all([nasKnown!==undefined?nasKnown:ping('/api',15000),ping('/api-backup',45000)]);
+  const nasOk=!!(nas&&nas.ok),nasReady=nasOk&&nas.knowledge_base,bkOk=!!(bk&&bk.ok),bkFull=bkOk&&bk.knowledge_base;
   if(nasReady&&API_BASE!=='/api'){API_BASE='/api';API_BACKUP_UNTIL=0}   // the NAS is back: use it straight away
   else if(!nasReady&&bkOk&&API_BASE==='/api'){API_BASE='/api-backup';API_BACKUP_UNTIL=Date.now()+300000}   // NAS down: no search waits on it
   let s,hl,sub;
   if(nasReady){s='ok';hl='Running on Home NAS';sub='All good. Your results come from the home NAS.'}
   else if(nasOk&&bkOk){s='warn';hl='Home NAS is starting';sub='Results come from the backup server (Render) until it is ready. Same accuracy.'}
-  else if(bkOk){s='warn';hl='Running on backup (Render)';sub='The home NAS is off or not answering. Results come from Render, just as accurate, sometimes a little slower.'}
+  else if(bkOk){s='warn';hl='Running on backup (Render)';sub=bkFull?'The home NAS is off or not answering. Results come from Render, just as accurate, sometimes a little slower.':'The home NAS is off or not answering. Render is answering but still loading its knowledge; results may be weaker for a few minutes.'}
   else if(nasOk){s='warn';hl='Running on Home NAS';sub='The NAS is answering but still loading its data. The backup server is not answering.'}
   else{s='bad';hl='No server is answering';sub='Check the internet connection and press Find again. If it stays like this, the NAS and the backup are both down.'}
   const ls=$('#lsst');if(ls){ls.dataset.s=s;$('#lsst-hl').textContent=hl;$('#lsst-det').textContent=s==='ok'?'Results come from the home NAS.':s==='bad'?'Check the internet connection.':'Results come from the backup (Render), same accuracy.'}
   const st=$('#sst');if(!st)return;st.dataset.s=s;$('#sst-hl').textContent=hl;$('#sst-sub').textContent=sub;
   const tm=new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
-  $('#sst-det').textContent=`Home NAS: ${nasReady?'online':nasOk?'starting':'offline'} · Backup: ${bkOk?'ready':'not answering'} · checked ${tm}`;
+  $('#sst-det').textContent=`Home NAS: ${nasReady?'online':nasOk?'starting':'offline'} · Backup: ${bkFull?'ready':bkOk?'loading knowledge':'not answering'} · checked ${tm}`;
 }
 setInterval(()=>{checkServers();heartbeat()},60000);
 async function api(p,o={},tries=5){
@@ -679,10 +682,11 @@ async function api(p,o={},tries=5){
     const {timeout,...opts}=o,ms=timeout!==undefined?timeout:(apiBase()==='/api'?10000:60000);
     const ctl=new AbortController(),tm=ms?setTimeout(()=>ctl.abort(),ms):0;
     try{r=await fetch(apiBase()+p,{headers:{'content-type':'application/json'},credentials:'same-origin',cache:'no-store',signal:ctl.signal,...opts})}
-    catch(e){clearTimeout(tm);if(useBackup())continue;if(i<tries-1){wake(1);await sleep(Math.min(2000*2**i,10000));continue}wake(0);throw new Error("Can't reach the server. Check the internet connection and try again.")}
+    catch(e){clearTimeout(tm);if(apiBase()==='/api'&&(o._drop=(o._drop||0)+1)<=2){await sleep(400);continue}if(useBackup())continue;if(i<tries-1){wake(1);await sleep(Math.min(2000*2**i,10000));continue}wake(0);throw new Error("Can't reach the server. Check the internet connection and try again.")}
     clearTimeout(tm);
     /* our server always answers in JSON; any other error page comes from the way there (the NAS is off or starting) */
     const down=[502,503,504].includes(r.status)||(r.status>=400&&!(r.headers.get('content-type')||'').includes('json'));
+    if(down&&apiBase()==='/api'&&(o._drop=(o._drop||0)+1)<=2){await sleep(400);continue}
     if(down&&useBackup())continue;
     if(down&&i<tries-1){wake(1);await sleep(Math.min(2000*2**i,10000));continue}
     wake(0);
@@ -738,7 +742,7 @@ const Q0=null;
 const _wt=setTimeout(()=>wake(1),2500);   // a slow first answer: say so
 /* before anything else, a quick look at the home NAS: when it is off, the page starts on the backup
    instead of waiting on it; the full status (both servers) follows in the footer */
-ping('/api',5000).then(n=>{if(!(n&&n.ok&&n.knowledge_base)){API_BASE='/api-backup';API_BACKUP_UNTIL=Date.now()+300000}checkServers(n);return api('/session')}).then(s=>{clearTimeout(_wt);wake(0);if(s.required&&!s.ok)showLogin();else if(!MY_NAME)showLogin(false);else{heartbeat();if(Q0){q.value=Q0;chips(Q0);find()}}}).catch(()=>{clearTimeout(_wt);wake(0)});
+ping('/api',15000).then(n=>{if(!(n&&n.ok&&n.knowledge_base)){API_BASE='/api-backup';API_BACKUP_UNTIL=Date.now()+300000}checkServers(n);return api('/session')}).then(s=>{clearTimeout(_wt);wake(0);if(s.required&&!s.ok)showLogin();else if(!MY_NAME)showLogin(false);else{heartbeat();if(Q0){q.value=Q0;chips(Q0);find()}}}).catch(()=>{clearTimeout(_wt);wake(0)});
 
 /* ---------- theme ---------- */
 function themeLabel(){$$('.tlabel').forEach(l=>l.textContent=document.documentElement.dataset.theme==='dark'?'Dark':'Light')}

@@ -139,10 +139,19 @@ def admin_data(name: str, since: float = 0):
     f = ROOT / "data" / name
     if not f.exists():
         raise HTTPException(404, "No such file here")
+    if name == "knowledge.json" and not KB.get("teams"):
+        raise HTTPException(409, "This server's knowledge base is empty; nothing worth copying")
     t = f.stat().st_mtime
     if since and t <= since + 1:
         return Response(status_code=204)
-    return Response(f.read_bytes(), media_type="application/json", headers={"x-data-time": str(t)})
+    return Response(f.read_bytes(), media_type="application/json", headers={"x-data-time": str(t), "x-kb-teams": str(len(KB.get("teams") or {}))})
+
+
+SYNC = dict(at=None, ok=None, error=None)     # the last data sync, shown by /api/healthz
+
+
+def _kb_size(d: dict) -> int:
+    return len(d.get("teams") or {}) + len(d.get("tournaments") or {}) + len(d.get("team_sources") or {})
 
 
 # the two servers keep the same knowledge base and learned spellings: each checks the other every
@@ -152,8 +161,24 @@ NAS_URL, RENDER_URL = "https://home-nas.tailfff30a.ts.net", "https://pucktrace-a
 DATA_FROM = _os.environ.get("DATA_FROM") or (NAS_URL if SERVER == "render" else RENDER_URL if SERVER == "nas" else "")
 
 
+async def _get_retry(c, url, tries=3, **kw):
+    """The Tailscale hostname now and then fails to resolve from a cloud host: try again before giving up."""
+    import asyncio
+    last = None
+    for i in range(tries):
+        try:
+            r = await c.get(url, **kw)
+            if r.status_code < 500:
+                return r
+            last = RuntimeError(f"HTTP {r.status_code}")
+        except Exception as e:
+            last = e
+        await asyncio.sleep(1 + i)
+    raise last
+
+
 async def _data_sync_loop():
-    import asyncio, httpx, json as _j
+    import asyncio, httpx, json as _j, time as _t
     from .adapters import base as _base
     global KB
     await asyncio.sleep(20)
@@ -163,13 +188,17 @@ async def _data_sync_loop():
                 for name in ("knowledge.json", "aliases_learned.json"):
                     f = ROOT / "data" / name
                     mine = f.stat().st_mtime if f.exists() else 0
-                    r = await c.get(f"{DATA_FROM}/api/admin/data", params={"name": name, "since": mine})
+                    r = await _get_retry(c, f"{DATA_FROM}/api/admin/data", params={"name": name, "since": mine})
                     if r.status_code != 200:
                         continue
                     theirs = float(r.headers.get("x-data-time") or 0)
                     if theirs <= mine + 1:
                         continue                              # an older server that doesn't know `since`
-                    _j.loads(r.content)                       # only valid JSON replaces what is here
+                    data = _j.loads(r.content)                # only valid JSON replaces what is here
+                    if name == "knowledge.json" and _kb_size(data) < 0.9 * _kb_size(KB):
+                        # never let a thinner knowledge base (a server that restarted empty) replace a full one
+                        print(f"[data sync] refused {name} from {DATA_FROM}: {_kb_size(data)} entries vs {_kb_size(KB)} here", flush=True)
+                        continue
                     if not (f.exists() and f.read_bytes() == r.content):
                         f.write_bytes(r.content)
                         if name == "knowledge.json":
@@ -179,53 +208,136 @@ async def _data_sync_loop():
                             _base.team_similarity.cache_clear()
                         print(f"[data sync] {name} updated from {DATA_FROM}", flush=True)
                     _os.utime(f, (theirs, theirs))            # same time on both: no copying back and forth
+            SYNC.update(at=_t.strftime("%Y-%m-%dT%H:%M:%S"), ok=True, error=None)
         except Exception as e:
+            SYNC.update(at=_t.strftime("%Y-%m-%dT%H:%M:%S"), ok=False, error=str(e)[:160])
             print("[data sync] failed:", e, flush=True)
-        await asyncio.sleep(int(_os.environ.get("SYNC_EVERY", "300")))
+        # without a knowledge base yet (a fresh restart), try again every minute
+        await asyncio.sleep(int(_os.environ.get("SYNC_EVERY", "60" if not KB.get("teams") else "300")))
+
+
+_STARTED = _time.time()
+
+
+def _rss_mb() -> int:
+    """Memory in use by this process, from /proc on Linux."""
+    try:
+        for line in open("/proc/self/status"):
+            if line.startswith("VmRSS:"):
+                return int(line.split()[1]) // 1024
+    except Exception:
+        pass
+    return 0
 
 
 @app.api_route("/api/healthz", methods=["GET", "HEAD"])   # uptime monitors check with HEAD
 def healthz():
     # open (no sign-in): only whether the published game list is loaded, no names or headers
     gl = globals().get("GAME_LIST") or {}
-    return dict(ok=True, server=SERVER, game_list=gl.get("games", 0), game_list_at=gl.get("at"), knowledge_base=len(KB.get("teams") or {}) > 0,
-                version=(_os.environ.get("APP_VERSION") or _os.environ.get("RENDER_GIT_COMMIT", ""))[:7] or None)
+    return dict(ok=True, server=SERVER, game_list=gl.get("games", 0), game_list_at=gl.get("at"), game_list_from=gl.get("source"), knowledge_base=len(KB.get("teams") or {}) > 0,
+                version=(_os.environ.get("APP_VERSION") or _os.environ.get("RENDER_GIT_COMMIT", ""))[:7] or None,
+                kb_teams=len(KB.get("teams") or {}), uptime_s=int(_time.time() - _STARTED), rss_mb=_rss_mb(),
+                searches=sum(1 for v in _JOBS.values() if v["status"] == "running"), max_searches=_max_searches(),
+                game_list_error=gl.get("error"), sync=SYNC)
 
 
 GAME_LIST_URL = _os.environ.get("GAME_LIST_URL", "https://github.com/Ajinkyaa2004/Hudl/releases/download/game-list/game-list.db.gz")
 GAME_LIST = dict(at=None, games=0, error=None)
 
 
+GAME_LIST_TOKEN = _os.environ.get("GAME_LIST_TOKEN", "")     # a GitHub token with read access, for a private repo
+GAME_LIST_MIN = 1000                                           # fewer games than this is not a game list
+
+
+async def _fetch_game_list(c) -> tuple[bytes, str]:
+    """The gzipped game list, from the first source that has it:
+    1. the public release link (a public repo),
+    2. the GitHub API with GAME_LIST_TOKEN (a private repo),
+    3. the other server's copy (NAS <-> Render), which needs no GitHub at all."""
+    import re as _re
+    errors = []
+    try:
+        r = await c.get(GAME_LIST_URL)
+        if r.status_code == 200:
+            return r.content, "github"
+        errors.append(f"release link: HTTP {r.status_code}")
+    except Exception as e:
+        errors.append(f"release link: {e}")
+    m = _re.search(r"github\.com/([^/]+)/([^/]+)/releases/download/([^/]+)/([^/?]+)", GAME_LIST_URL)
+    if GAME_LIST_TOKEN and m:
+        try:
+            owner, repo, tag, name = m.groups()
+            h = {"Authorization": f"Bearer {GAME_LIST_TOKEN}", "Accept": "application/vnd.github+json"}
+            rel = await c.get(f"https://api.github.com/repos/{owner}/{repo}/releases/tags/{tag}", headers=h)
+            aid = next((a["id"] for a in (rel.json().get("assets") or []) if a.get("name") == name), None) if rel.status_code == 200 else None
+            if aid:
+                r = await c.get(f"https://api.github.com/repos/{owner}/{repo}/releases/assets/{aid}",
+                                headers={"Authorization": f"Bearer {GAME_LIST_TOKEN}", "Accept": "application/octet-stream"})
+                if r.status_code == 200:
+                    return r.content, "github api"
+            errors.append(f"GitHub API: HTTP {rel.status_code}" + ("" if aid else ", asset not listed"))
+        except Exception as e:
+            errors.append(f"GitHub API: {e}")
+    if DATA_FROM:
+        try:
+            r = await _get_retry(c, f"{DATA_FROM}/api/admin/game-list", cookies={"pt_session": _token()})
+            if r.status_code == 200:
+                return r.content, "the other server"
+            errors.append(f"other server: HTTP {r.status_code}")
+        except Exception as e:
+            errors.append(f"other server: {e}")
+    raise RuntimeError("game list download: " + "; ".join(errors))
+
+
 async def load_game_list() -> int:
-    """Download the published game list (built on GitHub every 3 hours) and merge it into the local
-    index. Only the games table is touched: what the server learned (results, sources) stays."""
-    import asyncio, gzip, httpx, time
+    """Download the game list (built on GitHub every 3 hours) and merge it into the local index.
+    Only the games table is touched: what the server learned (results, sources) stays."""
+    import asyncio, gzip, time
+    import httpx
     from . import gameindex
     async with httpx.AsyncClient(follow_redirects=True, timeout=180) as c:
-        r = await c.get(GAME_LIST_URL)
-    if r.status_code != 200:
-        raise RuntimeError(f"game list download: HTTP {r.status_code}")
+        content, source = await _fetch_game_list(c)
     path = ROOT / "data" / "game-list.db"
 
     def merge() -> int:
-        path.write_bytes(gzip.decompress(r.content))
+        path.write_bytes(gzip.decompress(content))
         con = gameindex.conn()
         with gameindex._lock:
             con.execute("attach database ? as gl", (str(path),))
             try:
+                n = con.execute("select count(*) from gl.games").fetchone()[0]
+                if n < GAME_LIST_MIN:
+                    raise RuntimeError(f"game list from {source} holds only {n} games")
                 # games found live on this server since the list was built are kept when newer
                 con.execute("""insert or replace into games select g.* from gl.games g left join games l on l.url = g.url
                                where l.url is null or ifnull(l.updated, 0) <= ifnull(g.updated, 0)""")
                 con.commit()
-                n = con.execute("select count(*) from gl.games").fetchone()[0]
             finally:
                 con.execute("detach database gl")
         path.unlink(missing_ok=True)
         return n
     n = await asyncio.to_thread(merge)
-    GAME_LIST.update(at=time.strftime("%Y-%m-%dT%H:%M:%S"), games=n, error=None)
-    print(f"[game list] {n} games merged", flush=True)
+    GAME_LIST.update(at=time.strftime("%Y-%m-%dT%H:%M:%S"), games=n, error=None, source=source)
+    print(f"[game list] {n} games merged from {source}", flush=True)
     return n
+
+
+_EXPORT = ROOT / "data" / "game-list-export.db.gz"
+
+
+@app.get("/api/admin/game-list")
+async def admin_game_list():
+    """This server's game list (the games table only, gzipped) for the other server, rebuilt at most
+    once an hour. Refused while this server has too few games to be worth copying."""
+    import asyncio, time
+    from . import gameindex, export_games
+    with gameindex._lock:
+        n = gameindex.conn().execute("select count(*) from games").fetchone()[0]
+    if n < GAME_LIST_MIN:
+        raise HTTPException(503, f"only {n} games here")
+    if not _EXPORT.exists() or time.time() - _EXPORT.stat().st_mtime > 3600:
+        await asyncio.to_thread(export_games.export, ROOT / "data" / "games.db", _EXPORT)
+    return Response(_EXPORT.read_bytes(), media_type="application/gzip")
 
 
 async def _game_list_loop():
@@ -237,7 +349,7 @@ async def _game_list_loop():
         except Exception as e:
             GAME_LIST["error"] = str(e)[:200]
             print("[game list] failed:", e, flush=True)
-        await asyncio.sleep(3 * 3600 if not GAME_LIST["error"] else 900)
+        await asyncio.sleep(900 if GAME_LIST["error"] else 3600 if GAME_LIST.get("source") == "the other server" else 3 * 3600)
 
 
 async def _daily_harvest():
@@ -250,8 +362,9 @@ async def _daily_harvest():
         try:
             last = json.loads(status.read_text()).get("at") if status.exists() else None
             age = time.time() - time.mktime(time.strptime(last, "%Y-%m-%dT%H:%M:%S")) if last else 1e9
-            # with the published game list loaded, the small server needs no harvest of its own
-            if GAME_LIST["at"] and _os.environ.get("HARVEST_WITH_LIST", "0") != "1":
+            # with the published game list loaded, the small server needs no harvest of its own;
+            # a server without a disk (Render) never harvests: the games would vanish at its next restart
+            if SERVER == "render" or (GAME_LIST["at"] and _os.environ.get("HARVEST_WITH_LIST", "0") != "1"):
                 await asyncio.sleep(3600)
                 continue
             if age > 20 * 3600:
@@ -369,7 +482,28 @@ async def rosters(inp: RostersIn):
 import asyncio as _aio, secrets as _secrets, time as _time
 _JOBS: dict = {}
 _JOB_KEYS: dict = {}
-_JOB_SEM = None          # at most 3 searches at once: the free server has 512 MB and little CPU
+_JOB_SEM = None          # searches at once, see _max_searches()
+
+
+def _mem_limit_mb() -> int:
+    """The container's memory limit (cgroup v2 or v1), or 0 when there is none."""
+    for p in ("/sys/fs/cgroup/memory.max", "/sys/fs/cgroup/memory/memory.limit_in_bytes"):
+        try:
+            v = open(p).read().strip()
+            if v.isdigit() and int(v) < 1 << 50:
+                return int(v) // 1048576
+        except Exception:
+            pass
+    return 0
+
+
+def _max_searches() -> int:
+    """MAX_SEARCHES is a ceiling; a small box gets fewer: a search can take 100 MB, and the box
+    must keep room for the game list, the caches and the system (a 2 GB NAS, Render's 512 MB)."""
+    ceiling = int(_os.environ.get("MAX_SEARCHES", "3"))
+    lim = _mem_limit_mb()
+    by_memory = 3 if lim and lim <= 600 else 4 if lim and lim <= 1600 else ceiling
+    return max(1, min(ceiling, by_memory))
 
 
 def app_busy() -> bool:
@@ -391,7 +525,7 @@ def _job_start(key: str, factory) -> dict:
 
     async def run():
         global _JOB_SEM
-        _JOB_SEM = _JOB_SEM or _aio.Semaphore(int(_os.environ.get("MAX_SEARCHES", "3")))   # 3 on Render Free, 8 on the NAS
+        _JOB_SEM = _JOB_SEM or _aio.Semaphore(_max_searches())
         j = _JOBS[jid]
         try:
             async with _JOB_SEM:
