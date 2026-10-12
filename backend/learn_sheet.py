@@ -31,14 +31,11 @@ GIRLS = _re.compile(r"\b(?:lady|ladies|girls?|women'?s?|womens|female|fem|dam|da
 
 
 def sheet_rows():
-    wb = openpyxl.load_workbook(PROGRESS, read_only=True, data_only=True)
-    for r in wb["Progress"].iter_rows(values_only=True):
-        r = tuple(r) + (None,) * max(0, 15 - len(r))
-        h = r[2]
-        if isinstance(h, str) and h.strip().startswith("["):
-            p = parse_header(h.strip())
-            if p:
-                yield p, first_url(r[8])
+    from . import sheet
+    for r in sheet.rows(PROGRESS):
+        p = parse_header(r["header"].strip())
+        if p:
+            yield p, first_url(r.get("link"))
 
 
 def index_by_game():

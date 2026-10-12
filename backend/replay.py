@@ -104,18 +104,16 @@ def game_id(url: str) -> str | None:
 
 
 def load_games(start: str, end: str):
-    wb = openpyxl.load_workbook(PROGRESS, read_only=True, data_only=True)
+    from . import sheet
     games = []
-    for r in wb["Progress"].iter_rows(values_only=True):
-        r = tuple(r) + (None,) * max(0, 15 - len(r))      # some exported rows are short
-        h = r[2]
-        if not (isinstance(h, str) and h.startswith("[")):
-            continue
+    for r in sheet.rows(PROGRESS):
+        h = r["header"]
         p = parse_header(h)
         if not p or not (start <= p["date"] <= end):
             continue
-        games.append(dict(header=h.strip(), parsed=p, status=r[7], link=first_url(r[8]), r1=r[10], r2=r[12],
-                          analyst=r[4], expected_domain=domain(first_url(r[8])), expected_id=game_id(first_url(r[8]) or "")))
+        link = first_url(r.get("link"))
+        games.append(dict(header=h.strip(), parsed=p, status=r.get("status"), link=link, r1=r.get("r1"), r2=r.get("r2"),
+                          analyst=r.get("analyst"), expected_domain=domain(link), expected_id=game_id(link or "")))
     return games
 
 

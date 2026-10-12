@@ -96,10 +96,10 @@ def season_ids_from_kb(kb):
 
 def season_ids_from_progress(path):
     import openpyxl
-    wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+    from . import sheet
     c = Counter()
-    for r in wb["Progress"].iter_rows(values_only=True):
-        u = lookup.first_url(r[8]) if len(r) > 8 else None
+    for r in sheet.rows(path):
+        u = lookup.first_url(r.get("link"))
         m = re.search(r"gamesheetstats\.com/seasons/(\d+)", u or "")
         if m:
             c[m.group(1)] += 1

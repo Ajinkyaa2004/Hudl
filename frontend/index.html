@@ -168,13 +168,6 @@ kbd{font:11px var(--mono);border:1px solid var(--line2);border-bottom-width:2px;
 .sbox{position:relative;display:flex;align-items:center;gap:10px;background:var(--bg);border:1px solid var(--line2);border-radius:12px;padding:6px 6px 6px 14px;transition:border-color .15s,box-shadow .15s}
 .sbox:focus-within{border-color:var(--ac);box-shadow:0 0 0 4px var(--ac-ring)}
 .sbox.invalid{border-color:var(--no);box-shadow:0 0 0 4px var(--no-bg);animation:shake .3s}
-.recents{position:absolute;top:calc(100% + 8px);left:0;right:0;background:var(--s1);border:1px solid var(--line);border-radius:var(--r2);box-shadow:var(--sh3);z-index:50;display:none;overflow:hidden}
-.recents.on{display:block;animation:fade .2s var(--ease)}
-.r-item{padding:10px 14px;cursor:pointer;display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:13px;color:var(--tx);transition:background .15s;border-bottom:1px solid var(--line)}
-.r-item:last-child{border-bottom:0}
-.r-item:hover,.r-item.act{background:var(--s2)}
-.r-item .ic{color:var(--mu2);flex:none}
-.r-item span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sbox .ic{color:var(--mu2)}
 .sbox input{flex:1;min-width:0;background:none;border:0;outline:0;color:var(--tx);font:14px var(--mono);height:42px}
 .sbox input::placeholder{color:var(--mu2);font-family:var(--sans)}
@@ -504,7 +497,6 @@ kbd{font:11px var(--mono);border:1px solid var(--line2);border-bottom-width:2px;
             <input id="q" placeholder="[2216771] Team 1 0 - 0 Team 2 | Competition | 2026-09-20" autocomplete="off" spellcheck="false" autofocus enterkeyhint="search">
             <button class="iconbtn" type="button" id="qclear" title="New search" aria-label="Clear the search" style="border:0;background:none"><svg class="ic sm"><use href="#i-x"/></svg></button>
             <button class="btn" type="submit" id="go">Find</button>
-            <div class="recents" id="recents"></div>
           </form>
           <div class="shelp"><div class="chips" id="chips"></div><div class="keys"><span><kbd>/</kbd> search</span><span><kbd>Esc</kbd> close preview</span><span><kbd>S</kbd> save</span></div></div>
         </div>
@@ -829,10 +821,8 @@ const playersHtml=ps=>{const pos=ps.some(p=>p.pos);return `<div class="plist"><t
 /* ---------- find ---------- */
 const q=$('#q');
 q.addEventListener('input',()=>{chips(q.value);q.closest('.sbox').classList.remove('invalid')});
-function loadRecents(){try{const rs=JSON.parse(localStorage.getItem('pt-recent')||'[]');if(!rs.length)return;$('#recents').innerHTML=rs.map((r,i)=>`<div class="r-item" data-i="${i}">${ic('search','xs')}<span>${esc(r)}</span></div>`).join('');$$('.r-item').forEach(el=>el.onmousedown=e=>{e.preventDefault();q.value=rs[el.dataset.i];chips(q.value);$('#recents').classList.remove('on');find()});$('#recents').classList.add('on')}catch(e){}}
-q.addEventListener('focus',()=>{if(CUR)setTimeout(()=>q.select(),0);if(!q.value.trim())loadRecents()});
-q.addEventListener('blur',()=>setTimeout(()=>$('#recents').classList.remove('on'),100));
-$('#qclear').onclick=()=>{RUN++;CUR=null;q.value='';chips('');closePreview();clearInterval(TIMER);$('#go').disabled=false;$('#out').innerHTML=EMPTY;q.focus();loadRecents()};
+q.addEventListener('focus',()=>{if(CUR)setTimeout(()=>q.select(),0)});
+$('#qclear').onclick=()=>{RUN++;CUR=null;q.value='';chips('');closePreview();clearInterval(TIMER);$('#go').disabled=false;$('#out').innerHTML=EMPTY;q.focus()};
 const tok=n=>esc(n).replace(/\b((?:U|J)\s?\d{1,2}|\d{1,2}\s?U|20[01]\d|AAA|AA)\b/gi,'<b>$1</b>');
 const HRE=/^\s*(?:\[(\d+)\]\s*)?(.+?)\s+(?:\d+\s*-\s*\d+|vs\.?|v\.?|-|–)\s+(.+?)\s*\|\s*([^|]+?)\s*\|\s*(\d{4}-\d{2}-\d{2})/i;
 function chips(t){const m=t.match(HRE),c=$('#chips');
@@ -846,7 +836,6 @@ let CUR=null,RUN=0,TIMER=null;
 async function find(){
   const h=q.value.trim();if(!h)return;
   if(!chips(h)){q.closest('.sbox').classList.remove('invalid');void q.closest('.sbox').offsetWidth;q.closest('.sbox').classList.add('invalid');return}
-  $('#recents').classList.remove('on');try{let rs=JSON.parse(localStorage.getItem('pt-recent')||'[]');rs=[h,...rs.filter(x=>x!==h)].slice(0,6);localStorage.setItem('pt-recent',JSON.stringify(rs))}catch(e){}
   const run=++RUN;closePreview();
   $('#go').disabled=true;
   let quick=null;

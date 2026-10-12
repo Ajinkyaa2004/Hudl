@@ -41,14 +41,13 @@ async def main():
     args = ap.parse_args()
     kb = lookup.load_kb()
     rows = []
-    for r in openpyxl.load_workbook(ROOT / "data" / "progress.xlsx", read_only=True, data_only=True)["Progress"].iter_rows(values_only=True):
-        h = r[2]
-        if not (isinstance(h, str) and h.startswith("[")):
-            continue
+    from . import sheet
+    for r in sheet.rows(ROOT / "data" / "progress.xlsx"):
+        h = r["header"]
         p = parse_header(h)
         if not p or not (args.start <= p["date"] <= args.end):
             continue
-        for key, status, link, name in (("t1n", r[10], r[11], p["t1"]), ("t2n", r[12], r[13], p["t2"])):
+        for key, status, link, name in (("t1n", r.get("r1"), r.get("l1"), p["t1"]), ("t2n", r.get("r2"), r.get("l2"), p["t2"])):
             if "Not in" in str(status):
                 rows.append(dict(header=h.strip(), parsed=p, key=key, team=name, analyst=first_url(link)))
     random.seed(11)
