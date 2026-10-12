@@ -386,6 +386,28 @@ async def _daily_harvest():
         await asyncio.sleep(3600)
 
 
+async def _heartbeat_loop():
+    """One line a minute in the container log (memory, searches), so that when the container dies
+    the last lines before it show what it was doing; and a note at start of how long the previous
+    run lived, read from a small file on disk."""
+    import asyncio, json as _j
+    f = ROOT / "data" / "heartbeat.json"
+    try:
+        prev = _j.loads(f.read_text())
+        print(f"[alive] started; previous run last seen {prev.get('at')} after {prev.get('uptime_s')} s, rss {prev.get('rss_mb')} MB, {prev.get('searches')} searches running", flush=True)
+    except Exception:
+        print("[alive] started; no record of a previous run", flush=True)
+    while True:
+        beat = dict(at=_time.strftime("%Y-%m-%dT%H:%M:%S"), uptime_s=int(_time.time() - _STARTED), rss_mb=_rss_mb(),
+                    searches=sum(1 for v in _JOBS.values() if v["status"] == "running"), limit_mb=_mem_limit_mb())
+        print(f"[alive] up {beat['uptime_s']} s, rss {beat['rss_mb']} MB of {beat['limit_mb'] or '-'}, {beat['searches']} searches", flush=True)
+        try:
+            f.write_text(_j.dumps(beat))
+        except Exception:
+            pass
+        await asyncio.sleep(60)
+
+
 async def _cache_cleanup_loop():
     """Old cached pages are removed a minute after start and then once a day."""
     import asyncio
@@ -406,6 +428,7 @@ async def _start_harvest():
         asyncio.create_task(_game_list_loop())
     asyncio.create_task(_daily_harvest())
     asyncio.create_task(_cache_cleanup_loop())
+    asyncio.create_task(_heartbeat_loop())
     if DATA_FROM:
         asyncio.create_task(_data_sync_loop())
 
