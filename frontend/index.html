@@ -634,11 +634,20 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 /* the server sleeps on the free plan and can be briefly unreachable while it wakes or restarts:
    502/503/504 and network errors are retried with a "waking up" banner instead of failing */
 function wake(on){$('#wake').classList.toggle('on',!!on)}
-/* two servers: the main one (home NAS) at /api and a backup (Render) at /api-backup. When the
-   main one doesn't answer, the page switches to the backup for 5 minutes, then tries main again */
-let API_BASE='/api',API_BACKUP_UNTIL=0;
-function apiBase(){if(API_BASE!=='/api'&&Date.now()>API_BACKUP_UNTIL)API_BASE='/api';return API_BASE}
-function useBackup(){if(API_BASE==='/api'){API_BASE='/api-backup';API_BACKUP_UNTIL=Date.now()+300000;setTimeout(()=>checkServers(),500);return true}return false}
+/* two servers: the main one (home NAS) and a backup (Render) at /api-backup. The NAS has two ways
+   in: straight from the browser (NAS_DIRECT) and through Vercel (/api). Vercel's own name lookup of
+   the NAS fails for hours at a time, so the page uses whichever way answers. When neither does,
+   the page switches to the backup for 5 minutes, then tries the NAS again */
+const NAS_DIRECT=location.hostname.endsWith('actorix.in')?'https://home-nas.tailfff30a.ts.net/api':'/api';
+let NAS=NAS_DIRECT,API_BASE=NAS,API_BACKUP_UNTIL=0;
+const onNas=b=>b!=='/api-backup';
+function apiBase(){if(!onNas(API_BASE)&&Date.now()>API_BACKUP_UNTIL)API_BASE=NAS;return API_BASE}
+function useBackup(){if(onNas(API_BASE)){API_BASE='/api-backup';API_BACKUP_UNTIL=Date.now()+300000;setTimeout(()=>checkServers(),500);return true}return false}
+function otherNasWay(){if(NAS_DIRECT==='/api')return;NAS=NAS===NAS_DIRECT?'/api':NAS_DIRECT;if(onNas(API_BASE))API_BASE=NAS}
+/* the sign-in travels as a header (a cookie of this site doesn't reach the NAS's own address) */
+let TOKEN=null;try{TOKEN=localStorage.getItem('pt-token')||null}catch(e){}
+function setToken(t){if(!t)return;TOKEN=t;try{localStorage.setItem('pt-token',t)}catch(e){}}
+function hdrs(json=true){const h={};if(json)h['content-type']='application/json';if(TOKEN)h['x-pt-session']=TOKEN;return h}
 /* footer status: ask both servers every minute and say in plain words where results come from */
 /* one try at the server's health; the way there (Vercel -> Tailscale) drops about one request in
    twelve with an instant 502, so ping() asks up to three times before calling a server silent */
@@ -649,11 +658,20 @@ async function ping1(base,ms){
   catch(e){return null}finally{clearTimeout(t)}}
 async function ping(base,ms){for(let i=0;i<3;i++){const r=await ping1(base,ms);if(r)return r;await sleep(400)}return null
 }
+/* the NAS by both ways at once; the first that answers becomes the way in */
+async function pingNas(ms){
+  if(NAS_DIRECT==='/api')return ping('/api',ms);
+  for(let i=0;i<3;i++){
+    const r=await new Promise(res=>{let left=2;const done=(way,v)=>{if(v&&v.ok){res([way,v]);return}if(--left===0)res(null)};
+      ping1(NAS_DIRECT,ms).then(v=>done(NAS_DIRECT,v));ping1('/api',ms).then(v=>done('/api',v))});
+    if(r){if(NAS!==r[0]){NAS=r[0];if(onNas(API_BASE))API_BASE=NAS}return r[1]}
+    await sleep(400)}
+  return null}
 async function checkServers(nasKnown){
-  const [nas,bk]=await Promise.all([nasKnown!==undefined?nasKnown:ping('/api',15000),ping('/api-backup',45000)]);
+  const [nas,bk]=await Promise.all([nasKnown!==undefined?nasKnown:pingNas(15000),ping('/api-backup',45000)]);
   const nasOk=!!(nas&&nas.ok),nasReady=nasOk&&nas.knowledge_base,bkOk=!!(bk&&bk.ok),bkFull=bkOk&&bk.knowledge_base;
-  if(nasReady&&API_BASE!=='/api'){API_BASE='/api';API_BACKUP_UNTIL=0}   // the NAS is back: use it straight away
-  else if(!nasReady&&bkOk&&API_BASE==='/api'){API_BASE='/api-backup';API_BACKUP_UNTIL=Date.now()+300000}   // NAS down: no search waits on it
+  if(nasReady&&!onNas(API_BASE)){API_BASE=NAS;API_BACKUP_UNTIL=0}   // the NAS is back: use it straight away
+  else if(!nasReady&&bkOk&&onNas(API_BASE)){API_BASE='/api-backup';API_BACKUP_UNTIL=Date.now()+300000}   // NAS down: no search waits on it
   let s,hl,sub;
   if(nasReady){s='ok';hl='Running on Home NAS';sub='All good. Your results come from the home NAS.'}
   else if(nasOk&&bkOk){s='warn';hl='Home NAS is starting';sub='Results come from the backup server (Render) until it is ready. Same accuracy.'}
@@ -671,18 +689,19 @@ async function api(p,o={},tries=5){
     let r;
     /* a server that hangs counts as down: 10 s on the main one (it answers in well under a second),
        60 s on the backup (it may be waking up); o.timeout=0 for the slow source check */
-    const {timeout,...opts}=o,ms=timeout!==undefined?timeout:(apiBase()==='/api'?10000:60000);
+    const {timeout,...opts}=o,ms=timeout!==undefined?timeout:(onNas(apiBase())?10000:60000);
     const ctl=new AbortController(),tm=ms?setTimeout(()=>ctl.abort(),ms):0;
-    try{r=await fetch(apiBase()+p,{headers:{'content-type':'application/json'},credentials:'same-origin',cache:'no-store',signal:ctl.signal,...opts})}
-    catch(e){clearTimeout(tm);if(apiBase()==='/api'&&(o._drop=(o._drop||0)+1)<=2){await sleep(400);continue}if(useBackup())continue;if(i<tries-1){wake(1);await sleep(Math.min(2000*2**i,10000));continue}wake(0);throw new Error("Can't reach the server. Check the internet connection and try again.")}
+    try{r=await fetch(apiBase()+p,{headers:hdrs(),credentials:'same-origin',cache:'no-store',signal:ctl.signal,...opts})}
+    catch(e){clearTimeout(tm);if(onNas(apiBase())&&(o._drop=(o._drop||0)+1)<=2){otherNasWay();await sleep(400);continue}if(useBackup())continue;if(i<tries-1){wake(1);await sleep(Math.min(2000*2**i,10000));continue}wake(0);throw new Error("Can't reach the server. Check the internet connection and try again.")}
     clearTimeout(tm);
     /* our server always answers in JSON; any other error page comes from the way there (the NAS is off or starting) */
     const down=[502,503,504].includes(r.status)||(r.status>=400&&!(r.headers.get('content-type')||'').includes('json'));
-    if(down&&apiBase()==='/api'&&(o._drop=(o._drop||0)+1)<=2){await sleep(400);continue}
+    if(down&&onNas(apiBase())&&(o._drop=(o._drop||0)+1)<=2){otherNasWay();await sleep(400);continue}
     if(down&&useBackup())continue;
     if(down&&i<tries-1){wake(1);await sleep(Math.min(2000*2**i,10000));continue}
     wake(0);
     if(r.status===401&&p!=='/login'){showLogin();throw new Error('Sign in required')}
+    if(r.ok&&(p==='/login'||p==='/session')){const j=await r.json();setToken(j.token);return j}
     if(!r.ok){let m=r.statusText;try{m=(await r.json()).detail||m}catch(e){}const err=new Error(m||('Server error '+r.status));err.status=r.status;throw err}
     return r.json();
   }
@@ -735,7 +754,11 @@ const Q0=null;
 const _wt=setTimeout(()=>wake(1),2500);   // a slow first answer: say so
 /* before anything else, a quick look at the home NAS: when it is off, the page starts on the backup
    instead of waiting on it; the full status (both servers) follows in the footer */
-ping('/api',15000).then(n=>{if(!(n&&n.ok&&n.knowledge_base)){API_BASE='/api-backup';API_BACKUP_UNTIL=Date.now()+300000}checkServers(n);return api('/session')}).then(s=>{clearTimeout(_wt);wake(0);if(s.required&&!s.ok)showLogin();else if(!MY_NAME)showLogin(false);else{heartbeat();if(Q0){q.value=Q0;chips(Q0);find()}}}).catch(()=>{clearTimeout(_wt);wake(0)});
+/* a page signed in before the NAS was called directly has the sign-in only as a cookie of this site:
+   ask a same-site way for the token once, so nobody has to type the password again */
+const tokenOnce=TOKEN||NAS_DIRECT==='/api'?Promise.resolve():Promise.any(['/api-backup','/api'].map(b=>
+  fetch(b+'/session',{credentials:'same-origin',cache:'no-store'}).then(r=>r.json()).then(j=>{if(!j.token)throw 0;setToken(j.token)}))).catch(()=>{});
+Promise.all([pingNas(15000),tokenOnce]).then(([n])=>{if(!(n&&n.ok&&n.knowledge_base)){API_BASE='/api-backup';API_BACKUP_UNTIL=Date.now()+300000}checkServers(n);return api('/session')}).then(s=>{clearTimeout(_wt);wake(0);if(s.required&&!s.ok)showLogin();else if(!MY_NAME)showLogin(false);else{heartbeat();if(Q0){q.value=Q0;chips(Q0);find()}}}).catch(()=>{clearTimeout(_wt);wake(0)});
 
 /* ---------- theme ---------- */
 function themeLabel(){$$('.tlabel').forEach(l=>l.textContent=document.documentElement.dataset.theme==='dark'?'Dark':'Light')}
@@ -1011,7 +1034,7 @@ function editSource(r){
   $('#scancel').onclick=()=>$('#sedit').style.display='none';
   $('#ssave').onclick=async()=>{const body=Object.fromEntries($$('#sform2 input').map(i=>[i.dataset.f,i.value.trim()]));
     try{await post(kind==='teams'?'/sources/team':'/sources/tournament',body);$('#sedit').style.display='none';loadSources();stats();toast('Saved')}catch(e){$('#smsg').className='msg err';$('#smsg').textContent=e.message}};
-  if(r.key)$('#sdel').onclick=()=>{const m=$('#confirm-del');$('#cdel-msg').textContent=r.name;m.showModal();$('#cdel-cancel').onclick=()=>m.close();$('#cdel-ok').onclick=async()=>{m.close();await fetch(apiBase()+`/sources/${kind==='teams'?'team':'tournament'}/${encodeURIComponent(r.key)}`,{method:'DELETE'});$('#sedit').style.display='none';loadSources();stats();toast('Deleted')}};
+  if(r.key)$('#sdel').onclick=()=>{const m=$('#confirm-del');$('#cdel-msg').textContent=r.name;m.showModal();$('#cdel-cancel').onclick=()=>m.close();$('#cdel-ok').onclick=async()=>{m.close();await fetch(apiBase()+`/sources/${kind==='teams'?'team':'tournament'}/${encodeURIComponent(r.key)}`,{method:'DELETE',headers:hdrs(false),credentials:'same-origin'});$('#sedit').style.display='none';loadSources();stats();toast('Deleted')}};
   window.scrollTo({top:0,behavior:'smooth'});setTimeout(()=>$('#sform2 input'+(r.key?':not([readonly])':'')).focus(),200);
 }
 

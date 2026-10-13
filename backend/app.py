@@ -32,7 +32,21 @@ def _token() -> str:
 
 
 def _signed_in(request: Request) -> bool:
-    return not PASSWORD or _hm.compare_digest(request.cookies.get("pt_session", ""), _token())
+    """The session cookie (pages on the same site), or the same value in the x-pt-session header
+    (the page calling the NAS straight from the browser, where cookies of another site don't go)."""
+    if not PASSWORD:
+        return True
+    given = request.cookies.get("pt_session", "") or request.headers.get("x-pt-session", "")
+    return _hm.compare_digest(given, _token())
+
+
+# the page may call this server straight from the browser (not only through Vercel), so Vercel's
+# own name lookup of the NAS, which fails for hours at a time, is not in the way
+import re as _re_cors
+CORS_ORIGIN = _re_cors.compile(r"https://pucktrace\.actorix\.in|https://[a-z0-9-]+\.vercel\.app|http://(localhost|127\.0\.0\.1)(:\d+)?")
+CORS_HEADERS = {"access-control-allow-methods": "GET, POST, DELETE, OPTIONS",
+                "access-control-allow-headers": "content-type, x-pt-session",
+                "access-control-max-age": "7200", "access-control-allow-private-network": "true"}
 
 
 # which server answered, shown on the page: the home NAS (the Docker image sets APP_VERSION) or the Render backup
@@ -41,12 +55,21 @@ SERVER = "render" if _os.environ.get("RENDER") else ("nas" if _os.environ.get("A
 
 @app.middleware("http")
 async def _guard(request: Request, call_next):
-    if PASSWORD and request.url.path.startswith("/api/") and request.url.path not in OPEN and not _signed_in(request):
+    origin = request.headers.get("origin", "")
+    allowed = bool(origin) and bool(CORS_ORIGIN.fullmatch(origin))
+    if request.method == "OPTIONS" and allowed:                  # the browser asking before a cross-site call
+        from fastapi.responses import Response as _R
+        r = _R(status_code=204)
+    elif PASSWORD and request.url.path.startswith("/api/") and request.url.path not in OPEN and not _signed_in(request):
         r = JSONResponse({"detail": "Sign in required"}, status_code=401)
     else:
         r = await call_next(request)
     r.headers["x-pt-server"] = SERVER
     r.headers["access-control-expose-headers"] = "x-pt-server"
+    if allowed:
+        r.headers["access-control-allow-origin"] = origin
+        r.headers["vary"] = "origin"
+        r.headers.update(CORS_HEADERS)
     return r
 
 
@@ -91,7 +114,7 @@ def login(inp: LoginIn, request: Request):
         return dict(ok=True)
     if not _hm.compare_digest(inp.password.encode(), PASSWORD.encode()):
         raise HTTPException(401, "Wrong password")
-    r = JSONResponse(dict(ok=True))
+    r = JSONResponse(dict(ok=True, token=_token()))
     secure = request.headers.get("x-forwarded-proto", request.url.scheme) == "https"
     r.set_cookie("pt_session", _token(), max_age=30 * 86400, httponly=True, samesite="lax", secure=secure)
     return r
@@ -106,7 +129,9 @@ def logout():
 
 @app.get("/api/session")
 def session(request: Request):
-    return dict(required=bool(PASSWORD), ok=_signed_in(request))
+    ok = _signed_in(request)
+    # a signed-in page gets the token too, to call the NAS directly with it (pages signed in before this)
+    return dict(required=bool(PASSWORD), ok=ok, **({"token": _token()} if ok and PASSWORD else {}))
 
 
 @app.post("/api/admin/upload")
