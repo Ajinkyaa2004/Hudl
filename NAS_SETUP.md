@@ -59,6 +59,9 @@ Switch the NAS on and leave. Nothing else is needed:
 - while the NAS is off, starting, or not answering within 20 s, the page uses Render, and a search lost on the way is started again there;
 - Render copies the knowledge base and learned spellings from the NAS every 30 minutes, so its answers match the NAS's.
 
+- the page reaches the NAS straight from the browser (`https://home-nas.tailfff30a.ts.net/api`) and through Vercel (`/api`) at once and uses whichever answers, because Vercel's own lookup of the NAS's name fails for hours at a time;
+- the **PuckTrace Doorway Check** task (scheduled, root, every 5 minutes, script `deploy/doorway-check.sh` pasted into the task) restarts Tailscale when the server answers at home but not from the internet; its log is `/volume2/docker/pucktrace/doorway.log`.
+
 `https://pucktrace.actorix.in/api/healthz` shows the version the NAS runs; `https://pucktrace-api-8u5i.onrender.com/api/healthz` the backup's.
 
 ## If the GitHub repository is private
