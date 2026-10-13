@@ -43,11 +43,13 @@ CHECKS = [
 ]
 
 
-async def run(checks=CHECKS) -> dict:
+async def run(checks=CHECKS, gentle: bool = False) -> dict:
+    """gentle: on a live server, two checks at a time and the database lookups off the main loop,
+    so searches keep their speed while it runs."""
     from . import lookup
     from .adapters import run_all
     kb = lookup.load_kb()
-    sem = asyncio.Semaphore(4)
+    sem = asyncio.Semaphore(2 if gentle else 4)
 
     async def one(name, header, want):
       async with sem:
@@ -70,8 +72,11 @@ async def run(checks=CHECKS) -> dict:
                 # sources read in bulk each day (TimeToScore, GameSheet...) or tournaments already
                 # over answer from the game list instead of a live page
                 from . import gameindex
-                with gameindex._lock:
-                    hit = gameindex.conn().execute("select url, updated from games where url like ?", (f"%{want}%",)).fetchone()
+
+                def _find():
+                    with gameindex._lock:
+                        return gameindex.conn().execute("select url, updated from games where url like ?", (f"%{want}%",)).fetchone()
+                hit = await asyncio.to_thread(_find)
                 if hit:
                     ok, got, how, err = True, hit[0], "game list", None
         except Exception as e:

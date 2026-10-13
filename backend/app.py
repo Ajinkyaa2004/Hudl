@@ -671,10 +671,26 @@ def health_status():
         return dict(at=None, checks=[])
 
 
+_HEALTH_RUNNING = False
+
+
 @app.post("/api/health/run")
 async def health_run():
+    """Check every source once with a known game. Heavy (about 30 live sites): refused on the Render
+    backup, whose 512 MB it can exhaust while it carries everyone's searches, and run one at a time."""
+    global _HEALTH_RUNNING
     from . import health
-    return await health.run()
+    if SERVER == "render":
+        raise HTTPException(409, "The source check runs on the home NAS only. Try again when the footer says Running on Home NAS.")
+    if _HEALTH_RUNNING:
+        raise HTTPException(409, "A source check is already running. The results appear in about two minutes.")
+    _HEALTH_RUNNING = True
+    try:
+        # on its own thread and event loop: its page parsing never holds up searches and the
+        # health pings the page uses to decide whether the NAS is up
+        return await _aio.to_thread(lambda: _aio.run(health.run(gentle=True)))
+    finally:
+        _HEALTH_RUNNING = False
 
 
 @app.get("/api/learning")
