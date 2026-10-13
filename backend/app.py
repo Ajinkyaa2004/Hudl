@@ -281,13 +281,17 @@ async def _fetch_game_list(c) -> tuple[bytes, str]:
     3. the other server's copy (NAS <-> Render), which needs no GitHub at all."""
     import re as _re
     errors = []
-    try:
-        r = await c.get(GAME_LIST_URL)
-        if r.status_code == 200:
-            return r.content, "github"
-        errors.append(f"release link: HTTP {r.status_code}")
-    except Exception as e:
-        errors.append(f"release link: {e}")
+    # the release keeps a spare copy, uploaded just before the main one: one of the two is always whole
+    for url, label in ((GAME_LIST_URL, "github"), (GAME_LIST_URL.replace("game-list.db.gz", "game-list-spare.db.gz"), "github spare")):
+        if label == "github spare" and url == GAME_LIST_URL:
+            continue
+        try:
+            r = await c.get(url)
+            if r.status_code == 200:
+                return r.content, label
+            errors.append(f"{label}: HTTP {r.status_code}")
+        except Exception as e:
+            errors.append(f"{label}: {e}")
     m = _re.search(r"github\.com/([^/]+)/([^/]+)/releases/download/([^/]+)/([^/?]+)", GAME_LIST_URL)
     if GAME_LIST_TOKEN and m:
         try:

@@ -8,6 +8,11 @@ on:
   schedule:
     - cron: "23 */3 * * *"
   workflow_dispatch:
+    inputs:
+      fresh:
+        description: "Start from an empty list (only when both published copies are lost)"
+        type: boolean
+        default: false
 permissions:
   contents: write
 concurrency:
@@ -34,24 +39,49 @@ jobs:
             data/swehockey_scan.json
           key: game-list-${{ github.run_id }}
           restore-keys: game-list-
+      # The list accumulates: each run starts from the last published one (GameSheet games and
+      # earlier games come only from there). Starting from nothing would publish a list half as big,
+      # as happened on 12 October after an upload failed, so a missing list stops the run instead.
       - name: Start from the last published list
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           cp -n data/seed/*.json data/ || true
-          if gh release download game-list -p game-list.db.gz -D /tmp 2>/dev/null; then
-            gunzip -c /tmp/game-list.db.gz > data/games.db
+          for f in game-list.db.gz game-list-spare.db.gz; do
+            if gh release download game-list -p "$f" -D /tmp --clobber 2>/dev/null && gunzip -c "/tmp/$f" > data/games.db; then
+              echo "started from $f"; break
+            fi
+            rm -f data/games.db
+          done
+          if [ -f data/games.db ]; then
+            python -c "import sqlite3; print(sqlite3.connect('data/games.db').execute('select count(*) from games').fetchone()[0])" > /tmp/previous_count
+            echo "previous list: $(cat /tmp/previous_count) games"
+          elif [ "${{ inputs.fresh }}" = "true" ]; then
+            echo 0 > /tmp/previous_count; echo "starting from an empty list, as asked"
+          else
+            echo "::error::No published list to start from; run the workflow by hand with 'fresh' only if both copies are really lost"; exit 1
           fi
       - name: Collect this season's games
         run: python -m backend.harvest gamesheet timetoscore hockeytech deb poland sportsadmin swehockey owha
       - name: Export the public games table
-        run: python -m backend.export_games
+        run: |
+          python -m backend.export_games
+          new=$(python -c "import gzip,sqlite3,shutil; shutil.copyfileobj(gzip.open('data/game-list.db.gz'),open('/tmp/new.db','wb')); print(sqlite3.connect('/tmp/new.db').execute('select count(*) from games').fetchone()[0])")
+          old=$(cat /tmp/previous_count)
+          echo "new list: $new games (previous $old)"
+          if [ "$new" -lt $(( old * 9 / 10 )) ]; then
+            echo "::error::The new list ($new games) is much smaller than the last one ($old); not published"; exit 1
+          fi
+      # Two copies, uploaded one after the other: an upload that fails half-way (the old file is
+      # removed before the new one is in) never leaves the release without a good list.
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release view game-list >/dev/null 2>&1 || gh release create game-list --title "Game list" --notes "Public 2026-27 game schedules for PuckTrace, rebuilt every 3 hours." --latest=false
-          gh release upload game-list data/game-list.db.gz --clobber
+          cp data/game-list.db.gz /tmp/game-list-spare.db.gz
+          for i in 1 2 3; do gh release upload game-list /tmp/game-list-spare.db.gz --clobber && break; sleep 20; done
+          for i in 1 2 3; do gh release upload game-list data/game-list.db.gz --clobber && break; sleep 20; done
       - name: Save page cache and scan progress
         if: always()
         uses: actions/cache/save@v4
