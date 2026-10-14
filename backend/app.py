@@ -415,6 +415,92 @@ async def _daily_harvest():
         await asyncio.sleep(3600)
 
 
+# ---------------------------------------------------------------- switches to the backup
+# When a page moves to the backup it notes why (each way to the NAS: no answer, HTTP error...) and
+# reports it to the NAS once it is back. The NAS compares the time with its own record of when it
+# was running (runs.json, updated every minute), so the Status page can tell "the NAS was off" from
+# "the NAS was running, the way to it failed".
+RUNS = ROOT / "data" / "runs.json"
+SWITCHES = ROOT / "data" / "switches.jsonl"
+
+
+def _note_run(new: bool = False):
+    import json as _j
+    try:
+        runs = _j.loads(RUNS.read_text())
+    except Exception:
+        runs = []
+    now = int(_time.time())
+    if new or not runs:
+        runs.append([int(_STARTED), now])
+    else:
+        runs[-1][1] = now
+    try:
+        RUNS.write_text(_j.dumps(runs[-500:]))
+    except Exception:
+        pass
+
+
+def _running_at(t: float):
+    """True when this server was running at epoch t (to a minute and a half), False when not,
+    None when its record does not reach back that far."""
+    import json as _j
+    try:
+        runs = _j.loads(RUNS.read_text())
+    except Exception:
+        return None
+    if not runs or t < runs[0][0] - 60:
+        return None
+    return any(a - 30 <= t <= b + 90 for a, b in runs)
+
+
+class SwitchesIn(BaseModel):
+    events: list
+
+
+@app.post("/api/switches")
+def switches_add(inp: SwitchesIn):
+    import json as _j
+    clean = lambda v, n=200: str(v or "")[:n]
+    lines = []
+    for e in inp.events[:50]:
+        if not isinstance(e, dict):
+            continue
+        reasons = e.get("reasons") if isinstance(e.get("reasons"), dict) else {}
+        lines.append(_j.dumps(dict(at=clean(e.get("at"), 40), back_at=clean(e.get("back_at"), 40), name=_clean_name(e.get("name") or ""),
+                                   trigger=clean(e.get("trigger"), 80), reasons={clean(k, 20): clean(v) for k, v in list(reasons.items())[:4]},
+                                   received=_time.strftime("%Y-%m-%dT%H:%M:%S"), server=SERVER), ensure_ascii=False))
+    if lines:
+        try:
+            old = SWITCHES.read_text().splitlines() if SWITCHES.exists() else []
+            SWITCHES.write_text("\n".join((old + lines)[-1000:]) + "\n")
+        except Exception:
+            pass
+    return dict(ok=True, saved=len(lines))
+
+
+@app.get("/api/switches")
+def switches_list(limit: int = 50):
+    """The latest moves to the backup, newest first, each marked with whether this server was
+    running at that moment."""
+    import json as _j, datetime as _dt
+    try:
+        rows = [_j.loads(l) for l in SWITCHES.read_text().splitlines() if l.strip()]
+    except Exception:
+        rows = []
+    out = []
+    for e in reversed(rows[-max(1, min(limit, 200)):]):
+        try:
+            t = _dt.datetime.fromisoformat(e["at"].replace("Z", "+00:00")).timestamp()
+            e["nas_running"] = _running_at(t)
+            if e.get("back_at"):
+                e["away_s"] = int(_dt.datetime.fromisoformat(e["back_at"].replace("Z", "+00:00")).timestamp() - t)
+        except Exception:
+            e["nas_running"] = None
+        out.append(e)
+    return dict(server=SERVER, switches=out)
+
+
 async def _heartbeat_loop():
     """One line a minute in the container log (memory, searches), so that when the container dies
     the last lines before it show what it was doing; and a note at start of how long the previous
@@ -426,7 +512,10 @@ async def _heartbeat_loop():
         print(f"[alive] started; previous run last seen {prev.get('at')} after {prev.get('uptime_s')} s, rss {prev.get('rss_mb')} MB, {prev.get('searches')} searches running", flush=True)
     except Exception:
         print("[alive] started; no record of a previous run", flush=True)
+    first = True
     while True:
+        _note_run(new=first)
+        first = False
         beat = dict(at=_time.strftime("%Y-%m-%dT%H:%M:%S"), uptime_s=int(_time.time() - _STARTED), rss_mb=_rss_mb(),
                     searches=sum(1 for v in _JOBS.values() if v["status"] == "running"), limit_mb=_mem_limit_mb())
         print(f"[alive] up {beat['uptime_s']} s, rss {beat['rss_mb']} MB of {beat['limit_mb'] or '-'}, {beat['searches']} searches", flush=True)
