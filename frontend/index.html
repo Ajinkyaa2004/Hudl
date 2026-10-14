@@ -683,9 +683,10 @@ setInterval(()=>{checkServers();heartbeat()},60000);
 async function api(p,o={},tries=5){
   for(let i=0;;i++){
     let r;
-    /* a server that hangs counts as down: 10 s on the main one (it answers in well under a second),
+    /* a server that hangs counts as down: 25 s on the main one (alone it answers in well under a
+       second, but with 10 people searching at once it can take 8 s, and busy is not down),
        60 s on the backup (it may be waking up); o.timeout=0 for the slow source check */
-    const {timeout,...opts}=o,ms=timeout!==undefined?timeout:(onNas(apiBase())?10000:60000);
+    const {timeout,...opts}=o,ms=timeout!==undefined?timeout:(onNas(apiBase())?25000:60000);
     const ctl=new AbortController(),tm=ms?setTimeout(()=>ctl.abort(),ms):0;
     try{r=await fetch(apiBase()+p,{headers:hdrs(),credentials:'same-origin',cache:'no-store',signal:ctl.signal,...opts})}
     catch(e){clearTimeout(tm);if(onNas(apiBase())&&(o._drop=(o._drop||0)+1)<=2){otherNasWay();await sleep(400);continue}if(useBackup())continue;if(i<tries-1){wake(1);await sleep(Math.min(2000*2**i,10000));continue}wake(0);throw new Error("Can't reach the server. Check the internet connection and try again.")}
