@@ -607,9 +607,10 @@ kbd{font:11px var(--mono);border:1px solid var(--line2);border-bottom-width:2px;
 <div class="toast" id="toast"></div>
 <dialog class="modal" id="weekoff" aria-labelledby="wo-title">
   <h3 id="wo-title">Ajinkya is on a week off</h3>
-  <p>Yes, even the person who built this gets a holiday. The home NAS is switched off until Monday, so PuckTrace is running on its backup server today.</p>
+  <p>Yes, even the person who built this gets a holiday. The home NAS is switched off until Saturday, so PuckTrace is running on its backup server today.</p>
   <p>Same answers, same accuracy, just a little slower. A search may take a few extra seconds, so maybe sip your chai while it thinks.</p>
-  <p>Be kind to it. Full speed returns on Monday, along with Ajinkya.</p>
+  <p>Be kind to it. Full speed returns on Saturday, along with Ajinkya.</p>
+  <p>Any queries? Contact <a href="tel:+919004933771">+91 90049 33771</a>.</p>
   <div class="modal-actions"><button class="btn2 pri" id="wo-ok">Fine, I'll be patient</button></div>
 </dialog>
 <dialog class="modal" id="confirm-del">
@@ -708,7 +709,7 @@ async function checkServers(nasKnown){
 setInterval(()=>{checkServers();heartbeat()},60000);
 /* days the home NAS is off on purpose (India dates): when the page runs on the backup on one of
    them, signed-in people see a note once a day. Outside these dates it never shows. */
-const OFF_DAYS=['2026-10-15','2026-10-16','2026-10-17','2026-10-18'];
+const OFF_DAYS=['2026-10-15','2026-10-16'];
 function maybeWeekOff(){
   try{const d=new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Kolkata'});
     if(!OFF_DAYS.includes(d)||onNas(API_BASE)||$('#login').classList.contains('on'))return;
