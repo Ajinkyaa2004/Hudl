@@ -176,5 +176,35 @@
  "Nice": [
   "Nice Hockey Cote d'Azur",
   "Nice Cote d'Azur"
+ ],
+ "UBC": [
+  "University of British Columbia",
+  "UBC Thunderbirds",
+  "British Columbia Thunderbirds"
+ ],
+ "UNB": [
+  "University of New Brunswick",
+  "UNB Reds"
+ ],
+ "UPEI": [
+  "University of Prince Edward Island",
+  "UPEI Panthers"
+ ],
+ "StFX": [
+  "St. Francis Xavier University",
+  "St. Francis Xavier X-Men",
+  "St. Francis Xavier X-Women"
+ ],
+ "SMU": [
+  "Saint Mary's University",
+  "Saint Mary's Huskies"
+ ],
+ "UQTR": [
+  "Universite du Quebec a Trois-Rivieres",
+  "UQTR Patriotes"
+ ],
+ "UOIT": [
+  "Ontario Tech University",
+  "Ontario Tech Ridgebacks"
  ]
 }

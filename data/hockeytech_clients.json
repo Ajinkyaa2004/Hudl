@@ -544,5 +544,18 @@
    "4": "women.oua.hockeytech.com",
    "5": "men.oua.hockeytech.com"
   }
+ },
+ "canadawest": {
+  "key": "9c805e84a9fa60b7",
+  "name": "Canada West (U Sports)",
+  "sites": [
+   "men.canadawest.hockeytech.com",
+   "women.canadawest.hockeytech.com",
+   "canadawest.org"
+  ],
+  "league_ids": {
+   "1": "men.canadawest.hockeytech.com",
+   "2": "women.canadawest.hockeytech.com"
+  }
  }
 }

@@ -218,6 +218,12 @@ def decide(parsed: dict, cands: list) -> dict:
             unique.append(c)
     cands = unique
     strong_ones = [c for c in cands if strong(c) and c.get("kind", "protocol") == "protocol"]   # a results page is never a Found
+    # a team plays one game at a time: when a strong candidate starts at the header's time, strong
+    # copies of the pair on another date are a different game (the Czech U18 pair on 17 and 18 Oct)
+    from .base import TIME_MATCH as _TM
+    _at = {c.get("date") for c in strong_ones if _TM in c.get("reasons", [])}
+    if len(_at) == 1 and len(strong_ones) > 1:
+        strong_ones = [c for c in strong_ones if c.get("date") in _at]
     # one game listed by two sources (hockeydata via two league sites, onlajny and hockeydata):
     # the same hockeydata game id, or both teams strong and the same start time to 5 minutes
     if len(strong_ones) > 1:
