@@ -7,7 +7,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://home-nas.tailfff30a.ts.net/api/:path*"
+      "destination": "https://municipal-thrown-gather-born.trycloudflare.com/api/:path*"
     },
     {
       "source": "/api-backup/:path*",
