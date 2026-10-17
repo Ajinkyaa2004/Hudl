@@ -139,7 +139,7 @@ async def admin_upload(name: str, request: Request):
     """Put a local data file on a deployed server (signed in): the knowledge base built from
     Club Data and learned spellings are not in the public repo."""
     global KB
-    allowed = {"knowledge.json", "aliases_learned.json"}
+    allowed = {"knowledge.json", "aliases_learned.json", "sheet_log.json"}
     if name not in allowed:
         raise HTTPException(400, f"Allowed: {sorted(allowed)}")
     body = await request.body()
@@ -159,7 +159,7 @@ def admin_data(name: str, since: float = 0):
     """The private data files, for the other server to copy (signed in: both servers share
     APP_PASSWORD and APP_SECRET, so each can send the other a valid session token). With `since`,
     answers 204 unless this copy is newer, so the regular check costs nothing."""
-    if name not in {"knowledge.json", "aliases_learned.json"}:
+    if name not in {"knowledge.json", "aliases_learned.json", "sheet_log.json"}:
         raise HTTPException(400, "Not a data file")
     f = ROOT / "data" / name
     if not f.exists():
@@ -210,7 +210,7 @@ async def _data_sync_loop():
     while True:
         try:
             async with httpx.AsyncClient(timeout=90, cookies={"pt_session": _token()}) as c:
-                for name in ("knowledge.json", "aliases_learned.json"):
+                for name in ("knowledge.json", "aliases_learned.json", "sheet_log.json"):
                     f = ROOT / "data" / name
                     mine = f.stat().st_mtime if f.exists() else 0
                     r = await _get_retry(c, f"{DATA_FROM}/api/admin/data", params={"name": name, "since": mine})
@@ -553,6 +553,7 @@ async def _start_harvest():
 
 class SearchIn(BaseModel):
     header: str
+    name: str = ""           # who searched (the name given at sign-in), for the owner's search log
 
 
 class SaveIn(BaseModel):
@@ -685,7 +686,35 @@ def app_busy() -> bool:
     return any(v["status"] == "running" for v in _JOBS.values())
 
 
-def _job_start(key: str, factory) -> dict:
+# ---------------------------------------------------------------- the owner's search log
+# Every finished search adds a row to the owner's Google Sheet through its Apps Script web app:
+# time (IST), name, header, found Yes/No, report link, server. The address and its key are in
+# data/sheet_log.json ({"url": ..., "key": ...}), uploaded like the knowledge base and never in the
+# public repository. Sent in the background; nothing changes for the person searching.
+async def _sheet_log(name: str, header: str, result: dict):
+    import json as _j, datetime as _dt
+    try:
+        cfg = _j.loads((ROOT / "data" / "sheet_log.json").read_text())
+        if not cfg.get("url"):
+            return
+        a = (result or {}).get("auto") or {}
+        found = a.get("verdict") == "found"
+        try:
+            from zoneinfo import ZoneInfo
+            now = _dt.datetime.now(ZoneInfo("Asia/Kolkata"))
+        except Exception:
+            now = _dt.datetime.utcnow() + _dt.timedelta(hours=5, minutes=30)
+        row = dict(key=cfg.get("key", ""), time=now.strftime("%Y-%m-%d %H:%M:%S"), name=_clean_name(name) or "-",
+                   header=header[:500], found="Yes" if found else "No",
+                   link=((a.get("best") or {}).get("url") or "") if found else "", server=SERVER)
+        import httpx
+        async with httpx.AsyncClient(timeout=30, follow_redirects=True) as c:
+            await c.post(cfg["url"], content=_j.dumps(row), headers={"content-type": "text/plain"})
+    except Exception as e:
+        print(f"[sheet log] not sent: {str(e)[:120]}", flush=True)
+
+
+def _job_start(key: str, factory, on_done=None) -> dict:
     now = _time.time()
     for jid in [j for j, v in _JOBS.items() if v["status"] != "running" and now - v["started"] > 600]:
         _JOB_KEYS.pop(_JOBS[jid]["key"], None)
@@ -705,6 +734,8 @@ def _job_start(key: str, factory) -> dict:
             async with _JOB_SEM:
                 j["result"] = await _WORKERS.run(factory)
             j["status"] = "done"
+            if on_done:
+                _aio.create_task(on_done(j["result"]))
         except HTTPException as e:
             j.update(status="error", error=str(e.detail), code=e.status_code)
         except Exception as e:
@@ -740,7 +771,9 @@ async def search_start(inp: SearchIn, rosters: bool = False):
     if not lookup.parse_header(inp.header):
         raise HTTPException(400, "Could not read this header. Use: Team 1 vs Team 2 | Competition | YYYY-MM-DD")
     h = inp.header.strip()
-    return _job_start(f"search|{rosters}|{h}", lambda: _search_with_retry(h, rosters))
+    who = inp.name
+    return _job_start(f"search|{rosters}|{h}", lambda: _search_with_retry(h, rosters),
+                      on_done=lambda res: _sheet_log(who, h, res))
 
 
 @app.post("/api/rosters/start")

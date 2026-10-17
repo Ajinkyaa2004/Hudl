@@ -906,7 +906,7 @@ async function find(){
   const t0=Date.now();clearInterval(TIMER);
   TIMER=setInterval(()=>{const s=(Date.now()-t0)/1000;const p=$('#prog');if(p)p.style.width=Math.min(94,100*(1-Math.exp(-s/14)))+'%';const e=$('#elapsed');if(e)e.textContent=Math.round(s)+'s'},250);
   // the report search runs alone; rosters are read after it (from the game itself when it is found)
-  try{const r=await job('/search/start',{header:h});if(run!==RUN)return;CUR=r;
+  try{const r=await job('/search/start',{header:h,name:MY_NAME||''});if(run!==RUN)return;CUR=r;
     const found=(r.auto&&r.auto.verdict==='found')||r.outcome==='found';
     const st=found?'found':r.auto&&r.auto.verdict==='check'?'check':'none';
     r._rosLoading=true;render(r,h);clearInterval(TIMER);$('#go').disabled=false;
