@@ -637,7 +637,7 @@ function wake(on){$('#wake').classList.toggle('on',!!on)}
    in: straight from the browser (NAS_DIRECT) and through Vercel (/api). Vercel's own name lookup of
    the NAS fails for hours at a time, so the page uses whichever way answers. When neither does,
    the page switches to the backup for 5 minutes, then tries the NAS again */
-const NAS_DIRECT=location.hostname.endsWith('actorix.in')?'https://municipal-thrown-gather-born.trycloudflare.com/api':'/api';   // temporary Cloudflare tunnel while Tailscale Funnel is down (17 Oct)
+const NAS_DIRECT=location.hostname.endsWith('actorix.in')?'https://nas.actorix.in/api':'/api';   // the NAS's permanent Cloudflare Tunnel (starts with the NAS); /api through Vercel goes via Tailscale
 let NAS=NAS_DIRECT,API_BASE=NAS,API_BACKUP_UNTIL=0;
 const onNas=b=>b!=='/api-backup';
 function apiBase(){if(!onNas(API_BASE)&&Date.now()>API_BACKUP_UNTIL){API_BASE=NAS;setTimeout(noteBack,0)}return API_BASE}
