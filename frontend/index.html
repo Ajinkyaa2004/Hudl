@@ -684,8 +684,9 @@ async function checkServers(nasKnown){
   const [nas,bk]=await Promise.all([nasKnown!==undefined?nasKnown:pingNas(30000),ping('/api-backup',45000)]);
   const nasOk=!!(nas&&nas.ok),nasReady=nasOk&&nas.knowledge_base,bkOk=!!(bk&&bk.ok),bkFull=bkOk&&bk.knowledge_base;
   if(nasOk&&!nasReady)noteFail(NAS,'the NAS answered but was still loading its data');
+  if(nasReady)nasOkNow();
   if(nasReady&&!onNas(API_BASE)){API_BASE=NAS;API_BACKUP_UNTIL=0;noteBack()}   // the NAS is back: use it straight away
-  else if(!nasReady&&bkOk&&onNas(API_BASE)){API_BASE='/api-backup';API_BACKUP_UNTIL=Date.now()+300000;noteSwitch('the status check every minute found no NAS')}   // NAS down: no search waits on it
+  else if(!nasReady&&bkOk&&onNas(API_BASE)&&nasFailing()){API_BASE='/api-backup';API_BACKUP_UNTIL=Date.now()+300000;noteSwitch('the status check every minute found no NAS')}   // NAS down: no search waits on it
   if(nasReady)flushSw();
   let s,hl,sub;
   if(nasReady){s='ok';hl='Running on Home NAS';sub='All good. Your results come from the home NAS.'}
@@ -699,6 +700,11 @@ async function checkServers(nasKnown){
   $('#sst-det').textContent=`Home NAS: ${nasReady?'online':nasOk?'starting':'offline'} · Backup: ${bkFull?'ready':bkOk?'loading knowledge':'not answering'} · checked ${tm}`;
 }
 setInterval(()=>{checkServers();heartbeat()},60000);
+/* the NAS stays the server through short gaps (a restart, a network blip): the page keeps retrying
+   it, alternating the two ways in, and turns to the backup only after it has failed for 45 s */
+const NAS_GRACE=45000;let NAS_FAIL_SINCE=0;
+function nasFailing(){if(!NAS_FAIL_SINCE)NAS_FAIL_SINCE=Date.now();return Date.now()-NAS_FAIL_SINCE>NAS_GRACE}
+function nasOkNow(){NAS_FAIL_SINCE=0}
 async function api(p,o={},tries=5){
   for(let i=0;;i++){
     let r;
@@ -708,12 +714,13 @@ async function api(p,o={},tries=5){
     const {timeout,...opts}=o,ms=timeout!==undefined?timeout:(onNas(apiBase())?25000:60000);
     const ctl=new AbortController(),tm=ms?setTimeout(()=>ctl.abort(),ms):0;
     try{r=await fetch(apiBase()+p,{headers:hdrs(),credentials:'same-origin',cache:'no-store',signal:ctl.signal,...opts})}
-    catch(e){clearTimeout(tm);noteFail(apiBase(),e.name==='AbortError'?`no answer within ${ms/1000} s (${p.split('?')[0]})`:`could not connect (${e.message})`);if(onNas(apiBase())&&(o._drop=(o._drop||0)+1)<=2){otherNasWay();await sleep(400);continue}if(useBackup())continue;if(i<tries-1){wake(1);await sleep(Math.min(2000*2**i,10000));continue}wake(0);throw new Error("Can't reach the server. Check the internet connection and try again.")}
+    catch(e){clearTimeout(tm);noteFail(apiBase(),e.name==='AbortError'?`no answer within ${ms/1000} s (${p.split('?')[0]})`:`could not connect (${e.message})`);if(onNas(apiBase())&&!nasFailing()){wake(1);otherNasWay();await sleep(2000);continue}if(useBackup())continue;if(i<tries-1){wake(1);await sleep(Math.min(2000*2**i,10000));continue}wake(0);throw new Error("Can't reach the server. Check the internet connection and try again.")}
     clearTimeout(tm);
     /* our server always answers in JSON; any other error page comes from the way there (the NAS is off or starting) */
     const down=[502,503,504].includes(r.status)||(r.status>=400&&!(r.headers.get('content-type')||'').includes('json'));
     if(down)noteFail(apiBase(),`HTTP ${r.status}${r.headers.get('x-vercel-error')?' '+r.headers.get('x-vercel-error'):''} (${p.split('?')[0]})`);
-    if(down&&onNas(apiBase())&&(o._drop=(o._drop||0)+1)<=2){otherNasWay();await sleep(400);continue}
+    if(down&&onNas(apiBase())&&!nasFailing()){wake(1);otherNasWay();await sleep(2000);continue}
+    if(!down&&onNas(apiBase()))nasOkNow();
     if(down&&useBackup())continue;
     if(down&&i<tries-1){wake(1);await sleep(Math.min(2000*2**i,10000));continue}
     wake(0);
