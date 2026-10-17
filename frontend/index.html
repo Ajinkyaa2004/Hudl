@@ -681,7 +681,7 @@ async function pingNas(ms){
     await sleep(400)}
   return null}
 async function checkServers(nasKnown){
-  const [nas,bk]=await Promise.all([nasKnown!==undefined?nasKnown:pingNas(15000),ping('/api-backup',45000)]);
+  const [nas,bk]=await Promise.all([nasKnown!==undefined?nasKnown:pingNas(30000),ping('/api-backup',45000)]);
   const nasOk=!!(nas&&nas.ok),nasReady=nasOk&&nas.knowledge_base,bkOk=!!(bk&&bk.ok),bkFull=bkOk&&bk.knowledge_base;
   if(nasOk&&!nasReady)noteFail(NAS,'the NAS answered but was still loading its data');
   if(nasReady&&!onNas(API_BASE)){API_BASE=NAS;API_BACKUP_UNTIL=0;noteBack()}   // the NAS is back: use it straight away
