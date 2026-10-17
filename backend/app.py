@@ -691,7 +691,7 @@ def app_busy() -> bool:
 # time (IST), name, header, found Yes/No, report link, server. The address and its key are in
 # data/sheet_log.json ({"url": ..., "key": ...}), uploaded like the knowledge base and never in the
 # public repository. Sent in the background; nothing changes for the person searching.
-async def _sheet_log(name: str, header: str, result: dict):
+async def _sheet_log(name: str, header: str, result: dict, seconds: float = None):
     import json as _j, datetime as _dt
     try:
         cfg = _j.loads((ROOT / "data" / "sheet_log.json").read_text())
@@ -704,9 +704,16 @@ async def _sheet_log(name: str, header: str, result: dict):
             now = _dt.datetime.now(ZoneInfo("Asia/Kolkata"))
         except Exception:
             now = _dt.datetime.utcnow() + _dt.timedelta(hours=5, minutes=30)
+        link = ((a.get("best") or {}).get("url") or "") if found else ""
+        p = lookup.parse_header(header) or {}
+        verdict = a.get("verdict")
         row = dict(key=cfg.get("key", ""), time=now.strftime("%Y-%m-%d %H:%M:%S"), name=_clean_name(name) or "-",
-                   header=header[:500], found="Yes" if found else "No",
-                   link=((a.get("best") or {}).get("url") or "") if found else "", server=SERVER)
+                   header=header[:500], found="Yes" if found else "No", link=link, server=SERVER,
+                   seconds=seconds,
+                   result="Found" if found else ("Shortlist" if verdict == "check" and a.get("candidates") else "Nothing"),
+                   found_on=lookup.domain(link) if link else "",
+                   competition=(p.get("comp") or "")[:120],
+                   match_id=p.get("match_id") or "")
         import httpx
         async with httpx.AsyncClient(timeout=30, follow_redirects=True) as c:
             await c.post(cfg["url"], content=_j.dumps(row), headers={"content-type": "text/plain"})
@@ -735,7 +742,7 @@ def _job_start(key: str, factory, on_done=None) -> dict:
                 j["result"] = await _WORKERS.run(factory)
             j["status"] = "done"
             if on_done:
-                _aio.create_task(on_done(j["result"]))
+                _aio.create_task(on_done(j["result"], round(_time.time() - j["started"], 1)))
         except HTTPException as e:
             j.update(status="error", error=str(e.detail), code=e.status_code)
         except Exception as e:
@@ -773,7 +780,7 @@ async def search_start(inp: SearchIn, rosters: bool = False):
     h = inp.header.strip()
     who = inp.name
     return _job_start(f"search|{rosters}|{h}", lambda: _search_with_retry(h, rosters),
-                      on_done=lambda res: _sheet_log(who, h, res))
+                      on_done=lambda res, secs: _sheet_log(who, h, res, secs))
 
 
 @app.post("/api/rosters/start")
