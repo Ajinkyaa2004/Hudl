@@ -22,7 +22,7 @@ async def paced_browser(url: str, d: str):
     """One browser load at a time per site, a few seconds apart, one retry: sites such as
     MyHockeyRankings challenge bursts of automated loads."""
     import time
-    gate = _gates.setdefault(d, asyncio.Lock())
+    gate = _gates.setdefault((id(asyncio.get_running_loop()), d), asyncio.Lock())   # per event loop
     for attempt in range(2):
         async with gate:
             wait = 3 - (time.time() - _last.get(d, 0))

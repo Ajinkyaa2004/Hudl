@@ -390,7 +390,7 @@ async def _paced_html(url: str) -> str | None:
     import asyncio, time
     from . import rosters as _r
     d = url.split("/")[2]
-    gate = _r._gates.setdefault(d, asyncio.Lock())
+    gate = _r._gates.setdefault((id(asyncio.get_running_loop()), d), asyncio.Lock())   # per event loop
     async with gate:
         wait = 3 - (time.time() - _r._last.get(d, 0))
         if wait > 0:

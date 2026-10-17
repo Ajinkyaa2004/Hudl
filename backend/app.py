@@ -646,6 +646,40 @@ def _max_searches() -> int:
     return max(1, min(ceiling, by_memory))
 
 
+class _SearchWorkers:
+    """Searches run on a few worker threads, each with its own event loop for the server's life.
+    Their CPU work (reading league pages, scoring games, rosters) then never holds up the main loop,
+    which keeps answering health checks, job polls and presence at once: with 20 people searching,
+    a main-loop answer took up to 25 s before, and the page counts a NAS that slow as down.
+    SEARCH_WORKERS=0 runs searches on the main loop as before."""
+    def __init__(self):
+        self.loops = None
+        self.free = None
+
+    def _start(self, n: int):
+        import threading
+        self.loops, self.free = [], _aio.Queue()
+        for i in range(n):
+            loop = _aio.new_event_loop()
+            threading.Thread(target=loop.run_forever, name=f"search-{i}", daemon=True).start()
+            self.loops.append(loop)
+            self.free.put_nowait(loop)
+
+    async def run(self, factory):
+        if _os.environ.get("SEARCH_WORKERS", "1") == "0":
+            return await factory()
+        if self.loops is None:
+            self._start(_max_searches())
+        loop = await self.free.get()
+        try:
+            return await _aio.wrap_future(_aio.run_coroutine_threadsafe(factory(), loop))
+        finally:
+            self.free.put_nowait(loop)
+
+
+_WORKERS = _SearchWorkers()
+
+
 def app_busy() -> bool:
     """True while a search or roster job runs: background work (the daily refresh) can wait."""
     return any(v["status"] == "running" for v in _JOBS.values())
@@ -669,7 +703,7 @@ def _job_start(key: str, factory) -> dict:
         j = _JOBS[jid]
         try:
             async with _JOB_SEM:
-                j["result"] = await factory()
+                j["result"] = await _WORKERS.run(factory)
             j["status"] = "done"
         except HTTPException as e:
             j.update(status="error", error=str(e.detail), code=e.status_code)

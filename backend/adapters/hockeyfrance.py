@@ -19,7 +19,15 @@ FR_TOWNS = ("grenoble", "amiens", "rouen", "angers", "gap", "briancon", "bordeau
             "clermont", "montpellier", "valence", "roanne", "neuilly", "courbevoie", "francais volants", "reims", "morzine",
             "cholet", "wasquehal", "dunkerque", "hockey club 74", "annecy", "chambery", "megeve", "limoges", "toulouse", "poitiers",
             "compiegne", "meudon", "garges", "evry", "viry", "vaujany", "orleans", "rapaces", "gothiques", "boxers", "ducs d")
-_sem = asyncio.Semaphore(4)
+_SEMS: dict = {}     # 4 at a time, per event loop
+
+
+def _sem():
+    loop = asyncio.get_running_loop()
+    e = _SEMS.get(id(loop))
+    if e is None or e[0] is not loop:
+        e = _SEMS[id(loop)] = (loop, asyncio.Semaphore(4))
+    return e[1]
 
 
 async def post(data: dict, ttl: int = 1800):
@@ -40,7 +48,7 @@ async def post(data: dict, ttl: int = 1800):
     val = None
     for attempt in range(2):
         try:
-            async with _sem:
+            async with _sem():
                 async with httpx.AsyncClient(headers={"User-Agent": fetch.UA}, timeout=25) as c:
                     r = await c.post(AJAX, data=data)
             if r.status_code == 200:

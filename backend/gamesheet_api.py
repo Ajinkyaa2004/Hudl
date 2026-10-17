@@ -51,11 +51,11 @@ async def fs_key() -> str | None:
     FS_KEY = os.environ.get("GAMESHEET_FS_KEY") or (cache.read_text().strip() if cache.exists() else None)
     if FS_KEY:
         return FS_KEY
-    _setup()
+    st = _setup()
     try:
-        page = (await _client.get(BASE + "/")).text
+        page = (await st.client.get(BASE + "/")).text
         for src in re.findall(r'src="(/_next/static/[^"]+\.js)"', page)[:40]:
-            js = (await _client.get(BASE + src)).text
+            js = (await st.client.get(BASE + src)).text
             m = re.search(r"AIza[0-9A-Za-z_\-]{35}", js)
             if m:
                 FS_KEY = m.group(0)
@@ -78,26 +78,31 @@ _pace = None
 stats = dict(requests=0, retries=0, rate_limited=0, errors=0)
 
 
-_loop = None
+_STATES: dict = {}     # one client, limiter and pacer per event loop (the server runs searches on several)
 
 
-def _setup():
-    global _client, _sem, _pace, _loop
-    if _client is not None and _loop is not asyncio.get_running_loop():
-        _client = None                  # an earlier asyncio.run owned it
-    if _client is None:
-        _loop = asyncio.get_running_loop()
-        _client = httpx.AsyncClient(headers=HEADERS, timeout=httpx.Timeout(60.0, connect=15.0), follow_redirects=True,
-                                    limits=httpx.Limits(max_connections=CONCURRENCY + 2, max_keepalive_connections=CONCURRENCY + 2))
-        _sem = asyncio.Semaphore(CONCURRENCY)
-        _pace = asyncio.Lock()
+class _St:
+    def __init__(self):
+        self.client = httpx.AsyncClient(headers=HEADERS, timeout=httpx.Timeout(60.0, connect=15.0), follow_redirects=True,
+                                        limits=httpx.Limits(max_connections=CONCURRENCY + 2, max_keepalive_connections=CONCURRENCY + 2))
+        self.sem = asyncio.Semaphore(CONCURRENCY)
+        self.pace = asyncio.Lock()
+
+
+def _setup() -> "_St":
+    global _client
+    loop = asyncio.get_running_loop()
+    e = _STATES.get(id(loop))
+    if e is None or e[0] is not loop:          # a loop id can be reused after an earlier asyncio.run ended
+        e = _STATES[id(loop)] = (loop, _St())
+    _client = e[1].client
+    return e[1]
 
 
 async def close():
-    global _client
-    if _client is not None:
-        await _client.aclose()
-        _client = None
+    e = _STATES.pop(id(asyncio.get_running_loop()), None)
+    if e is not None:
+        await e[1].client.aclose()
 
 
 async def _request(method: str, url: str, params: dict | None = None, body: dict | None = None, tries: int = 5):
@@ -105,18 +110,18 @@ async def _request(method: str, url: str, params: dict | None = None, body: dict
     Paced (MIN_GAP between starts, CONCURRENCY in flight); 429/5xx/403 back off exponentially,
     honouring Retry-After."""
     global _last
-    _setup()
+    st = _setup()
     delay = 2.0
     for attempt in range(tries):
-        async with _sem:
-            async with _pace:
+        async with st.sem:
+            async with st.pace:
                 wait = MIN_GAP - (time.monotonic() - _last)
                 if wait > 0:
                     await asyncio.sleep(wait)
                 _last = time.monotonic()
             stats["requests"] += 1
             try:
-                r = await (_client.post(url, params=params, json=body) if method == "POST" else _client.get(url, params=params))
+                r = await (st.client.post(url, params=params, json=body) if method == "POST" else st.client.get(url, params=params))
             except (httpx.TimeoutException, httpx.TransportError):
                 r = None
         if r is not None and r.status_code == 200:

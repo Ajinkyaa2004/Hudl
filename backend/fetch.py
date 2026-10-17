@@ -347,7 +347,7 @@ async def screenshot(url: str, ttl: int = 6 * 3600, width: int = 1280, height: i
     if miss.exists() and time.time() - miss.stat().st_mtime < 1800:
         return None
     d = urlparse(url).netloc.lower().replace("www.", "")
-    gate = _shot_gates.setdefault(d, asyncio.Lock())
+    gate = _shot_gates.setdefault((id(asyncio.get_running_loop()), d), asyncio.Lock())   # per event loop
     await _context()
     async with gate:                       # one load at a time per site, a little apart
         wait = 2.5 - (time.time() - _shot_last.get(d, 0))
