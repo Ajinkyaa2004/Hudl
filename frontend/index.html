@@ -1036,7 +1036,11 @@ function render(r,header){
   $('#out').innerHTML=h;
   wireShots($('#out'));
   $$('[data-copy]').forEach(b=>b.onclick=()=>copy(b.dataset.copy, b));
-  $$('.pick').forEach(b=>b.onclick=()=>{$$('.cand').forEach(c=>c.classList.toggle('sel',c.dataset.k===b.dataset.k));$('#sv_p').value=b.dataset.url;const s=$('#savebtn').closest('.sec');s.classList.add('open');toast('Selected. Save it below to remember it.')});
+  /* "This one" is the analyst's deliberate choice: it is saved at once, so PuckTrace answers this game
+     instantly next time and learns the team spellings and the competition's website from it */
+  $$('.pick').forEach(b=>b.onclick=async()=>{$$('.cand').forEach(c=>c.classList.toggle('sel',c.dataset.k===b.dataset.k));$('#sv_p').value=b.dataset.url;
+    try{await post('/save',{header,protocol:b.dataset.url,t1link:'',t2link:'',comp_site:''});toast('Saved. PuckTrace will answer this game at once next time.','ok');stats()}
+    catch(e){const s=$('#savebtn').closest('.sec');s.classList.add('open');toast('Selected. Save it below to remember it.')}});
   $('#savebtn').onclick=async()=>{try{const s=await post('/save',{header,protocol:$('#sv_p').value,t1link:$('#sv_1').value,t2link:$('#sv_2').value,comp_site:$('#sv_c').value});$('#savemsg').className='msg ok';$('#savemsg').textContent=`Saved · next time this game is answered at once`+(s.learned&&s.learned.length?` · learned: ${s.learned.join('; ')}`:'');stats();toast('Saved')}
     catch(e){$('#savemsg').className='msg err';$('#savemsg').textContent=e.message}};
 }
