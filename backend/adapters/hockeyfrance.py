@@ -174,7 +174,9 @@ class HockeyFrance(Adapter):
                 date, hhmm = when[:10], when[11:16]
                 if days_apart(parsed["date"], date) not in (0, 1):
                     continue
-                rec, vis = g.get("receveur") or {}, g.get("visiteur") or {}
+                rec, vis = g.get("receveur"), g.get("visiteur")
+                if not isinstance(rec, dict) or not isinstance(vis, dict):
+                    continue                  # a team not decided yet ("NA"): it used to stop the whole search
                 home, away = team_name(rec), team_name(vis)
                 sc = g.get("score") or []
                 score = None
@@ -183,14 +185,17 @@ class HockeyFrance(Adapter):
                         score = "-".join(str(x.get("score") if isinstance(x, dict) else x) for x in sc)
                     except Exception:
                         score = None
-                league = f"{pick[cid]} {((g.get('phase') or {}).get('libelle') or '')}".strip()
+                ph = g.get("phase")
+                league = f"{pick[cid]} {(ph.get('libelle') if isinstance(ph, dict) else '') or ''}".strip()
                 cand = dict(source=self.name, site=self.site, league=league, home=home, away=away, date=date, score=score, status=g.get("etat"),
                             kind="protocol", adapter=self.name, url=REPORT.format(id=g["id"]),
                             start_utc=local_to_utc(date, hhmm, "Europe/Paris"))
                 score_candidate(cand, parsed, pick[cid])
+                base = dict(cand)
                 # also try the short registered names ("Orléans" for "Orléans Division 2 Renards d'Orléans")
                 alt = dict(cand, home=short_name(rec) or home, away=short_name(vis) or away)
                 score_candidate(alt, parsed, pick[cid])
+                variants = [base, alt]
                 if alt["confidence"] > cand["confidence"]:
                     cand = dict(alt, home_full=home, away_full=away)
                 # and the town alone: "Roanne Renards de Roanne" is "CH Roanne", "Montpellier Vipers de
@@ -198,8 +203,39 @@ class HockeyFrance(Adapter):
                 alt2 = dict(cand, home=town(home), away=town(away))
                 if (alt2["home"], alt2["away"]) != (cand["home"], cand["away"]):
                     score_candidate(alt2, parsed, pick[cid])
+                    variants.append(alt2)
                     if alt2["confidence"] > cand["confidence"]:
                         cand = dict(alt2, home_full=home, away_full=away)
+                # each team by its best-fitting name: the town can fit one club and the short name the
+                # other ("Châlons-en-Champagne" by town, "Brest" by short name); the orientation must agree
+                sw = lambda v: "home and away are swapped on the site" in v.get("reasons", [])
+                same_way = [v for v in variants if sw(v) == sw(cand)]
+                best_ts = [max(v["team_scores"][i] for v in same_way) for i in (0, 1)]
+                if best_ts != cand["team_scores"] and base["confidence"] > 0.3:
+                    d_part = base["confidence"] - min(base["team_scores"]) * 0.75
+                    cand = dict(cand, team_scores=best_ts, confidence=round(min(best_ts) * 0.75 + d_part, 2),
+                                reasons=cand.get("reasons", []) + ["each team matched by its best name on the site"])
+                # the site names some clubs by their town only ("Brest"), headers add the nickname
+                # ("HC Brest Albatros"): with the other team clearly matching on the right date, the
+                # town written in the header's team name identifies the club
+                ts = cand["team_scores"]
+                if max(ts) >= 0.85 and min(ts) < 0.8:
+                    weak = ts.index(min(ts))
+                    swapped = "home and away are swapped on the site" in cand.get("reasons", [])
+                    site_team = (vis if swapped else rec) if weak == 0 else (rec if swapped else vis)
+                    hdr_team = parsed["t1"] if weak == 0 else parsed["t2"]
+                    d_part = cand["confidence"] - min(ts) * 0.75
+                    if d_part >= 0.2 and _town_in(hdr_team, short_name(site_team)):
+                        ts[weak] = 0.8
+                        cand["confidence"] = round(min(ts) * 0.75 + d_part, 2)
+                        cand["reasons"] = cand.get("reasons", []) + [f"the site names the club by its town ({short_name(site_team)})"]
                 if min(cand["team_scores"]) >= 0.6:
                     out.append(cand)
         return out
+
+
+def _town_in(header_team: str, site_short: str) -> bool:
+    from ..lookup import strip_accents
+    hw = set(re.findall(r"[a-z]+", strip_accents(header_team or "").lower()))
+    sw = [w for w in re.findall(r"[a-z]+", strip_accents(site_short or "").lower()) if len(w) >= 3 and w not in ("hockey", "club", "division")]
+    return bool(sw) and all(w in hw for w in sw)
