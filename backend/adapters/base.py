@@ -192,8 +192,13 @@ _AGE_RE = re.compile(r"\b(?:u|j)\s?\d{1,2}\b|\b\d{1,2}\s?(?:u|o)\b", re.I)
 COLOURS = re.compile(r"\b(gold|black|white|red|blue|navy|green|silver|orange|purple|grey|gray|maroon|teal|yellow|royal|tier\s?[12i]+|[ab]\d?|elite\s?\d|premier|select)\b", re.I)
 
 
+_ROMAN_TIER = {"tieri": "tier1", "tierii": "tier2", "tieriii": "tier3"}
+
+
 def _colours(name: str) -> set:
-    return {c.lower().replace(" ", "") for c in COLOURS.findall(name or "")} - {"a", "b"}
+    # 'Tier II' and 'Tier 2' are the same tier
+    out = {c.lower().replace(" ", "") for c in COLOURS.findall(name or "")} - {"a", "b"}
+    return {_ROMAN_TIER.get(c, c) for c in out}
 
 
 def _team_similarity(header_name: str, site_name: str, context: str = "") -> tuple[float, str]:

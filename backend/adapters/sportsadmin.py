@@ -58,7 +58,12 @@ class SportsAdmin(Adapter):
     async def find(self, parsed, tm, kb):
         tours = load()
         near = [tid for tid, t in tours.items() if any(days_apart(parsed["date"], d) in (0, 1) for d in t.get("dates", []))]
-        pages = await asyncio.gather(*[get_text(SCHED.format(tid=tid), ttl=1800) for tid in near[:20]])
+        # the saved dates are a snapshot: games scheduled after it (or a season's later rounds)
+        # are missing from it, so a tournament already under way counts too
+        running = [tid for tid, t in tours.items() if tid not in near and t.get("dates") and t["dates"][0] <= parsed["date"]
+                   and "test" not in (t.get("name") or "").lower()]
+        near = near + sorted(running, key=lambda tid: -len(tours[tid].get("dates", [])))
+        pages = await asyncio.gather(*[get_text(SCHED.format(tid=tid), ttl=1800) for tid in near[:30]])
         out = []
         for tid, page in zip(near, pages):
             if not page:

@@ -40,11 +40,12 @@ from .ayhl import Ayhl
 from .digitalshift import DigitalShift
 from .ncaa import NCAA
 from .nwahl import Nwahl
+from .echl import Echl
 
 INDEX = Index()
 ADAPTERS = [SweHockey(), HockeyTech(), GameSheetLive(), HockeyNo(), Sihf(), Leijonat(), CeskyHokej(), Deb(), Liiga(), Nhl(), Del2(), SportsAdmin(), Ligasy(),
             TimeToScore(), Khl(), HockeyBy(), Chl(), EsportsCz(), HockeyData(), PennyDel(), UkHockey(), HockeyFrance(), Onlajny(),
-            ItaliaHockey(), Lhf(), RampTournament(), HockeySlovakia(), Ramp(), Regystra(), Kreezee(), Ayhl(), DigitalShift(), NCAA(), Nwahl()]
+            ItaliaHockey(), Lhf(), RampTournament(), HockeySlovakia(), Ramp(), Regystra(), Kreezee(), Ayhl(), DigitalShift(), NCAA(), Nwahl(), Echl()]
 BUDGET_S = 30
 WEB = WebSearch()
 WEB_SEARCH = True     # last resort when no source knows the game; the replay turns it off
@@ -331,7 +332,21 @@ def decide(parsed: dict, cands: list) -> dict:
                 and min(c["team_scores"]) >= 0.7 and c.get("kind", "protocol") == "protocol"]
         # a game one age group off (the club's other team, or a team playing up) is shown as an
         # option to pick, never chosen on its own
-        pair = [c for c in pair if not any("plays in the" in r for r in c.get("reasons", []))]
+        # (unless the competition itself names that age: a U18 team in an 'Elite Showcase U19AAA')
+        comp_ages = set(re.findall(r"(?<!\d)(\d{1,2})(?=\s*U\b|U)|\bU\s*(\d{1,2})", parsed["comp"], re.I))
+        comp_ages = {x for t in comp_ages for x in t if x}
+        def _play_up_named(c):
+            ups = [re.search(r"plays in the (\d{1,2})U division", r) for r in c.get("reasons", [])]
+            ups = [m.group(1) for m in ups if m]
+            return bool(ups) and all(a in comp_ages for a in ups)
+        pair = [c for c in pair if not any("plays in the" in r for r in c.get("reasons", [])) or _play_up_named(c)]
+        if len(pair) > 1:
+            # the same game listed twice (a never-played placeholder in another division and the
+            # real game with its result): the copy with a result is the game
+            played = [c for c in pair if c.get("score") or str(c.get("status") or "").lower() in ("final", "completed", "final/so", "final/ot")]
+            same = len({(c.get("start_utc"), c.get("home"), c.get("away")) for c in pair}) == 1
+            if same and len(played) == 1:
+                pair = played
         if len(pair) == 1:
             pair[0]["reasons"] = pair[0]["reasons"] + ["the only game starting at the header's time; both names are close, check them"]
             strong_ones = pair

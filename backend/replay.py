@@ -60,6 +60,9 @@ def canonical(url: str):
         ("metalligaen", r"metalligaen\.dk/.*gameId=(\d+)"),
         ("hockeydata-at", r"eishockey\.at/game-center/[^/]+/spiel/(\d+)"),
         ("hockeydata", r"alps\.hockey/.*gameId=([0-9a-f-]{36})"),
+        ("echl", r"echl\.com/games/(\d{4}/\d{2}/\d{2}/[a-z0-9-]+)"),
+        ("digitalshift", r"/stats#/\d+/game/(\d+)"),     # HockeyShift / DigitalShift sites, with or without /boxscore
+        ("ramp", r"/division/\d+/\d+/(?:game/view|gamesheet)/(\d{6,})"),   # RAMP game ids are global across its sites
         ("hockeyfrance", r"hockeyfrance\.com/competitions/rencontre/(\d+)"),
         ("hockeyfrance", r"liguemagnus\.com/rencontre/(\d+)"),     # the league site shows the federation's games by the same id
         ("onlajny", r"onlajny\.com/match/.*id/(\d+)"),
@@ -77,12 +80,17 @@ def canonical(url: str):
     for system, pat in pats:
         m = re.search(pat, url, re.I)
         if m:
+            if system == "hockeytech":
+                return system, _ht_client(url, d), m.group(1)
             return system, m.group(1)
     # every HockeyTech league site (ajhl.ca, hjhl.ca, csshl.ca, u18aaa.ca, nwjhl.com, ...) uses the
     # same /stats/game-center/{id} and /stats/game-summary/{id} pages for the feed's game id
     m = re.search(r"/stats/game-(?:center|summary)/(\d+)", url)
     if m:
-        return "hockeytech", m.group(1)
+        return "hockeytech", _ht_client(url, d), m.group(1)
+    m = re.search(r"/games?/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})", url, re.I)
+    if m:                                # sites with UUID game ids (my.200x85.com)
+        return d, m.group(1).lower()
     gid = game_id(url)                   # any other site: same site and same game number
     if gid:
         return d, gid
@@ -90,6 +98,33 @@ def canonical(url: str):
     if m:
         return d, m.group(1)
     return None
+
+
+def _ht_client(url: str, d: str) -> str:
+    """The HockeyTech client a game link belongs to: game ids are only unique within one client
+    (AEHL U13 AAA game 23765 and Alberta junior game 23765 are different games). '?' when the
+    link doesn't say (chl.ca/gamecentre/{id}, a team's own site): see same_game()."""
+    from .adapters.hockeytech import SITES, LEAGUES
+    m = re.search(r"client_code=(\w+)", url)
+    if m:
+        return m.group(1).lower()
+    m = re.search(r"(?:^|//|\.)chl\.ca/(\w+)/", url)
+    if m and m.group(1).lower() in LEAGUES:
+        return m.group(1).lower()
+    host = (d or "").removeprefix("www.")
+    if host not in SITES and host.endswith(".hockeytech.com"):
+        return host.split(".")[-3]               # east.csshl.hockeytech.com -> csshl
+    return SITES.get(host) or SITES.get(d) or "?"
+
+
+def same_game(a, b) -> bool:
+    """Two canonical keys name the same game; a HockeyTech link that doesn't say its client
+    matches on the game id alone."""
+    if not a or not b:
+        return False
+    if a == b:
+        return True
+    return (len(a) == len(b) == 3 and a[0] == b[0] == "hockeytech" and a[2] == b[2] and "?" in (a[1], b[1]))
 
 
 def game_id(url: str) -> str | None:
@@ -167,7 +202,7 @@ async def phase2(g, row, kb, sem):
     corr = _corrections()
     if a.get("verdict") == "found":
         got = canonical(best["url"])
-        if exp and got == exp:
+        if same_game(exp, got):
             row["auto_result"] = "correct"
         elif exp and got and got[0] == exp[0] and (g["parsed"].get("match_id") or "") in corr:
             row["auto_result"] = "sheet error"

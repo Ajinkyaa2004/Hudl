@@ -18,8 +18,8 @@ TEAM = re.compile(r'"isHome":(true|false),"seoname":"([^"]*)","nameShort":"([^"]
 # schools the NCAA writes in a form no general rule spells out
 SCHOOLS = {"rit": "Rochester Institute of Technology", "liu": "Long Island University", "uconn": "UConn",
            "omaha": "Nebraska Omaha", "army west point": "Army", "boston u.": "Boston University",
-           "colorado col.": "Colorado College", "umass lowell": "UMass Lowell Massachusetts Lowell",
-           "massachusetts": "UMass Massachusetts", "saint michael's": "St. Michael's College", "post": "Post",
+           "colorado col.": "Colorado College", "umass lowell": "UMass Lowell Massachusetts Lowell River Hawks",
+           "massachusetts": "UMass Massachusetts Minutemen", "saint michael's": "St. Michael's College", "post": "Post",
            "concordia-montreal": "Concordia", "minnesota st.": "Minnesota State Mankato", "minn. duluth": "Minnesota Duluth",
            "rensselaer": "Rensselaer Polytechnic Institute RPI"}
 WORDS = [(r"\bAlas\.", "Alaska"), (r"\bMinn\.", "Minnesota"), (r"\bMich\.", "Michigan"), (r"\bCol\.", "College"),

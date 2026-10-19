@@ -84,6 +84,20 @@
    ],
    "all_seasons_of_year": true,
    "strip": "\\s*-\\s*[A-Za-z' ]+\\**$|\\*+$"
+  },
+  {
+   "site": "https://www.federalhockey.com",
+   "client_service_id": "603c74d0-0ed2-4d3f-8171-b447f9398da4",
+   "league": 182,
+   "name": "Federal Prospects Hockey League",
+   "context": "",
+   "tz": "America/New_York",
+   "comp": [
+    "federal prospects",
+    "fphl",
+    "federal hockey"
+   ],
+   "names": {}
   }
  ]
 }

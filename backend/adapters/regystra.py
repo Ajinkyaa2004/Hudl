@@ -27,7 +27,7 @@ def _text(s: str) -> str:
     return re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", s or ""))).strip()
 
 
-TAG = r"(?:[A-Z]?\d+(?:st|nd|rd|th)(?:\s*Seed)?|CONS|[A-Z]\d?|Game\s*\d+\s*(?:Winner|Loser))"
+TAG = r"(?:[A-Z]?\d+(?:st|nd|rd|th)(?:\s*Seed)?|Seed\s*#?\s*\d+|CONS|[A-Z]\d?|Game\s*\d+\s*(?:Winner|Loser))"
 SEED = re.compile(r"^\s*\(" + TAG + r"\)\s*|\s*\(" + TAG + r"\)\s*$|^\s*\d{2}'\s*", re.I)
 
 

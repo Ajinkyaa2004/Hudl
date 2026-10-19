@@ -345,7 +345,7 @@ async def harvest_owha(log=print) -> dict:
         rows = []
         for kind, path in (("league", f"/api/leaguegame/get/{a['aid']}/{a['sid']}/0/0/0/0/"),
                            ("exhibition", f"/api/portalgame/get/{a['aid']}/{a['sid']}/0/0/0/0/0")):
-            data = await get_json(a["host"] + path, ttl=3 * 3600, timeout=180)
+            data = await get_json(a.get("api", a["host"]) + path, ttl=3 * 3600, timeout=180)   # a Blazor site's JSON comes from a classic RAMP host
             for g in data or []:
                 d = (g.get("sDate") or "")[:10]
                 if not g.get("GID") or d < "2026-07-01":

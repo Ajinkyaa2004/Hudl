@@ -1,6 +1,20 @@
 {
- "_about": "RAMP InterActive associations whose whole season is read into the game list every day: league games (/api/leaguegame/get/{aid}/{sid}/0/0/0/0/) and team-entered exhibitions (/api/portalgame/get/{aid}/{sid}/0/0/0/0/0). aid = association id, sid = the 2026-27 season id (from the site's season menu). Game pages open at {host}/division/{cat}/{div}/gamesheet/{GID}.",
+ "_about": "RAMP InterActive associations whose whole season is read into the game list every day: league games (/api/leaguegame/get/{aid}/{sid}/0/0/0/0/) and team-entered exhibitions (/api/portalgame/get/{aid}/{sid}/0/0/0/0/0). aid = association id, sid = the 2026-27 season id (from the site's season menu). Game pages open at {host}/division/{cat}/{div}/gamesheet/{GID}. api: the classic RAMP host that answers the JSON when the site itself is a Blazor site (owhlu22elite.ca).",
  "associations": [
-  {"name": "OWHA", "host": "https://www.owha.on.ca", "aid": 2784, "sid": 14461, "tz": "America/Toronto"}
+  {
+   "name": "OWHA",
+   "host": "https://www.owha.on.ca",
+   "aid": 2784,
+   "sid": 14461,
+   "tz": "America/Toronto"
+  },
+  {
+   "name": "OWHL U22 Elite",
+   "host": "https://www.owhlu22elite.ca",
+   "aid": 2789,
+   "sid": 14459,
+   "tz": "America/Toronto",
+   "api": "https://www.owha.on.ca"
+  }
  ]
 }

@@ -48,6 +48,8 @@ def index_by_game():
         c = canonical(url)
         if c:
             out[c] = (home, away, date)
+            if len(c) == 3 and c[0] == "hockeytech":
+                out.setdefault(("hockeytech-id", c[2]), []).append((home, away, date))
     return out
 
 
@@ -57,6 +59,10 @@ def learn_aliases(rows, games) -> tuple[dict, Counter]:
     for p, url in rows:
         c = canonical(url) if url else None
         g = games.get(c) if c else None
+        if not g and c and len(c) == 3 and c[1] == "?":
+            # a HockeyTech link that doesn't say its league: the game id decides when only one league has it
+            hits = games.get(("hockeytech-id", c[2])) or []
+            g = hits[0] if len(hits) == 1 else None
         if not g:
             why["link not in the index"] += 1
             continue
