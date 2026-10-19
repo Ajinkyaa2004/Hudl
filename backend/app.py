@@ -547,6 +547,8 @@ async def _start_harvest():
     asyncio.create_task(_daily_harvest())
     asyncio.create_task(_cache_cleanup_loop())
     asyncio.create_task(_heartbeat_loop())
+    if SERVER != "render":
+        asyncio.create_task(_recheck_loop())
     if DATA_FROM:
         asyncio.create_task(_data_sync_loop())
 
@@ -691,6 +693,67 @@ def app_busy() -> bool:
 # time (IST), name, header, found Yes/No, report link, server. The address and its key are in
 # data/sheet_log.json ({"url": ..., "key": ...}), uploaded like the knowledge base and never in the
 # public repository. Sent in the background; nothing changes for the person searching.
+# ---------------------------------------------------------------- re-checking not-found searches
+# Reports often go online hours after a game. Every search that ended without a report is kept in
+# data/recheck.json and searched again later in the day while the server is quiet; a report found
+# then is stored (the game list and the remembered answers), so the next analyst gets it at once.
+RECHECK = ROOT / "data" / "recheck.json"
+_RECHECK_LOCK = None
+
+
+def _recheck_note(header: str, result: dict):
+    import json as _j
+    a = (result or {}).get("auto") or {}
+    if a.get("verdict") == "found" or SERVER == "render":
+        return
+    try:
+        items = _j.loads(RECHECK.read_text())
+    except Exception:
+        items = {}
+    now = _time.time()
+    e = items.get(header) or dict(first=now, tries=0, last=0)
+    items[header] = e
+    items = {h: v for h, v in items.items() if now - v["first"] < 3 * 86400}
+    try:
+        RECHECK.write_text(_j.dumps(items))
+    except Exception:
+        pass
+
+
+async def _recheck_loop():
+    """Every 20 minutes, while no search runs, search again up to 5 headers that ended without a
+    report at least 30 minutes ago (each at most once an hour, for 3 days)."""
+    import asyncio, json as _j
+    await asyncio.sleep(300)
+    while True:
+        try:
+            items = _j.loads(RECHECK.read_text()) if RECHECK.exists() else {}
+            now = _time.time()
+            due = [h for h, v in items.items() if now - v["first"] > 1800 and now - v.get("last", 0) > 3600]
+            done = 0
+            for h in sorted(due, key=lambda h: items[h].get("last", 0))[:5]:
+                if app_busy():
+                    break
+                items[h]["last"] = _time.time()
+                items[h]["tries"] = items[h].get("tries", 0) + 1
+                try:
+                    r = await _WORKERS.run(lambda h=h: _search_with_retry(h, False))
+                    if ((r.get("auto") or {}).get("verdict")) == "found":
+                        items.pop(h, None)
+                        done += 1
+                        print(f"[recheck] found later: {h[:90]}", flush=True)
+                except Exception:
+                    pass
+                await asyncio.sleep(20)
+            items = {h: v for h, v in items.items() if _time.time() - v["first"] < 3 * 86400}
+            RECHECK.write_text(_j.dumps(items))
+            if due:
+                print(f"[recheck] {len(due)} waiting, {done} found now, {len(items)} kept", flush=True)
+        except Exception as e:
+            print(f"[recheck] error: {str(e)[:120]}", flush=True)
+        await asyncio.sleep(1200)
+
+
 async def _sheet_log(name: str, header: str, result: dict, seconds: float = None):
     import json as _j, datetime as _dt
     try:
@@ -780,7 +843,12 @@ async def search_start(inp: SearchIn, rosters: bool = False):
     h = inp.header.strip()
     who = inp.name
     return _job_start(f"search|{rosters}|{h}", lambda: _search_with_retry(h, rosters),
-                      on_done=lambda res, secs: _sheet_log(who, h, res, secs))
+                      on_done=lambda res, secs: _after_search(who, h, res, secs))
+
+
+async def _after_search(who: str, h: str, res: dict, secs: float):
+    _recheck_note(h, res)
+    await _sheet_log(who, h, res, secs)
 
 
 @app.post("/api/rosters/start")

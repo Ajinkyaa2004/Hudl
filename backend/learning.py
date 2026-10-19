@@ -63,22 +63,41 @@ def learn_aliases(parsed: dict, url: str) -> list[str]:
     """If the saved report is a game in the index, link the header's team names to the site's."""
     from .adapters.base import team_similarity, aliases
     with gameindex._lock:
-        g = gameindex.conn().execute("select home, away from games where url=?", (url,)).fetchone()
+        g = gameindex.conn().execute("select home, away, date from games where url=?", (url,)).fetchone()
     if not g:
         return []
-    home, away = g
+    home, away, gdate = g
     pairs = [(parsed["t1"], home), (parsed["t2"], away)]
     if team_similarity(parsed["t1"], away)[0] + team_similarity(parsed["t2"], home)[0] > \
        team_similarity(parsed["t1"], home)[0] + team_similarity(parsed["t2"], away)[0]:
         pairs = [(parsed["t1"], away), (parsed["t2"], home)]
+    # the same checks as the sheet learning (learn_sheet.py): a pick can be a mistake, so a game
+    # is learned from only when it plausibly is the header's game: the date within a day, and one
+    # team clearly matching or both close; ages and girls'/boys' teams must agree
+    from .learn_sheet import ANCHOR, BOTH_CLOSE, LEARN_BELOW, GIRLS
+    import datetime as _dt
+    try:
+        if abs((_dt.date.fromisoformat(gdate) - _dt.date.fromisoformat(parsed["date"])).days) > 1:
+            return []
+    except Exception:
+        return []
+    scores = [team_similarity(h, s_)[0] for h, s_ in pairs]
+    if max(scores) < ANCHOR and min(scores) < BOTH_CLOSE:
+        return []
+    from .adapters.base import tokens as _tk
     try:
         data = json.loads(ALIAS_FILE.read_text())
     except Exception:
         data = {}
     added = []
-    for header_name, site_name in pairs:
-        if team_similarity(header_name, site_name)[0] >= 0.8:
+    for (header_name, site_name), sc in zip(pairs, scores):
+        if sc >= LEARN_BELOW:
             continue
+        ha, sa = _tk(header_name)[1], _tk(site_name)[1]
+        if (ha and sa and not (ha & sa)) or bool(GIRLS.search(header_name)) != bool(GIRLS.search(site_name)):
+            continue
+        if sc < 0.5:
+            continue                      # names this unlike are learned only from the sheet, where two rows must agree
         lst = data.setdefault(site_name, [])
         if header_name not in lst:
             lst.append(header_name)

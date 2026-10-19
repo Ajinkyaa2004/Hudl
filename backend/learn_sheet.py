@@ -26,6 +26,7 @@ from .seed import SKIP
 ANCHOR = 0.8          # the team that vouches for the row
 LEARN_BELOW = 0.8     # the other team is learned only when it doesn't already match this well
 UNLIKE = 0.5          # names less than half alike need two rows that agree
+BOTH_CLOSE = 0.6      # with no anchor, both teams at least this alike (and the date right) also vouch for the row
 import re as _re
 GIRLS = _re.compile(r"\b(?:lady|ladies|girls?|women'?s?|womens|female|fem|dam|damer|naiset|frauen|zeny)\b", _re.I)
 
@@ -72,27 +73,30 @@ def learn_aliases(rows, games) -> tuple[dict, Counter]:
         crossed = [(p["t1"], away), (p["t2"], home)]
         pairs = crossed if s(*crossed[0]) + s(*crossed[1]) > s(*straight[0]) + s(*straight[1]) else straight
         scores = [s(*pr) for pr in pairs]
-        if max(scores) < ANCHOR:
+        # the analyst's link is this game when one team clearly matches, or when both are close
+        if max(scores) < ANCHOR and min(scores) < BOTH_CLOSE:
             why["neither team matches"] += 1
             continue
         if min(scores) >= LEARN_BELOW:
             why["both already match"] += 1
             continue
-        hdr, site = pairs[scores.index(min(scores))]
-        ha, sa = tokens(hdr)[1], tokens(site)[1]
-        if ha and sa and not (ha & sa):
-            why["ages disagree"] += 1
-            continue
-        hb, sb = tokens(hdr)[0], tokens(site)[0]
-        if not hb or not sb or hb == sb:
-            why["nothing to learn"] += 1
-            continue
-        if bool(GIRLS.search(hdr)) != bool(GIRLS.search(site)):
-            why["girls' and boys' names"] += 1
-            continue
-        learned[site][hdr] += 1
-        weak[(site, hdr)] = min(weak.get((site, hdr), 1.0), min(scores))
-        why["learned"] += 1
+        for (hdr, site), sc in zip(pairs, scores):
+            if sc >= LEARN_BELOW:
+                continue
+            ha, sa = tokens(hdr)[1], tokens(site)[1]
+            if ha and sa and not (ha & sa):
+                why["ages disagree"] += 1
+                continue
+            hb, sb = tokens(hdr)[0], tokens(site)[0]
+            if not hb or not sb or hb == sb:
+                why["nothing to learn"] += 1
+                continue
+            if bool(GIRLS.search(hdr)) != bool(GIRLS.search(site)):
+                why["girls' and boys' names"] += 1
+                continue
+            learned[site][hdr] += 1
+            weak[(site, hdr)] = min(weak.get((site, hdr), 1.0), sc)
+            why["learned"] += 1
     # names that look nothing alike are kept only when two rows agree
     for (site, hdr), sc in weak.items():
         if sc < UNLIKE and learned[site][hdr] < 2:

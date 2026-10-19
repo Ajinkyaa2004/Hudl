@@ -173,10 +173,20 @@ def _team_similarity_all(header_name: str, site_name: str, context: str = "") ->
     for alt in aliases().get(sb, ()):
         if alt and (alt == hb or alt in hb or hb in alt):
             ages = "".join(f" U{a}" for a in sorted(tokens(site_name)[1]))
-            s2, r2 = _team_similarity(header_name, alt + ages, context)
+            if alt == hb:
+                # a learned spelling of exactly this club (age groups left out): the club name counts
+                # as matched, tier words included ("New Jersey Rockets 16U Premier" = "New Jersey
+                # Rockets"); only the age group is still compared, so U14 never matches U16
+                s2, r2 = _team_similarity(header_name, _AGE_RE.sub(" ", header_name).strip() + ages, context)
+                r2 = "learned spelling of this club; " + r2
+            else:
+                s2, r2 = _team_similarity(header_name, alt + ages, context)
             if s2 > best[0]:
                 best = (s2, r2 + " (via alias)")
     return best
+
+
+_AGE_RE = re.compile(r"\b(?:u|j)\s?\d{1,2}\b|\b\d{1,2}\s?(?:u|o)\b", re.I)
 
 
 COLOURS = re.compile(r"\b(gold|black|white|red|blue|navy|green|silver|orange|purple|grey|gray|maroon|teal|yellow|royal|tier\s?[12i]+|[ab]\d?|elite\s?\d|premier|select)\b", re.I)

@@ -30,3 +30,4 @@ data/roster_truth.json
 tests/roster_truth_*.json
 data/game-list.db*
 data/sheet_log.json
+data/recheck.json
