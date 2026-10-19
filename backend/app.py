@@ -326,7 +326,7 @@ async def load_game_list() -> int:
     from . import gameindex
     async with httpx.AsyncClient(follow_redirects=True, timeout=180) as c:
         content, source = await _fetch_game_list(c)
-    path = ROOT / "data" / "game-list.db"
+    path = ROOT / "data" / "game-list-download.db"     # never the export's scratch file
 
     def merge() -> int:
         import io, shutil
@@ -334,6 +334,13 @@ async def load_game_list() -> int:
             shutil.copyfileobj(g, out, 1 << 20)       # streamed: never the whole list in memory at once
         con = gameindex.conn()
         with gameindex._lock:
+            # a failed merge must never leave the list attached: an open transaction kept 'gl' attached
+            # and every later merge failed ('database gl is already in use') until a restart
+            try:
+                con.rollback()
+                con.execute("detach database gl")
+            except Exception:
+                pass
             con.execute("attach database ? as gl", (str(path),))
             try:
                 n = con.execute("select count(*) from gl.games").fetchone()[0]
@@ -343,8 +350,14 @@ async def load_game_list() -> int:
                 con.execute("""insert or replace into games select g.* from gl.games g left join games l on l.url = g.url
                                where l.url is null or ifnull(l.updated, 0) <= ifnull(g.updated, 0)""")
                 con.commit()
+            except Exception:
+                con.rollback()
+                raise
             finally:
-                con.execute("detach database gl")
+                try:
+                    con.execute("detach database gl")
+                except Exception:
+                    pass
         path.unlink(missing_ok=True)
         return n
     n = await asyncio.to_thread(merge)

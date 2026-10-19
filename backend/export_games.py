@@ -11,7 +11,9 @@ DATA = Path(__file__).resolve().parent.parent / "data"
 
 
 def export(src: Path = DATA / "games.db", out: Path = DATA / "game-list.db.gz") -> int:
-    tmp = DATA / "game-list.db"
+    # its own scratch file: the server unpacks its downloaded list into data/game-list.db, and an
+    # export for the other server running at the same moment used to clash with it ("gl is locked")
+    tmp = out.with_name(out.name.replace(".db.gz", "") + ".export-tmp.db")
     tmp.unlink(missing_ok=True)
     s = sqlite3.connect(src)
     d = sqlite3.connect(tmp)

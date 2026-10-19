@@ -31,3 +31,5 @@ tests/roster_truth_*.json
 data/game-list.db*
 data/sheet_log.json
 data/recheck.json
+data/game-list-download.db*
+data/*.export-tmp.db*
