@@ -40,7 +40,7 @@ def canonical(url: str):
         ("leijonat", r"leijonat\.fi/.*gameid=(\d+)"),
         ("leijonat", r"(?:mestis|liiga)\.fi/.*?/(27\d{5})(?:/|$|\?)"),
         ("swehockey", r"swehockey\.se/Game/(?:Events|LineUps|Reports)/(\d+)"),
-        ("sihf", r"sihf\.ch/.*game-center/game/(\d+)"),
+        ("sihf", r"sihf\.ch/.*game-center/game/(?:[a-z]+/)?(\d+)"),
         ("hockeyno", r"hockey\.no/.*matchId=(\d+)"),
         ("ceskyhokej", r"ceskyhokej\.cz/game/detail/(\d+)"),
         ("hokejcz", r"(?<![a-z])hokej\.cz/zapas/(\d+)"),
