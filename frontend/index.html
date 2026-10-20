@@ -857,7 +857,7 @@ function openPreview(i){
   if(it.facts)h+=it.facts;
   if(it.players&&it.players.length>=5)h+=playersHtml(it.players);
   h+=`<div class="frame">${shotHtml(it.url)}</div>`;
-  $('#dbody').innerHTML=h;$('#dbody').scrollTop=0;wireShots($('#dbody'));
+  $('#dbody').innerHTML=h;$('#dbody').scrollTop=0;wireShots($('#dbody'));wireVpn($('#dbody'));
   $('#drawer').classList.add('on');$('#scrim').classList.add('on');$('#drawer').setAttribute('aria-hidden','false');
   document.body.style.overflow='hidden';
   const sh=$('#dbody .shot');if(sh)sh.onclick=()=>sh.classList.toggle('zoomed');
@@ -939,9 +939,22 @@ function renderLoading(r){
 
 const RC={'wrong age group':['vi','Wrong age group'],'few players':['wa','Few players'],'old season':['mu','Old season'],verified:['ok','This season'],probable:['wa','Probably current'],check:['wa','Check it'],blocked:['vi','Open in Chrome'],unreachable:['mu','Did not load'],'not a roster':['mu','Not a roster'],'no roster':['mu','No roster posted'],'not found':['mu','Page gone']};
 function confBar(c){const v=Math.round(c*100),col=v>=85?'var(--ok)':v>=60?'var(--wa)':'var(--no)';return `<div class="conf"><span class="mono" style="min-width:38px">${v}%</span><span class="bar"><i style="width:${v}%;background:${col}"></i></span></div>`}
+/* sites that open only with a VPN (hokej.cz: Czechia). The page checks the viewer's own connection by
+   loading a small image from the site: it loads with the VPN on and fails without it. */
+const VPN_PROBE={'hokej.cz':'https://www.hokej.cz/data/photo/20240413/100805_2b56_38390.png'};
+function vpnNote(c){if(!c||!c.vpn)return '';
+  return `<div class="note" style="background:var(--vi-bg,var(--s2));color:var(--tx)">${ic('shield')}<span><b>VPN needed.</b> ${esc(c.vpn)} opens only with the VPN on.${c.kind==='schedule'?' PuckTrace knows the game (teams, date, score) but not its hokej.cz page yet: find it on the schedule.':''} <span class="vpnst" data-vpn="${esc(c.vpn)}">Checking your VPN…</span></span></div>`}
+function wireVpn(root){
+  root.querySelectorAll('.vpnst[data-vpn]').forEach(el=>{if(el._w)return;el._w=1;const site=el.dataset.vpn,u=VPN_PROBE[site];
+    if(!u){el.textContent='';return}
+    const test=()=>{el.textContent='Checking your VPN…';const im=new Image();const t=setTimeout(()=>{im.src='';bad()},8000);
+      const ok=()=>{clearTimeout(t);el.innerHTML=`<b style="color:var(--ok)">VPN is on</b>, the link will open.`};
+      const bad=()=>{clearTimeout(t);el.innerHTML=`<b style="color:var(--wa)">VPN looks off:</b> turn it on, then open the link. <a href="#" class="vpnre">Check again</a>`;const a=el.querySelector('.vpnre');if(a)a.onclick=e=>{e.preventDefault();test()}};
+      im.onload=ok;im.onerror=bad;im.src=u+'?t='+Date.now()};
+    test()})}
 function reportFacts(c){
   const ageNote=(c.reasons||[]).map(x=>(x.match(/header says ([^,;)]+), competition and game say ([^;)]+)/)||[])).find(m=>m.length);
-  return `${ageNote?`<div class="note" style="background:var(--wa-bg);color:var(--wa)">${ic('alert')}<span><b style="color:inherit">Header age looks wrong.</b> It says ${esc(ageNote[1])}, but the competition and this game are ${esc(ageNote[2])}. The start time matches, so check the teams on the video.</span></div>`:''}${c.via==='index'?`<div><span class="badge ok">${ic('bolt','xs')}Remembered</span> <span class="mu small">seen before, no site search needed</span></div>`:''}<div class="teams">${esc(c.home)}<span class="vs">vs</span>${esc(c.away)}</div>
+  return `${vpnNote(c)}${ageNote?`<div class="note" style="background:var(--wa-bg);color:var(--wa)">${ic('alert')}<span><b style="color:inherit">Header age looks wrong.</b> It says ${esc(ageNote[1])}, but the competition and this game are ${esc(ageNote[2])}. The start time matches, so check the teams on the video.</span></div>`:''}${c.via==='index'?`<div><span class="badge ok">${ic('bolt','xs')}Remembered</span> <span class="mu small">seen before, no site search needed</span></div>`:''}<div class="teams">${esc(c.home)}<span class="vs">vs</span>${esc(c.away)}</div>
    <dl class="kv"><dt>Date</dt><dd class="mono">${esc(c.date||'')}</dd>${c.score?`<dt>Score</dt><dd class="mono">${esc(c.score)}</dd>`:''}${c.league?`<dt>League</dt><dd>${esc(c.league)}</dd>`:''}<dt>Site</dt><dd>${esc(c.site)}</dd>
    <dt>Match</dt><dd>${confBar(c.confidence)}</dd></dl>`}
 function whyHtml(c){return (c.reasons||[]).length?`<details class="why"><summary>${ic('help','xs')}Why this game</summary><ul>${c.reasons.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></details>`:''}
@@ -1006,8 +1019,8 @@ function render(r,header){
     rep=`<div class="cands">${auto.candidates.map((c,k)=>{
       const i=item({title:`${c.home} vs ${c.away}`,url:c.url,sub:`${c.date} · ${c.site}`,facts:`<div class="facts">${reportFacts(c)}</div>`});
       return `<div class="cand" data-k="${k}"><div data-p="${i}">${shotHtml(c.url)}</div><div class="c"><div class="t">${esc(c.home)} <span class="mu2" style="font-weight:400">vs</span> ${esc(c.away)}</div>
-        <div class="m">${esc(c.date)}${c.score?' · '+esc(c.score):''} · ${esc(c.site)}${c.league?' · '+esc(c.league):''}</div>${c.via==='index'?`<div><span class="badge ok">${ic('bolt','xs')}Remembered</span></div>`:''}${confBar(c.confidence)}
-        <div class="acts"><button class="btn2 pick" data-url="${esc(c.url)}" data-k="${k}">${ic('check')}This one</button><a class="btn2" href="${esc(c.url)}" target="_blank" rel="noopener">${ic('ext')}Open</a></div></div></div>`}).join('')}</div>`;
+        <div class="m">${esc(c.date)}${c.score?' · '+esc(c.score):''} · ${esc(c.site)}${c.league?' · '+esc(c.league):''}</div>${c.via==='index'?`<div><span class="badge ok">${ic('bolt','xs')}Remembered</span></div>`:''}${confBar(c.confidence)}${vpnNote(c)}
+        <div class="acts">${c.kind==='schedule'?'':`<button class="btn2 pick" data-url="${esc(c.url)}" data-k="${k}" data-ch="${esc(c.ch_id||'')}" data-cid="${esc(c.comp_id||'')}">${ic('check')}This one</button>`}<a class="btn2" href="${esc(c.url)}" target="_blank" rel="noopener">${ic('ext')}${c.kind==='schedule'?'Open schedule':'Open'}</a></div></div></div>`}).join('')}</div>`;
   }else{
     const srcs=auto.adapters.filter(a=>a.name!=='index'),ok=srcs.filter(a=>a.ok).map(a=>a.site),bad=srcs.filter(a=>!a.ok);
     rep=`<div class="note">${ic('alert')}<div><b>No report found automatically.</b><div style="margin-top:3px">${srcs.length?`Checked memory and ${srcs.length} site${srcs.length>1?'s':''} in ${auto.seconds}s: ${esc(ok.join(', '))}${bad.length?` · did not respond: ${esc(bad.map(a=>a.site).join(', '))}`:''}.`:'No automatic source covers these teams yet.'} Use the rosters below, or search by hand from the links further down.</div>${bad.length?`<button class="btn2" style="margin-top:10px" onclick="find()">${ic('refresh')}Search again</button>`:''}</div></div>`;
@@ -1034,12 +1047,12 @@ function render(r,header){
     <div class="factions"><button class="btn2 pri" id="savebtn">${ic('save')}Save</button><span class="msg" id="savemsg"></span></div></div></div>`;
 
   $('#out').innerHTML=h;
-  wireShots($('#out'));
+  wireShots($('#out'));wireVpn($('#out'));
   $$('[data-copy]').forEach(b=>b.onclick=()=>copy(b.dataset.copy, b));
   /* "This one" is the analyst's deliberate choice: it is saved at once, so PuckTrace answers this game
      instantly next time and learns the team spellings and the competition's website from it */
   $$('.pick').forEach(b=>b.onclick=async()=>{$$('.cand').forEach(c=>c.classList.toggle('sel',c.dataset.k===b.dataset.k));$('#sv_p').value=b.dataset.url;
-    try{await post('/save',{header,protocol:b.dataset.url,t1link:'',t2link:'',comp_site:''});toast('Saved. PuckTrace will answer this game at once next time.','ok');stats()}
+    try{await post('/save',{header,protocol:b.dataset.url,t1link:'',t2link:'',comp_site:'',ch_id:b.dataset.ch||'',comp_id:b.dataset.cid||''});toast('Saved. PuckTrace will answer this game at once next time.','ok');stats()}
     catch(e){const s=$('#savebtn').closest('.sec');s.classList.add('open');toast('Selected. Save it below to remember it.')}});
   $('#savebtn').onclick=async()=>{try{const s=await post('/save',{header,protocol:$('#sv_p').value,t1link:$('#sv_1').value,t2link:$('#sv_2').value,comp_site:$('#sv_c').value});$('#savemsg').className='msg ok';$('#savemsg').textContent=`Saved · next time this game is answered at once`+(s.learned&&s.learned.length?` · learned: ${s.learned.join('; ')}`:'');stats();toast('Saved')}
     catch(e){$('#savemsg').className='msg err';$('#savemsg').textContent=e.message}};

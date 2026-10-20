@@ -182,7 +182,7 @@ def _kb_size(d: dict) -> int:
 # the two servers keep the same knowledge base and learned spellings: each checks the other every
 # 5 minutes and takes its copy when it is newer (a save on the NAS reaches Render; an update loaded
 # on Render while the NAS is off reaches the NAS when it starts)
-NAS_URL, RENDER_URL = "https://home-nas.tailfff30a.ts.net", "https://pucktrace-api-8u5i.onrender.com"
+NAS_URL, RENDER_URL = "https://nas.actorix.in", "https://pucktrace-api-8u5i.onrender.com"   # the NAS by its Cloudflare Tunnel: Render often fails to look up the Tailscale name
 DATA_FROM = _os.environ.get("DATA_FROM") or (NAS_URL if SERVER == "render" else RENDER_URL if SERVER == "nas" else "")
 
 
@@ -577,6 +577,8 @@ class SaveIn(BaseModel):
     t1link: str = ""
     t2link: str = ""
     comp_site: str = ""
+    ch_id: str = ""         # a hokej.cz option picked: its game on ceskyhokej.cz ...
+    comp_id: str = ""       # ... and competition, so the pick teaches the hokej.cz numbering
 
 
 class TeamIn(BaseModel):
@@ -890,6 +892,9 @@ async def save(inp: SaveIn):
         raise HTTPException(400, "Could not parse header")
     if not (inp.protocol or inp.t1link or inp.t2link):
         raise HTTPException(400, "Nothing to save: add a protocol link or roster links")
+    if inp.ch_id and inp.comp_id:
+        from . import hokejcz
+        hokejcz.learn_pick(KB, inp.protocol.strip(), inp.ch_id, inp.comp_id)
     lookup.save_result(KB, p, inp.protocol.strip(), inp.t1link.strip(), inp.t2link.strip(), inp.comp_site.strip())
     try:
         await lookup.learn_from_link(inp.protocol.strip(), p)

@@ -112,7 +112,8 @@ class CeskyHokej(Adapter):
                 for g in games:
                     lg = czech_age(comps[cid] or "")
                     cand = dict(source=self.name, site=self.site, league=lg, home=g["home"], away=g["away"], date=dt,
-                                score=g["score"], status=None, kind="protocol", adapter=self.name, url=f"https://ceskyhokej.cz/game/detail/{g['gid']}")
+                                score=g["score"], status=None, kind="protocol", adapter=self.name, url=f"https://ceskyhokej.cz/game/detail/{g['gid']}",
+                                comp_id=cid)
                     score_candidate(cand, parsed, lg)
                     if min(cand["team_scores"]) >= 0.6:
                         out.append(cand)

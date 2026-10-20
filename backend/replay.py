@@ -43,6 +43,7 @@ def canonical(url: str):
         ("sihf", r"sihf\.ch/.*game-center/game/(\d+)"),
         ("hockeyno", r"hockey\.no/.*matchId=(\d+)"),
         ("ceskyhokej", r"ceskyhokej\.cz/game/detail/(\d+)"),
+        ("hokejcz", r"(?<![a-z])hokej\.cz/zapas/(\d+)"),
         ("hockeydata", r"deb-online\.live/.*gameId=([0-9a-f-]{36})"),
         ("gamesheet", r"gamesheetstats\.com/seasons/\d+/games/(\d+)"),
         ("khl", r"(?:online\.khl\.ru/online/|khl\.ru/game/\d+/)(\d+)"),

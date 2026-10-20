@@ -184,6 +184,11 @@ def main():
     print(f"sources: {nc} competitions and {nt} teams updated")
     if a.dry_run:
         return
+    from .hokejcz import anchors_from_sheet
+    have = kb.setdefault("hokejcz_anchors", {})
+    for cid, pairs in anchors_from_sheet(rows).items():
+        have[cid] = sorted({tuple(x) for x in have.get(cid, [])} | {tuple(x) for x in pairs})
+        have[cid] = [list(x) for x in have[cid]]
     print(f"spellings added: {write_aliases(learned)} -> {ALIAS_FILE}")
     kb["sheet_learned"] = datetime.datetime.now().isoformat(timespec="seconds")
     lookup.save_kb(kb)

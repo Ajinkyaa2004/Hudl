@@ -349,16 +349,19 @@ async def search_full(header, kb, rosters=True):
         mem = learning.remembered(p) if USE_MEMORY else None
     except Exception:
         pass
+    from . import hokejcz
     if mem and mem["confirmed"]:
         # you saved this game's report before: answer at once
         auto = dict(verdict="found", candidates=[], adapters=[], seconds=0, fast=True, remembered=True,
                     best=dict(url=mem["url"], site=domain(mem["url"]), source=mem["source"] or "saved", home=p["t1"], away=p["t2"], date=p["date"],
                               confidence=1.0, team_scores=[1.0, 1.0], kind="protocol", reasons=["you saved this report for this game earlier"]))
+        auto = hokejcz.apply(auto, kb)        # a ceskyhokej.cz link saved before is answered with hokej.cz
     else:
         try:
             auto = await run_all(p, r["teams"], kb)
         except Exception as e:
             auto = dict(verdict="none", best=None, candidates=[], adapters=[], seconds=0, error=str(e)[:200])
+        auto = hokejcz.apply(auto, kb)        # Czech games: hokej.cz links only, never ceskyhokej.cz
         if auto["verdict"] == "found" and USE_MEMORY:
             try:
                 learning.remember(p, header, auto["best"]["url"], auto["best"].get("adapter") or auto["best"].get("source"), confirmed=False)
