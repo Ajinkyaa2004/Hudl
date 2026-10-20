@@ -276,7 +276,7 @@ def healthz():
                 version=(_os.environ.get("APP_VERSION") or _os.environ.get("RENDER_GIT_COMMIT", ""))[:7] or None,
                 kb_teams=len(KB.get("teams") or {}), uptime_s=int(_time.time() - _STARTED), rss_mb=_rss_mb(),
                 searches=sum(1 for v in _JOBS.values() if v["status"] == "running"), max_searches=_max_searches(),
-                game_list_error=gl.get("error"), sync=SYNC)
+                game_list_error=gl.get("error"), sync=SYNC, backup_key=bool(_os.environ.get("KB_KEY")))
 
 
 GAME_LIST_URL = _os.environ.get("GAME_LIST_URL", "https://github.com/Ajinkyaa2004/Hudl/releases/download/game-list/game-list.db.gz")
