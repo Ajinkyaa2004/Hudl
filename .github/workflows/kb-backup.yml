@@ -1,0 +1,41 @@
+# Locked backup of the private data (knowledge base, learned spellings, search-log settings) for
+# the Render backup, which has no disk: when it restarts while the NAS is off, it opens this copy
+# (backend/kbvault.py). Copied from the NAS, or from Render when the NAS is off; never an empty or
+# thin knowledge base. The release asset is locked with KB_KEY and is unreadable without it.
+name: Knowledge backup
+on:
+  schedule:
+    - cron: "7,37 * * * *"
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: kb-backup
+  cancel-in-progress: false
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install httpx==0.28.1
+      - name: Copy and lock
+        env:
+          KB_KEY: ${{ secrets.KB_KEY }}
+          APP_PASSWORD: ${{ secrets.APP_PASSWORD }}
+        run: python -m backend.kbvault backup kb.vault
+      # Two copies, uploaded one after the other (a failed upload never leaves no copy); nothing
+      # is uploaded when the content hasn't changed since the last copy.
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          [ -f kb.vault ] || { echo "nothing to publish"; exit 0; }
+          gh release view kb-backup >/dev/null 2>&1 || gh release create kb-backup --title "Knowledge backup (locked)" --notes "Locked copy of PuckTrace's private data for the backup server. Unreadable without the key." --latest=false
+          if gh release download kb-backup -p kb.sha -O old.sha 2>/dev/null && cmp -s old.sha kb.sha; then echo "unchanged since the last copy"; exit 0; fi
+          cp kb.vault kb-spare.vault
+          for i in 1 2 3; do gh release upload kb-backup kb-spare.vault --clobber && break; sleep 15; done
+          for i in 1 2 3; do gh release upload kb-backup kb.vault kb.sha --clobber && break; sleep 15; done

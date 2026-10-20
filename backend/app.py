@@ -237,6 +237,19 @@ async def _data_sync_loop():
         except Exception as e:
             SYNC.update(at=_t.strftime("%Y-%m-%dT%H:%M:%S"), ok=False, error=str(e)[:160])
             print("[data sync] failed:", e, flush=True)
+        if not KB.get("teams") and _os.environ.get("KB_KEY"):
+            # still empty (a restart while the NAS is off): open the locked copy kept on GitHub
+            try:
+                from . import kbvault
+                done = await asyncio.to_thread(kbvault.restore, ROOT / "data", _os.environ["KB_KEY"])
+                if done:
+                    KB = lookup.load_kb()
+                    _base._ALIASES = None
+                    _base.team_similarity.cache_clear()
+                    SYNC.update(vault=_t.strftime("%Y-%m-%dT%H:%M:%S"))
+                    print(f"[data sync] restored {', '.join(done)} from the locked backup", flush=True)
+            except Exception as e:
+                print("[data sync] locked backup failed:", e, flush=True)
         # without a knowledge base yet (a fresh restart), try again every minute
         await asyncio.sleep(int(_os.environ.get("SYNC_EVERY", "60" if not KB.get("teams") else "300")))
 
