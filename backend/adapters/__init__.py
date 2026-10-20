@@ -328,7 +328,13 @@ def decide(parsed: dict, cands: list) -> dict:
         anch = [c for c in cands if anchored(c) and c.get("kind", "protocol") == "protocol"]
         if len(anch) == 1:
             anch[0]["reasons"] = anch[0]["reasons"] + ["one team and the exact start time match; the other team's name is written differently"]
-            strong_ones = anch
+            if min(anch[0]["team_scores"]) >= 0.5:
+                strong_ones = anch
+            else:
+                # the other team looks like another club, not another spelling: offered first, the
+                # analyst confirms (LI Royals 16U vs a Boston Americans 16U game against CT Polar Bears)
+                anch[0]["reasons"] = anch[0]["reasons"] + ["the other team's name is quite different: check it is the same team"]
+                cands.sort(key=lambda c: c is not anch[0])
     if not strong_ones and not any(strong(c) for c in cands):
         # one game, and only one, starting at the header's minute with both teams reasonably like
         # the header's names ("Jets" for "Chicago Jets 2012"): the time pins it down

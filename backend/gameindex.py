@@ -24,6 +24,9 @@ def conn() -> sqlite3.Connection:
         _conn.execute("pragma journal_mode=wal")
         _conn.execute("""create table if not exists games(url text primary key, source text, site text, gid text, date text,
                          time text, start_utc text, home text, away text, league text, status text, score text, updated real)""")
+        # games a source has deleted (never-played placeholders): kept as a record so the servers that
+        # merge the published list delete them too
+        _conn.execute("create table if not exists removed(url text primary key, at real)")
         _conn.execute("create index if not exists games_date on games(date)")
         _conn.execute("create index if not exists games_source on games(source)")
         _conn.commit()
@@ -46,6 +49,21 @@ def add_games(games: list[dict], source: str | None = None) -> int:
         c.executemany(f"insert or replace into games({','.join(COLS)},updated) values ({','.join('?' * (len(COLS) + 1))})", rows)
         c.commit()
     return len(rows)
+
+
+def remove_games(urls: list[str]) -> int:
+    """Delete games their source no longer lists, and record them as removed."""
+    urls = [u for u in urls if u]
+    if not urls:
+        return 0
+    _DAY_CACHE.clear()
+    now = time.time()
+    with _lock:
+        c = conn()
+        c.executemany("delete from games where url = ?", [(u,) for u in urls])
+        c.executemany("insert or replace into removed values (?, ?)", [(u, now) for u in urls])
+        c.commit()
+    return len(urls)
 
 
 _local = threading.local()

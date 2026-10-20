@@ -362,6 +362,11 @@ async def load_game_list() -> int:
                 # games found live on this server since the list was built are kept when newer
                 con.execute("""insert or replace into games select g.* from gl.games g left join games l on l.url = g.url
                                where l.url is null or ifnull(l.updated, 0) <= ifnull(g.updated, 0)""")
+                try:                                   # games their source deleted (lists from before have no record)
+                    con.execute("delete from games where url in (select url from gl.removed)")
+                    con.execute("insert or replace into removed select url, at from gl.removed")
+                except Exception:
+                    pass
                 con.commit()
             except Exception:
                 con.rollback()

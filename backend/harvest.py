@@ -39,17 +39,28 @@ async def harvest_gamesheet(log=print) -> dict:
     try:
         seasons = await ga.current_seasons(known)
         log(f"GameSheet: {len(seasons)} current seasons ({time.time() - t:.0f}s)")
-        n, failed = 0, 0
+        n, failed, removed = 0, 0, 0
         sem = asyncio.Semaphore(4)
 
         async def one(s):
-            nonlocal n, failed
+            nonlocal n, failed, removed
             async with sem:
                 gs = await ga.season_games(s["sid"], s.get("name") or "")
             if gs is None:
                 failed += 1
                 return
-            n += gameindex.add_games(gamesheet_rows(gs))
+            rows = gamesheet_rows(gs)
+            n += gameindex.add_games(rows)
+            # games the season no longer lists were deleted on GameSheet (a showcase's placeholder
+            # copies): drop them, but never a game that has a result, and only after a full read
+            have = {r["url"] for r in rows}
+            with gameindex._lock:
+                old = gameindex.conn().execute(
+                    "select url, status, score from games where source = 'GameSheet' and url like ?",
+                    (f"%/seasons/{s['sid']}/games/%",)).fetchall()
+            if rows and len(rows) >= 0.2 * len(old):
+                gone = [u for u, st, sc in old if u not in have and not sc and str(st or "").lower() not in ("final", "completed")]
+                removed += gameindex.remove_games(gone)
         await asyncio.gather(*[one(s) for s in seasons])
         # remember the seasons (names and dates) for the live adapter and the Sources screen
         kb = lookup.load_kb()
@@ -67,7 +78,7 @@ async def harvest_gamesheet(log=print) -> dict:
             pass
     finally:
         await ga.close()
-    log(f"GameSheet: {n} games indexed, {failed} seasons failed, {time.time() - t:.0f}s")
+    log(f"GameSheet: {n} games indexed, {removed} deleted placeholders removed, {failed} seasons failed, {time.time() - t:.0f}s")
     return dict(seasons=len(seasons), games=n, failed=failed)
 
 

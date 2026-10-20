@@ -391,10 +391,19 @@ def score_candidate(cand: dict, parsed: dict, context: str = "") -> dict:
         # noted only: header times are not always the start time (Swedish friendlies), so this
         # counts only when another game of these teams does start at the header's time (decide())
         reasons.append(f"starts {abs((cu - hu).total_seconds()) / 3600:.0f} h away from the header time")
+    # a girls' or women's game when nothing in the header says so: shown to the analyst (many girls'
+    # headers don't say so, so it doesn't decide anything on its own)
+    site_w = _WOMEN.search(" ".join([ctx or "", cand.get("league") or "", cand.get("home") or "", cand.get("away") or ""]))
+    hdr_w = _WOMEN.search(" ".join([parsed.get("comp") or "", parsed.get("t1") or "", parsed.get("t2") or ""]))
+    if site_w and not hdr_w:
+        reasons.append("a girls'/women's game on the site; the header doesn't say so")
     cand["confidence"] = round(conf, 2)
     cand["reasons"] = reasons
     cand["team_scores"] = [round(s1, 2), round(s2, 2)]
     return cand
+
+
+_WOMEN = re.compile(r"\b(?:lady|ladies|girls?|women'?s?|womens|female|fem|dam|damer|naiset|frauen|zeny|wjhl|pwhl)\b|\((?:g|w)\)", re.I)
 
 
 def strong(c: dict) -> bool:

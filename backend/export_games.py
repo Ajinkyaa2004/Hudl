@@ -21,6 +21,12 @@ def export(src: Path = DATA / "games.db", out: Path = DATA / "game-list.db.gz") 
                  start_utc text, home text, away text, league text, status text, score text, updated real)""")
     rows = s.execute("select url, source, site, gid, date, time, start_utc, home, away, league, status, score, updated from games").fetchall()
     d.executemany("insert or replace into games values (?,?,?,?,?,?,?,?,?,?,?,?,?)", rows)
+    # games their source deleted: the servers merging this list delete them too
+    d.execute("create table removed(url text primary key, at real)")
+    try:
+        d.executemany("insert or replace into removed values (?, ?)", s.execute("select url, at from removed").fetchall())
+    except sqlite3.OperationalError:
+        pass
     d.commit()
     d.execute("vacuum")
     d.close()
