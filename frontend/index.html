@@ -1054,7 +1054,11 @@ function render(r,header){
   $$('.pick').forEach(b=>b.onclick=async()=>{$$('.cand').forEach(c=>c.classList.toggle('sel',c.dataset.k===b.dataset.k));$('#sv_p').value=b.dataset.url;
     try{await post('/save',{header,protocol:b.dataset.url,t1link:'',t2link:'',comp_site:'',ch_id:b.dataset.ch||'',comp_id:b.dataset.cid||''});toast('Saved. PuckTrace will answer this game at once next time.','ok');stats()}
     catch(e){const s=$('#savebtn').closest('.sec');s.classList.add('open');toast('Selected. Save it below to remember it.')}});
-  $('#savebtn').onclick=async()=>{try{const s=await post('/save',{header,protocol:$('#sv_p').value,t1link:$('#sv_1').value,t2link:$('#sv_2').value,comp_site:$('#sv_c').value});$('#savemsg').className='msg ok';$('#savemsg').textContent=`Saved · next time this game is answered at once`+(s.learned&&s.learned.length?` · learned: ${s.learned.join('; ')}`:'');stats();toast('Saved')}
+  /* a hokej.cz link saved by hand teaches the hokej.cz numbering when the search showed exactly one Czech game */
+  const czIds=[...new Map([...(auto.best?[auto.best]:[]),...(auto.candidates||[])].filter(c=>c.ch_id).map(c=>[c.ch_id,c])).values()];
+  const czOne=czIds.length===1?czIds[0]:null;
+  $('#savebtn').onclick=async()=>{try{const pv=$('#sv_p').value,cz=czOne&&/hokej\.cz\/zapas\/\d+/.test(pv)&&!/ceskyhokej/.test(pv);
+    const s=await post('/save',{header,protocol:pv,t1link:$('#sv_1').value,t2link:$('#sv_2').value,comp_site:$('#sv_c').value,ch_id:cz?czOne.ch_id:'',comp_id:cz?(czOne.comp_id||''):''});$('#savemsg').className='msg ok';$('#savemsg').textContent=`Saved · next time this game is answered at once`+(s.learned&&s.learned.length?` · learned: ${s.learned.join('; ')}`:'');stats();toast('Saved')}
     catch(e){$('#savemsg').className='msg err';$('#savemsg').textContent=e.message}};
 }
 

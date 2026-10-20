@@ -19,6 +19,7 @@ ZAPAS = "https://www.hokej.cz/zapas/{id}"
 # hokej.cz schedule pages, by ceskyhokej.cz competition id (only the ones known to exist)
 SCHEDULE = {"14": "https://www.hokej.cz/tipsport-extraliga/zapasy", "2": "https://www.hokej.cz/maxa-liga/zapasy"}
 HOME = "https://www.hokej.cz/"
+SURE_SPAN = 60
 VPN_NOTE = "hokej.cz opens only with a VPN (Czechia)"
 
 
@@ -48,7 +49,10 @@ def links_for(ch_id: int, cid: str | None, kb: dict) -> tuple[list[str], bool]:
     gaps = list(dict.fromkeys([a[1] - a[0] for a in (lo[-1:] + hi[:1])]))
     # nearer known game first
     gaps.sort(key=lambda g: min(abs(a[0] - ch_id) for a in anchors if a[1] - a[0] == g))
-    return [ZAPAS.format(id=ch_id + g) for g in gaps], bool(lo and hi and len(gaps) == 1)
+    # sure only between two close known games with the same gap (tested up to 36 game numbers apart,
+    # all right; the numbering changes its gap now and then, so far-apart known games prove less)
+    sure = bool(lo and hi and len(gaps) == 1 and hi[0][0] - lo[-1][0] <= SURE_SPAN)
+    return [ZAPAS.format(id=ch_id + g) for g in gaps], sure
 
 
 def _convert(c: dict, kb: dict) -> tuple[list[dict], bool]:
@@ -68,6 +72,7 @@ def _convert(c: dict, kb: dict) -> tuple[list[dict], bool]:
     for k, u in enumerate(urls):
         x = copy.deepcopy(base)
         x["url"] = u
+        x["hk_sure"] = sure
         if sure:
             x["reasons"].append(f"{VPN_NOTE}; link worked out from the hokej.cz games analysts opened just before and after this one")
         else:
@@ -99,6 +104,18 @@ def apply(auto: dict, kb: dict) -> dict:
             auto["verdict"] = "check"
             auto["best"] = None
             cands = conv + cands
+        # the same Czech game found on another site (onlajny) and on the federation's list: hokej.cz
+        # first; its sure link is the answer, otherwise the hokej.cz options go first to check
+        if auto.get("best") and "hokej.cz" not in (auto["best"].get("url") or ""):
+            b = auto["best"]
+            twins = [c for c in cands if c.get("vpn") == "hokej.cz" and c.get("kind") != "schedule"
+                     and c.get("date") == b.get("date") and min(c.get("team_scores") or [0]) >= 0.8]
+            if twins:
+                tw_sure = [c for c in twins if c.get("hk_sure")]
+                auto["best"] = tw_sure[0] if len({c["url"] for c in tw_sure}) == 1 else None
+                if not auto["best"]:
+                    auto["verdict"] = "check"
+                cands = twins + [c for c in cands if c not in twins]
     auto["candidates"] = cands
     return auto
 

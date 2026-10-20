@@ -43,6 +43,7 @@ from .nwahl import Nwahl
 from .echl import Echl
 
 INDEX = Index()
+_CZ = CeskyHokej()
 ADAPTERS = [SweHockey(), HockeyTech(), GameSheetLive(), HockeyNo(), Sihf(), Leijonat(), CeskyHokej(), Deb(), Liiga(), Nhl(), Del2(), SportsAdmin(), Ligasy(),
             TimeToScore(), Khl(), HockeyBy(), Chl(), EsportsCz(), HockeyData(), PennyDel(), UkHockey(), HockeyFrance(), Onlajny(),
             ItaliaHockey(), Lhf(), RampTournament(), HockeySlovakia(), Ramp(), Regystra(), Kreezee(), Ayhl(), DigitalShift(), NCAA(), Nwahl(), Echl()]
@@ -127,7 +128,11 @@ async def run_all(parsed: dict, tm: dict, kb: dict) -> dict:
     except Exception:
         idx = []
     first = decide(parsed, idx)
-    if first["verdict"] == "found" and _exact_enough(parsed, first["best"]):
+    # Czech games are answered with hokej.cz, worked out from the federation's own game list:
+    # a Czech game remembered from another site (onlajny) still asks the federation
+    czech_elsewhere = (first["verdict"] == "found" and "hokej.cz" not in (first["best"].get("url") or "")
+                       and _CZ.applies(parsed, tm, kb))
+    if first["verdict"] == "found" and _exact_enough(parsed, first["best"]) and not czech_elsewhere:
         first.update(adapters=[dict(name="index", site=INDEX.site, ok=True, error=None, n=len(idx))], seconds=round(time.time() - started, 2), fast=True)
         return first
     sites = learned_sites(parsed, kb)
