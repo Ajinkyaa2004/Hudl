@@ -90,8 +90,9 @@ def learn_aliases(parsed: dict, url: str) -> list[str]:
     except Exception:
         data = {}
     added = []
+    never = {(_tk(a)[0], _tk(b)[0]) for a, b in data.get("_never", [])}
     for (header_name, site_name), sc in zip(pairs, scores):
-        if sc >= LEARN_BELOW:
+        if sc >= LEARN_BELOW or (_tk(site_name)[0], _tk(header_name)[0]) in never:
             continue
         ha, sa = _tk(header_name)[1], _tk(site_name)[1]
         if (ha and sa and not (ha & sa)) or bool(GIRLS.search(header_name)) != bool(GIRLS.search(site_name)):

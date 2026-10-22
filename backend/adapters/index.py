@@ -22,7 +22,10 @@ class Index(Adapter):
         from .. import gameindex
         want1, want2 = gameindex.words(parsed["t1"]), gameindex.words(parsed["t2"])
         out = []
-        for g in gameindex.games_on(gameindex.around(parsed["date"], 1, 1)):
+        # a header without a start time ("...T00:00:00") sometimes carries the wrong date: look three
+        # days either side; a game more than a day off is only ever offered under Pick one
+        wide = parsed.get("time") in (None, "", "00:00")
+        for g in gameindex.games_on(gameindex.around(parsed["date"], 3 if wide else 1, 3 if wide else 1)):
             gw = gameindex.words(g["home"]) | gameindex.words(g["away"])
             # cheap filter before the full scorer: a distinctive word of either team must appear,
             # or the names are short/odd enough that words don't help

@@ -373,7 +373,7 @@ def score_candidate(cand: dict, parsed: dict, context: str = "") -> dict:
     elif d == 1:
         dscore, dr = 0.85, "one day off (time zone)"
     else:
-        dscore, dr = 0.0, f"{d} days off"
+        dscore, dr = 0.0, f"{d} days off: the header's date may be wrong, check it"
     reasons.append(dr)
     if o1 or o2:
         # a header age that contradicts its own competition is trusted only for one team, when the

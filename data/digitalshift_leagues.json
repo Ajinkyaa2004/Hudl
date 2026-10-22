@@ -98,6 +98,21 @@
     "federal hockey"
    ],
    "names": {}
+  },
+  {
+   "site": "https://canam.hockeyshift.com",
+   "client_service_id": "7a8fe54f-6da5-4df8-a689-9c80b3a5b1e1",
+   "league": 1188,
+   "name": "Can/Am Hockey (Lake Placid)",
+   "context": "",
+   "tz": "America/New_York",
+   "comp": [
+    "can/am",
+    "canam",
+    "can-am",
+    "lake placid"
+   ],
+   "names": {}
   }
  ]
 }

@@ -114,13 +114,15 @@ def learn_aliases(rows, games) -> tuple[dict, Counter]:
 
 
 def write_aliases(learned: dict) -> int:
-    """Merge into data/aliases_learned.json, keyed by the site's spelling as saves do."""
+    """Merge into data/aliases_learned.json, keyed by the site's spelling as saves do. Pairs on its
+    '_never' list (spellings found wrong by hand: different teams) are never learned again."""
     from .adapters.base import tokens as _t
     try:
         data = json.loads(ALIAS_FILE.read_text())
     except Exception:
         data = {}
     have = {(_t(k)[0], _t(v)[0]) for k, vs in data.items() if not k.startswith("_") for v in vs}
+    have |= {(_t(a)[0], _t(b)[0]) for a, b in data.get("_never", [])}
     n = 0
     for site, hdrs in learned.items():
         for hdr in hdrs:
@@ -184,6 +186,19 @@ def main():
     print(f"sources: {nc} competitions and {nt} teams updated")
     if a.dry_run:
         return
+    # TeamLinkt sites the analysts used: learned (or refreshed) so their games are read from now on
+    import re as _r
+    from .adapters.teamlinkt import discover
+    seen = {}
+    for p, url in rows:
+        m = _r.search(r"teamlinkt\.com/[Ll]eagues/event/(\d+)/\d+", url or "")
+        if m and p["date"] >= (datetime.date.today() - datetime.timedelta(days=60)).isoformat():
+            seen[m.group(1)] = url
+    for url in seen.values():
+        try:
+            discover(url)
+        except Exception as e:
+            print("teamlinkt:", e)
     from .hokejcz import anchors_from_sheet
     have = kb.setdefault("hokejcz_anchors", {})
     for cid, pairs in anchors_from_sheet(rows).items():
