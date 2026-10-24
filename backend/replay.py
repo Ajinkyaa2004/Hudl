@@ -61,6 +61,7 @@ def canonical(url: str):
         ("metalligaen", r"metalligaen\.dk/.*gameId=(\d+)"),
         ("hockeydata-at", r"eishockey\.at/game-center/[^/]+/spiel/(\d+)"),
         ("hockeydata", r"alps\.hockey/.*gameId=([0-9a-f-]{36})"),
+        ("mmjhl", r"mmjhl\.ca/box/(\d+)"),
         ("echl", r"echl\.com/games/(\d{4}/\d{2}/\d{2}/[a-z0-9-]+)"),
         ("digitalshift", r"/stats#/\d+/game/(\d+)"),     # HockeyShift / DigitalShift sites, with or without /boxscore
         ("ramp", r"/division/\d+/\d+/(?:game/view|gamesheet)/(\d{6,})"),   # RAMP game ids are global across its sites
