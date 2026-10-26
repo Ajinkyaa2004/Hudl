@@ -942,6 +942,18 @@ function confBar(c){const v=Math.round(c*100),col=v>=85?'var(--ok)':v>=60?'var(-
 /* sites that open only with a VPN (hokej.cz: Czechia). The page checks the viewer's own connection by
    loading a small image from the site: it loads with the VPN on and fails without it. */
 const VPN_PROBE={'hokej.cz':'https://www.hokej.cz/data/photo/20240413/100805_2b56_38390.png'};
+/* a league whose site blocks automatic reading: where to find the game, and for RSEQ the Spordle
+   match sheet built from the game number the analyst reads on the RSEQ page */
+function blockedNote(c,k){
+  const num=c.pdf?`<div class="pdfnum" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px"><input class="f mono pdfn" inputmode="numeric" placeholder="Game number, e.g. 912048" style="flex:1 1 100%;min-width:0">
+    <a class="btn2 pdfo" target="_blank" rel="noopener" aria-disabled="true">${ic('ext')}Open match sheet</a><button class="btn2 pdfc" data-copy="">${ic('copy')}Copy link</button>
+    <button class="btn2 pick" data-url="" data-k="${k}" disabled>${ic('check')}This one</button></div>`:'';
+  return `<div class="note">${ic('alert')}<div><b>This league's site blocks automatic reading.</b> Open its schedule, find <b>${esc(c.home)}</b> vs <b>${esc(c.away)}</b>${c.when?` (${esc(c.when)})`:` on ${esc(c.date)}`} and open the game.${c.pdf?' The match sheet is <span class="mono">pdf.play.spordle.com/game/</span> + the game number on the RSEQ page: type it here.':''}${num}</div></div>`}
+function wirePdf(root){root.querySelectorAll('.pdfnum').forEach(w=>{const q=s=>w.querySelector(s),i=q('.pdfn'),o=q('.pdfo'),cp=q('.pdfc'),p=q('.pick');
+  const set=()=>{const n=(i.value.match(/\d{4,}/)||[''])[0],u=n?'https://pdf.play.spordle.com/game/'+n:'';
+    if(u)o.href=u;else o.removeAttribute('href');o.style.opacity=cp.style.opacity=u?'':'.55';o.style.pointerEvents=u?'':'none';
+    cp.dataset.copy=u;cp.disabled=p.disabled=!u;p.dataset.url=u};
+  i.oninput=set;set()})}
 function vpnNote(c){if(!c||!c.vpn)return '';
   return `<div class="note" style="background:var(--vi-bg,var(--s2));color:var(--tx)">${ic('shield')}<span><b>VPN needed.</b> ${esc(c.vpn)} opens only with the VPN on.${c.kind==='schedule'?' PuckTrace knows the game (teams, date, score) but not its hokej.cz page yet: find it on the schedule.':''} <span class="vpnst" data-vpn="${esc(c.vpn)}">Checking your VPN…</span></span></div>`}
 function wireVpn(root){
@@ -1019,7 +1031,7 @@ function render(r,header){
     rep=`<div class="cands">${auto.candidates.map((c,k)=>{
       const i=item({title:`${c.home} vs ${c.away}`,url:c.url,sub:`${c.date} · ${c.site}`,facts:`<div class="facts">${reportFacts(c)}</div>`});
       return `<div class="cand" data-k="${k}"><div data-p="${i}">${shotHtml(c.url)}</div><div class="c"><div class="t">${esc(c.home)} <span class="mu2" style="font-weight:400">vs</span> ${esc(c.away)}</div>
-        <div class="m">${esc(c.date)}${c.score?' · '+esc(c.score):''} · ${esc(c.site)}${c.league?' · '+esc(c.league):''}</div>${c.via==='index'?`<div><span class="badge ok">${ic('bolt','xs')}Remembered</span></div>`:''}${confBar(c.confidence)}${vpnNote(c)}
+        <div class="m">${esc(c.when||c.date)}${c.score?' · '+esc(c.score):''} · ${esc(c.site)}${c.league?' · '+esc(c.league):''}</div>${c.via==='index'?`<div><span class="badge ok">${ic('bolt','xs')}Remembered</span></div>`:''}${c.blocked?blockedNote(c,k):confBar(c.confidence)}${vpnNote(c)}
         <div class="acts">${c.kind==='schedule'?'':`<button class="btn2 pick" data-url="${esc(c.url)}" data-k="${k}" data-ch="${esc(c.ch_id||'')}" data-cid="${esc(c.comp_id||'')}">${ic('check')}This one</button>`}<a class="btn2" href="${esc(c.url)}" target="_blank" rel="noopener">${ic('ext')}${c.kind==='schedule'?'Open schedule':'Open'}</a></div></div></div>`}).join('')}</div>`;
   }else{
     const srcs=auto.adapters.filter(a=>a.name!=='index'),ok=srcs.filter(a=>a.ok).map(a=>a.site),bad=srcs.filter(a=>!a.ok);
@@ -1047,7 +1059,7 @@ function render(r,header){
     <div class="factions"><button class="btn2 pri" id="savebtn">${ic('save')}Save</button><span class="msg" id="savemsg"></span></div></div></div>`;
 
   $('#out').innerHTML=h;
-  wireShots($('#out'));wireVpn($('#out'));
+  wireShots($('#out'));wireVpn($('#out'));wirePdf($('#out'));
   $$('[data-copy]').forEach(b=>b.onclick=()=>copy(b.dataset.copy, b));
   /* "This one" is the analyst's deliberate choice: it is saved at once, so PuckTrace answers this game
      instantly next time and learns the team spellings and the competition's website from it */

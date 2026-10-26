@@ -43,12 +43,13 @@ from .nwahl import Nwahl
 from .echl import Echl
 from .teamlinkt import TeamLinkt
 from .mmjhl import Mmjhl
+from .blocked import Blocked
 
 INDEX = Index()
 _CZ = CeskyHokej()
 ADAPTERS = [SweHockey(), HockeyTech(), GameSheetLive(), HockeyNo(), Sihf(), Leijonat(), CeskyHokej(), Deb(), Liiga(), Nhl(), Del2(), SportsAdmin(), Ligasy(),
             TimeToScore(), Khl(), HockeyBy(), Chl(), EsportsCz(), HockeyData(), PennyDel(), UkHockey(), HockeyFrance(), Onlajny(),
-            ItaliaHockey(), Lhf(), RampTournament(), HockeySlovakia(), Ramp(), Regystra(), Kreezee(), Ayhl(), DigitalShift(), NCAA(), Nwahl(), Echl(), TeamLinkt(), Mmjhl()]
+            ItaliaHockey(), Lhf(), RampTournament(), HockeySlovakia(), Ramp(), Regystra(), Kreezee(), Ayhl(), DigitalShift(), NCAA(), Nwahl(), Echl(), TeamLinkt(), Mmjhl(), Blocked()]
 BUDGET_S = 30
 WEB = WebSearch()
 WEB_SEARCH = True     # last resort when no source knows the game; the replay turns it off
@@ -217,7 +218,8 @@ def decide(parsed: dict, cands: list) -> dict:
     # source may mark it uncertain (e.g. a game on the day before the header's)
     live_urls = {c["url"] for c in cands if c.get("via") != "index"}
     cands = [c for c in cands if not (c.get("via") == "index" and c["url"] in live_urls)]
-    cands = sorted(cands, key=lambda c: -c["confidence"])
+    # a blocked league's schedule first: other sources' look-alikes for its games are other games
+    cands = sorted(cands, key=lambda c: (not c.get("blocked"), -c["confidence"]))
     seen_urls, unique = set(), []
     for c in cands:                      # the same game can appear under two phases of one league
         key = re.sub(r"&divisionId=\d+|\?tab=.*$", "", c["url"])
