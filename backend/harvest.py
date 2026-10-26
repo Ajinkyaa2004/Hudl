@@ -7,11 +7,14 @@ headers resolve from the index in under a second.
 
 The server also runs it once a day in the background (backend/app.py)."""
 from __future__ import annotations
-import asyncio, json, re, sys, time
+import asyncio, datetime, json, re, sys, time
 from pathlib import Path
 from . import gameindex, lookup
 
 DATA = Path(__file__).resolve().parent.parent / "data"
+
+
+TEST_SEASON = re.compile(r"\b(test|testing|demo)\b|\bzz+-", re.I)
 
 
 def gamesheet_rows(games: list[dict]) -> list[dict]:
@@ -19,6 +22,9 @@ def gamesheet_rows(games: list[dict]) -> list[dict]:
     out = []
     for g in games:
         if not g.get("date") or g["date"] < "2026-07-01":
+            continue
+        # GameSheet's own test seasons ("Test » ZZ-Testing Association": Team Blue v Team Red)
+        if TEST_SEASON.search(f"{g.get('season_name') or ''} {g.get('division') or ''}"):
             continue
         league = " ".join(x for x in (g.get("season_name"), g.get("division")) if x)
         out.append(dict(url=g["url"], source="GameSheet", site="gamesheetstats.com", gid=g["game_id"], date=g["date"], time=g.get("time"),
@@ -37,8 +43,14 @@ async def harvest_gamesheet(log=print) -> dict:
         pass
     t = time.time()
     try:
-        seasons = await ga.current_seasons(known)
-        log(f"GameSheet: {len(seasons)} current seasons ({time.time() - t:.0f}s)")
+        # the season API answers home and office connections but challenges GitHub's runners (every
+        # request since mid-October, so each run spent 90 minutes finding 0 seasons): one probe decides
+        errors = ga.stats["errors"]
+        if known:
+            await ga.season_info(known[-1])
+        blocked = ga.stats["errors"] > errors
+        seasons = [] if blocked else await ga.current_seasons(known)
+        log(f"GameSheet: {len(seasons)} current seasons ({time.time() - t:.0f}s)" + (" - season API blocked here" if blocked else ""))
         n, failed, removed = 0, 0, 0
         sem = asyncio.Semaphore(4)
 
@@ -62,6 +74,30 @@ async def harvest_gamesheet(log=print) -> dict:
                 gone = [u for u, st, sc in old if u not in have and not sc and str(st or "").lower() not in ("final", "completed")]
                 removed += gameindex.remove_games(gone)
         await asyncio.gather(*[one(s) for s in seasons])
+        # every other season's games by day (GameSheet's Firestore, open everywhere): the last three
+        # weeks and the next two, so new games and filled-in placeholders arrive even when blocked
+        read = {str(s["sid"]) for s in seasons}
+        today = datetime.date.today()
+        fs = [g for g in await ga.games_by_date((today - datetime.timedelta(days=21)).isoformat(),
+                                                (today + datetime.timedelta(days=14)).isoformat()) if g["sid"] not in read]
+        for g in fs:
+            if g.get("association"):
+                g["season_name"] = f"{g['season_name'].strip()} » {g['association'].strip()}"
+        rows = gamesheet_rows(fs)
+        with gameindex._lock:      # these rows carry no score: keep the one already known
+            c = gameindex.conn()
+            have = {}
+            for i in range(0, len(rows), 900):
+                chunk = [r["url"] for r in rows[i:i + 900]]
+                have.update(c.execute(f"select url, score from games where score is not null and url in ({','.join('?' * len(chunk))})", chunk).fetchall())
+        for r in rows:
+            r["score"] = r["score"] or have.get(r["url"])
+        n += gameindex.add_games(rows)
+        log(f"GameSheet by day: {len(rows)} games from {len({g['sid'] for g in fs})} more seasons")
+        with gameindex._lock:      # test seasons listed before they were filtered out
+            tests = [u for u, lg in gameindex.conn().execute("select url, league from games where source = 'GameSheet'").fetchall()
+                     if TEST_SEASON.search(lg or "")]
+        removed += gameindex.remove_games(tests)
         # remember the seasons (names and dates) for the live adapter and the Sources screen
         kb = lookup.load_kb()
         gsk = kb.setdefault("gamesheet_seasons", {})
@@ -72,7 +108,7 @@ async def harvest_gamesheet(log=print) -> dict:
         try:                               # keep the public season list current
             f = DATA / "gamesheet_season_ids.json"
             d = json.loads(f.read_text()) if f.exists() else {}
-            d["ids"] = sorted({int(i) for i in d.get("ids", [])} | {int(x["sid"]) for x in seasons})
+            d["ids"] = sorted({int(i) for i in d.get("ids", [])} | {int(x["sid"]) for x in seasons} | {int(g["sid"]) for g in fs if g["sid"].isdigit()})
             f.write_text(json.dumps(d))
         except Exception:
             pass

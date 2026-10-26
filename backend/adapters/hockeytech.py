@@ -125,6 +125,12 @@ class HockeyTech(Adapter):
         yy = [f"{year-1}-{str(year)[2:]}", f"{str(year-1)[2:]}-{str(year)[2:]}", f"{str(year)[2:]}-{str(year+1)[2:]}", f"{str(year-1)[2:]}/{str(year)[2:]}", f"{str(year)[2:]}/{str(year+1)[2:]}"]
         ids = [(s["season_id"], s.get("season_name", "")) for s in seasons
                if str(year) in s.get("season_name", "") or any(y in s.get("season_name", "") for y in yy)]
+        # seasons named without a year ("U16 Regular Season", United Tier 1) whose dates cover the
+        # last two months or the next one
+        import datetime
+        lo, hi = (datetime.date.today() - datetime.timedelta(days=60)).isoformat(), (datetime.date.today() + datetime.timedelta(days=30)).isoformat()
+        ids += [(s["season_id"], s.get("season_name", "")) for s in seasons
+                if (s["season_id"], s.get("season_name", "")) not in ids and (s.get("start_date") or "9") <= hi and (s.get("end_date") or "0") >= lo]
         # a league can run a season it hasn't listed yet (OJHL 2026-27 regular season = 82 while
         # the list stops at 81): also read the next two numbers; an empty one costs one request
         try:

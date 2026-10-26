@@ -62,6 +62,10 @@ jobs:
             echo "::error::No published list to start from; run the workflow by hand with 'fresh' only if both copies are really lost"; exit 1
           fi
       - name: Collect this season's games
+        env:
+          # GameSheet's public web key (the one its site gives every browser), for its by-day game
+          # list: the site itself challenges GitHub's runners, so they can't read the key from it
+          GAMESHEET_FS_KEY: ${{ secrets.GAMESHEET_FS_KEY }}
         run: python -m backend.harvest gamesheet timetoscore hockeytech deb poland sportsadmin swehockey owha
       - name: Export the public games table
         run: |
