@@ -42,6 +42,7 @@ Re-running the seed overwrites hand edits, so only do it if you want to start ov
 5. **Rosters.** When there is no report, both teams' current rosters are looked up (see Rosters).
 
 A result is Found only when one game matches both teams with age group, level and colour or tier consistent, on the same or the neighbouring day. Two extra rules use the header time, which is Moscow time (UTC+3):
+
 - Among several games of the same teams, the one starting at the header time wins, and a game hours away loses to one at the header time.
 - If one team clearly matches (age and level included) and a game of that team starts within 20 minutes of the header time, that is the game even if the opponent's name is written differently. A team plays one game at a time.
 
@@ -51,17 +52,17 @@ A header time of 00:00 is treated as unknown. Names are compared with abbreviati
 
 | Source | How | Covers |
 | --- | --- | --- |
-| GameSheet | public JSON API: every game of all ~870 current seasons daily; live day feed for games not in the list yet | USA Hockey and Hockey Canada youth, showcases (CCM, Chicago Mission, MAHA, Beast, USHL Fall Classic, ...), PJHL and more |
-| TimeToScore | public schedule tables of every league and tournament on the blackbear, usphl, caha, asec and cna hosts; USPHL exhibitions read from scoresheets | AHF, Tier 1 (THF), NGHL, AGHF, USPHL/NCDC, CAHA, SCAHA, NorCal, Tinseltown and other tournaments |
-| HockeyTech | public JSON schedule, 72 leagues (`data/hockeytech_clients.json`) | CHL leagues, AHL, USHL, PWHL, Junior A leagues, Alberta/Manitoba AAA and female leagues, CSSHL, OUA, UT1HL, ... |
-| hockeydata (deb-online) | division schedules, ~780 divisions found by number | DEB (Oberliga, DNL, youth, friendlies), German regional leagues (BEV, NRW), Austrian regional leagues, Netherlands |
-| stats.swehockey.se | day pages plus cup/tournament games read by game number | Sweden |
-| KHL family | day lists on online.khl.ru | KHL, MHL, VHL, cups and friendlies |
-| hockey.by, polskihokej.eu, lhf.lv | calendars | Belarus, Poland, Latvia |
-| Finland, Switzerland, Norway, Denmark, Czechia | federation JSON / pages | leijonat + Liiga, sihf, hockey.no, sportsadmin + Metal Ligaen, ceskyhokej |
-| ICE Hockey League, Alps League, DEL, DEL2, CHL, France, Italy, UK (EIHL, NIHL), onlajny (Slovakia, friendlies) | league sites and feeds | as named |
-| RAMP, 200x85, Blue Line/Kreezee, AYHL, HockeyShift, tournamentsgurus | league and tournament platforms | OWHL, Ontario/US tournaments, AYHL, HS Elite, EAK |
-| NHL | api-web.nhle.com | NHL |
+| GameSheet | Public JSON API: every game of all ~870 current seasons daily; live day feed for games not in the list yet | USA Hockey and Hockey Canada youth, showcases (CCM, Chicago Mission, MAHA, Beast, USHL Fall Classic, ...), PJHL and more |
+| TimeToScore | Public schedule tables of every league and tournament on the blackbear, usphl, caha, asec and cna hosts; USPHL exhibitions read from scoresheets | AHF, Tier 1 (THF), NGHL, AGHF, USPHL/NCDC, CAHA, SCAHA, NorCal, Tinseltown and other tournaments |
+| HockeyTech | Public JSON schedule, 72 leagues (`data/hockeytech_clients.json`) | CHL leagues, AHL, USHL, PWHL, Junior A leagues, Alberta/Manitoba AAA and female leagues, CSSHL, OUA, UT1HL, ... |
+| hockeydata (deb-online) | Division schedules, ~780 divisions found by number | DEB (Oberliga, DNL, youth, friendlies), German regional leagues (BEV, NRW), Austrian regional leagues, Netherlands |
+| stats.swehockey.se | Day pages plus cup/tournament games read by game number | Sweden |
+| KHL family | Day lists on online.khl.ru | KHL, MHL, VHL, cups and friendlies |
+| hockey.by, polskihokej.eu, lhf.lv | Calendars | Belarus, Poland, Latvia |
+| Finland, Switzerland, Norway, Denmark, Czechia | Federation JSON / pages | leijonat + Liiga, sihf, hockey.no, sportsadmin + Metal Ligaen, ceskyhokej |
+| ICE Hockey League, Alps League, DEL, DEL2, CHL, France, Italy, UK (EIHL, NIHL), onlajny (Slovakia, friendlies) | League sites and feeds | As named |
+| RAMP, 200x85, Blue Line/Kreezee, AYHL, HockeyShift, tournamentsgurus | League and tournament platforms | OWHL, Ontario/US tournaments, AYHL, HS Elite, EAK |
+| NHL | `api-web.nhle.com` | NHL |
 
 Blocked by a security check, so shown as links to open in Chrome: hockeyslovakia.sk (a results page link is given; senior Slovak games are found on onlajny), scgha.com (Stoney Creek) and other MBSportsWeb association sites.
 
@@ -86,9 +87,9 @@ The server refreshes the game list once a day (`backend/harvest.py`: GameSheet, 
 
 ## Outcomes
 
-- Found: a report was found automatically, or this exact game was saved before with a report link.
-- Check: both teams known, sources are listed in RTT order.
-- Not found: at least one team is not in the knowledge base. Candidates with a different age group or level are shown as rejected with the reason.
+- **Found:** A report was found automatically, or this exact game was saved before with a report link.
+- **Check:** Both teams known, sources are listed in RTT order.
+- **Not found:** At least one team is not in the knowledge base. Candidates with a different age group or level are shown as rejected with the reason.
 
 ## Layout
 
