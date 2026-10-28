@@ -556,7 +556,7 @@ kbd{font:11px var(--mono);border:1px solid var(--line2);border-bottom-width:2px;
         <div class="apane" id="ap-users">
         <div class="sec"><div class="hd"><span class="hic"><svg class="ic sm"><use href="#i-plus"/></svg></span><h3>Add a user</h3></div><div class="bd">
           <form id="aform" autocomplete="off"><div class="fgrid">
-            <label for="aname">Name</label><input class="f" id="aname" maxlength="40" placeholder="e.g. Karan Sharma" autocomplete="off">
+            <label for="aname">Username</label><input class="f" id="aname" maxlength="40" placeholder="e.g. Karan Sharma" autocomplete="off">
             <label for="apw">Password</label><input class="f mono" id="apw" placeholder="Leave empty: PuckTrace makes one" autocomplete="new-password">
           </div>
           <div class="factions"><button class="btn2 pri" type="submit"><svg class="ic sm"><use href="#i-plus"/></svg>Create user</button><span class="msg" id="amsg"></span></div></form>
@@ -676,8 +676,8 @@ kbd{font:11px var(--mono);border:1px solid var(--line2);border-bottom-width:2px;
 <div class="login" id="login"><form class="lcard" id="lform">
   <div class="brand" style="justify-content:center;padding:0 0 6px;font-size:22px"><svg width="34" height="34"><use href="#i-puck"/></svg><span>Puck<b>Trace</b></span></div>
   <div class="mu small" style="text-align:center;margin-bottom:20px">Match reports and rosters for RTT</div>
-  <input class="f" id="lname" type="text" placeholder="Your name" autocomplete="username" maxlength="40" style="margin-bottom:8px">
-  <input class="f" id="lpw" type="password" placeholder="Your password" autocomplete="current-password">
+  <input class="f" id="lname" type="text" placeholder="Username" autocomplete="username" maxlength="40" style="margin-bottom:8px">
+  <input class="f" id="lpw" type="password" placeholder="Password" autocomplete="current-password">
   <button class="btn" type="submit" style="width:100%;margin-top:12px">Sign in</button>
   <div class="msg err" id="lmsg" style="margin-top:10px;text-align:center"></div>
   <div class="lby"><a href="https://actorix.in" target="_blank" rel="noopener" title="Actorix website" style="display:inline-flex;align-items:center;gap:6px"><span class="axlogo" role="img" aria-label="Actorix logo" style="width:18px;height:18px"></span>Built by <b>Actorix</b> · Mumbai, India</a><br><a href="mailto:actorix.business@gmail.com">actorix.business@gmail.com</a> · <a href="tel:+919136433771">+91 91364 33771</a></div>
@@ -842,7 +842,7 @@ function setMe(n,admin){if(n){MY_NAME=n;try{localStorage.setItem('pt-name',n)}ca
   if(admin){show('admin');return}
   $('#lmsg').textContent='This address is for admins only. The team uses pucktrace.actorix.in';$('#login').classList.add('on')}
 $('#lform').onsubmit=async e=>{e.preventDefault();$('#lmsg').textContent='';
-  const name=$('#lname').value.trim().replace(/\s+/g,' ').slice(0,40);if(!name){$('#lmsg').textContent='Please enter your name';$('#lname').focus();return}
+  const name=$('#lname').value.trim().replace(/\s+/g,' ').slice(0,40);if(!name){$('#lmsg').textContent='Please enter your username';$('#lname').focus();return}
   if(!$('#lpw').value){$('#lmsg').textContent='Please enter your password';$('#lpw').focus();return}
   try{const j=await post('/login',{password:$('#lpw').value,name});$('#lpw').value='';
     if(ADMIN_SITE&&!j.admin){setMe(j.name||name,false);return}   // the admin address stays closed to the team

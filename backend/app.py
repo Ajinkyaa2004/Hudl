@@ -136,7 +136,7 @@ def login(inp: LoginIn, request: Request):
         return dict(ok=True, token=_token())
     u = _users.verify(inp.name, inp.password)
     if not u:
-        raise HTTPException(401, "Wrong name or password")
+        raise HTTPException(401, "Wrong username or password")
     _users.note_login(u["name"])
     tok = _users.token_for(_SECRET, u)
     r = JSONResponse(dict(ok=True, token=tok, name=u["name"], admin=bool(u.get("admin"))))
