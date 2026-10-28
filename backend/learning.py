@@ -74,7 +74,7 @@ def learn_aliases(parsed: dict, url: str) -> list[str]:
     # the same checks as the sheet learning (learn_sheet.py): a pick can be a mistake, so a game
     # is learned from only when it plausibly is the header's game: the date within a day, and one
     # team clearly matching or both close; ages and girls'/boys' teams must agree
-    from .learn_sheet import ANCHOR, BOTH_CLOSE, LEARN_BELOW, GIRLS
+    from .learn_sheet import ANCHOR, BOTH_CLOSE, LEARN_BELOW, GIRLS, nickname_only
     import datetime as _dt
     try:
         if abs((_dt.date.fromisoformat(gdate) - _dt.date.fromisoformat(parsed["date"])).days) > 1:
@@ -92,7 +92,7 @@ def learn_aliases(parsed: dict, url: str) -> list[str]:
     added = []
     never = {(_tk(a)[0], _tk(b)[0]) for a, b in data.get("_never", [])}
     for (header_name, site_name), sc in zip(pairs, scores):
-        if sc >= LEARN_BELOW or (_tk(site_name)[0], _tk(header_name)[0]) in never:
+        if sc >= LEARN_BELOW or (_tk(site_name)[0], _tk(header_name)[0]) in never or nickname_only(site_name):
             continue
         ha, sa = _tk(header_name)[1], _tk(site_name)[1]
         if (ha and sa and not (ha & sa)) or bool(GIRLS.search(header_name)) != bool(GIRLS.search(site_name)):

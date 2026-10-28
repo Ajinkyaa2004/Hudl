@@ -40,9 +40,34 @@ _ALIAS_FILE = _Path(__file__).resolve().parent.parent.parent / "data" / "aliases
 _ALIASES = None
 
 
+_ALIAS_SEEN = dict(at=0.0, mtimes=None)
+
+
+def _alias_files_changed() -> bool:
+    """An upload or the sync from the other server replaced a spellings file: read it again (checked
+    at most every 10 s). Before, the file was read once, so an upload waited for a restart."""
+    import time as _t
+    now = _t.time()
+    if now - _ALIAS_SEEN["at"] < 10:
+        return False
+    _ALIAS_SEEN["at"] = now
+    m = []
+    for f in (_ALIAS_FILE, _ALIAS_FILE.with_name("aliases_learned.json")):
+        try:
+            m.append(f.stat().st_mtime)
+        except OSError:
+            m.append(None)
+    changed = _ALIAS_SEEN["mtimes"] is not None and m != _ALIAS_SEEN["mtimes"]
+    _ALIAS_SEEN["mtimes"] = m
+    return changed
+
+
 def aliases() -> dict:
-    """norm(short) -> [norm(full), ...] in both directions, loaded once."""
+    """norm(short) -> [norm(full), ...] in both directions; read again when a file changes."""
     global _ALIASES
+    if _alias_files_changed():
+        _ALIASES = None
+        team_similarity.cache_clear()
     if _ALIASES is None:
         _ALIASES = {}
         for f in (_ALIAS_FILE, _ALIAS_FILE.with_name("aliases_learned.json")):   # hand-made, then learned from saves

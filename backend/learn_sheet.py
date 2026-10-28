@@ -28,6 +28,23 @@ LEARN_BELOW = 0.8     # the other team is learned only when it doesn't already m
 UNLIKE = 0.5          # names less than half alike need two rows that agree
 BOTH_CLOSE = 0.6      # with no anchor, both teams at least this alike (and the date right) also vouch for the row
 import re as _re
+# a site's name made only of these (a nickname, a colour, "Team", "Jr", an age) names no club: learned
+# as a spelling it matches every team with that nickname ("Hawks" = Pembina Valley Hawks also caught
+# a US "Hawks" team), so such names are never learned
+GENERIC_WORDS = set("""hawks kings eagles lightning rangers blues flyers bruins wolves bears sabres stars panthers lions tigers jets
+blackhawks hurricanes thunder storm wild ice knights warriors devils titans sharks penguins wings capitals islanders senators
+canadiens leafs oilers flames canucks rockets cyclones comets chiefs generals pirates vikings raiders mustangs huskies cougars
+wildcats owls saints spartans trojans bulldogs falcons ravens bombers rebels express phoenix aces admirals americans colonials
+crusaders dragons ducks giants hornets lynx mavericks monarchs predators rams rattlers renegades rush sting thunderbirds vipers
+wolverines yankees jr junior team hockey club hc academy selects elite prep varsity jv a aa aaa b major minor tier premier
+national white black blue gold red green orange grey gray silver navy purple yellow maroon royal teal""".split())
+
+
+def nickname_only(name: str) -> bool:
+    words = [w for w in _re.split(r"[^a-z0-9]+", (name or "").lower()) if w and not _re.fullmatch(r"\d+u?|u\d+|\d+o", w)]
+    return bool(words) and all(w in GENERIC_WORDS for w in words)
+
+
 GIRLS = _re.compile(r"\b(?:lady|ladies|girls?|women'?s?|womens|female|fem|dam|damer|naiset|frauen|zeny)\b", _re.I)
 
 
@@ -129,6 +146,8 @@ def new_pairs(learned: dict, data: dict | None = None) -> list[tuple[str, str]]:
     have |= {(_t(a)[0], _t(b)[0]) for a, b in data.get("_never", [])}
     out = []
     for site, hdrs in learned.items():
+        if nickname_only(site):
+            continue
         for hdr in hdrs:
             key = (tokens(site)[0], tokens(hdr)[0])
             if key not in have:
