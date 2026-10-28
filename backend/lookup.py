@@ -50,7 +50,8 @@ def comp_country(comp: str):
     return None
 
 
-AGE_RE = re.compile(r"\b(?:u|j)\s?(\d{1,2})\b|\b(\d{1,2})\s?u\b|\b(20[01]\d)\b|\b(\d{1,2})\s?o\b", re.I)
+# "U18AA", "u13AAA": an age written straight into the level counts too (Ontario/OMHA style)
+AGE_RE = re.compile(r"\b(?:u|j)\s?(\d{1,2})(?=aaa|aa|\b)|\b(\d{1,2})\s?u\b|\b(20[01]\d)\b|\b(\d{1,2})\s?o\b", re.I)
 LEVEL_RE = re.compile(r"\b(aaa|aa|elite|major|minor|female|women|girls?|\(g\)|\(w\))\b", re.I)
 FULL_RE = re.compile(
     r"^\s*(?:\[(?P<id>\d+)\]\s*)?(?P<t1>.+?)\s+(?:\d+\s*-\s*\d+|vs\.?|v\.?|-|–)\s+(?P<t2>.+?)\s*\|\s*(?P<comp>[^|]+?)\s*\|\s*(?P<date>\d{4}-\d{2}-\d{2})(?:[T ](?P<time>\d{2}:\d{2}))?", re.I)
@@ -81,7 +82,8 @@ def _tokens(name):
     if any(len(a) <= 2 for a in ages):          # "San Jose Jr Sharks 2014 12U": the age group wins
         ages = {a for a in ages if len(a) <= 2}
     # Women's, Female, Girls and the (G)/(W) tags all mean the same: a girls' or women's team
-    levels = {"female" if x.strip("()") in ("women", "girl", "girls", "g", "w") else x.strip("()") for x in LEVEL_RE.findall(s)}
+    # levels are read after the ages are taken out, so the "AA" of "U18AA" counts
+    levels = {"female" if x.strip("()") in ("women", "girl", "girls", "g", "w") else x.strip("()") for x in LEVEL_RE.findall(AGE_RE.sub(" ", s))}
     base = LEVEL_RE.sub(" ", AGE_RE.sub(" ", s))
     base = re.sub(r"\b(hc|hk|sk|if|ifk|ik|bk|hf|ec|ehc|ev|hcm|mhk|hkm|jr\.?|junior|juniors|ncdc|hockey|club|team|ishockeyklubb|ishockeyklub|ishockeylag|ishockey|eishockey|hockeyklubb|hockeyclub|jaakiekko|idrettslag|sportsklubb)\b", " ", base)
     return re.sub(r"[^a-z0-9]", "", base), frozenset(ages), frozenset(levels)
