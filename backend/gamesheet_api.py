@@ -24,6 +24,8 @@ on scheduledTimeGmt, which is true UTC in both schemas. scheduledStartTime is lo
 Report link: https://gamesheetstats.com/seasons/{sid}/games/{game_id}
 
     .venv/bin/python -m backend.gamesheet_api --index            # every game of the current seasons -> data/gamesheet_games.json
+                                                                 #   and the compact team list -> data/gamesheet_teams.json
+    .venv/bin/python -m backend.gamesheet_api --teams            # only rebuild data/gamesheet_teams.json from the full index
     .venv/bin/python -m backend.gamesheet_api --season 15554     # print one season
     .venv/bin/python -m backend.gamesheet_api --day 2026-09-20   # every game of one UTC day, all seasons (Firestore)
 """
@@ -415,6 +417,26 @@ async def build_index(known_ids=None, today: str | None = None, path: Path = IND
     return idx
 
 
+TEAMS_FILE = DATA / "gamesheet_teams.json"
+
+
+def export_teams(src: Path = INDEX_FILE, out: Path = TEAMS_FILE) -> int:
+    """The part of the full index the roster lookup needs, small enough for every server (the full
+    file is ~50 MB and never leaves this machine): {built, seasons: {sid: {name, start, end}},
+    teams: [[sid, team id, name, division, season name], ...]}. Servers get it by the admin upload
+    and keep it in step with each other like the knowledge base."""
+    d = json.loads(src.read_text())
+    teams = {}
+    for g in d.get("games") or []:
+        for side, div in (("home", g.get("division")), ("away", g.get("away_division") or g.get("division"))):
+            tid = g.get(f"{side}_id")
+            if tid and g.get(side) and (g["sid"], tid) not in teams:
+                teams[(g["sid"], tid)] = [g["sid"], tid, g[side], div or "", g.get("season_name") or ""]
+    seasons = {sid: {k: s.get(k) for k in ("name", "start", "end")} for sid, s in (d.get("seasons") or {}).items()}
+    out.write_text(json.dumps(dict(built=d.get("built"), seasons=seasons, teams=list(teams.values())), separators=(",", ":")))
+    return len(teams)
+
+
 async def _main():
     import argparse
     ap = argparse.ArgumentParser()
@@ -422,6 +444,7 @@ async def _main():
     ap.add_argument("--season")
     ap.add_argument("--day")
     ap.add_argument("--current", action="store_true")
+    ap.add_argument("--teams", action="store_true")
     a = ap.parse_args()
     try:
         if a.season:
@@ -438,6 +461,8 @@ async def _main():
             print(len(ss), "current seasons")
         if a.index:
             await build_index()
+        if a.index or a.teams:
+            print(export_teams(), "teams ->", TEAMS_FILE)
     finally:
         await close()
     print(stats)

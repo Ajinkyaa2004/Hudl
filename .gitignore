@@ -14,6 +14,8 @@ data/screens/
 data/shots/
 data/games.db*
 data/gamesheet_games.json
+data/gamesheet_games_*.json
+data/gamesheet_teams.json
 data/gamesheet_fs_key.txt
 data/harvest_status.json
 data/health.json
@@ -33,3 +35,6 @@ data/sheet_log.json
 data/recheck.json
 data/game-list-download.db*
 data/*.export-tmp.db*
+PUCKTRACE_CONTEXT.md
+CLAUDE.md
+AGENTS.md

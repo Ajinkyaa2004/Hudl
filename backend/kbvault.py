@@ -18,7 +18,7 @@ from pathlib import Path
 
 MAGIC = b"PTV1"
 VAULT_URL = "https://github.com/Ajinkyaa2004/Hudl/releases/download/kb-backup/{name}"
-FILES = ("knowledge.json", "aliases_learned.json", "sheet_log.json")
+FILES = ("knowledge.json", "aliases_learned.json", "sheet_log.json", "gamesheet_teams.json")
 SERVERS = ("https://nas.actorix.in", "https://pucktrace-api-8u5i.onrender.com")
 MIN_TEAMS = 5000          # never back up (or restore) a knowledge base that is empty or thin
 

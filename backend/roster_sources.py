@@ -340,18 +340,36 @@ GS = "https://gamesheetstats.com"
 GS_TEAM_LINK = re.compile(r"gamesheetstats\.com/seasons/(\d+)/teams/(\d+)")
 GS_GAME_LINK = re.compile(r"gamesheetstats\.com/seasons/(\d+)/games/(\d+)")
 _gs_index = None
+_gs_index_src = None
+
+
+def _gs_source():
+    """The full index where it exists (the developer's machine), else the compact team list the
+    servers get (data/gamesheet_teams.json, see gamesheet_api.export_teams); with its time, so a
+    newly uploaded or synced list is picked up."""
+    for name in ("gamesheet_games.json", "gamesheet_teams.json"):
+        p = DATA / name
+        if p.exists():
+            return p, p.stat().st_mtime
+    return None, 0
 
 
 def gs_index() -> dict:
-    """From data/gamesheet_games.json: teams {(sid, tid): (name, division, season_name)},
-    games {game_id: game}, seasons, and a word index for name matching."""
-    global _gs_index
-    if _gs_index is None:
+    """GameSheet teams {(sid, tid): (name, division, season_name)}, games {game_id: game} (full
+    index only), seasons, and a word index for name matching."""
+    global _gs_index, _gs_index_src
+    src = _gs_source()
+    if _gs_index is None or src != _gs_index_src:
         try:
-            d = json.loads((DATA / "gamesheet_games.json").read_text())
+            d = json.loads(src[0].read_text()) if src[0] else {}
         except Exception:
-            d = dict(games=[], seasons={})
+            d = {}
         teams, games, words = {}, {}, {}
+        for sid, tid, name, div, sname in d.get("teams") or []:          # compact list
+            if (sid, tid) not in teams:
+                teams[(sid, tid)] = (name, div or "", sname or "")
+                for w in _words(name):
+                    words.setdefault(w, set()).add((sid, tid))
         for g in d.get("games") or []:
             games[g["game_id"]] = g
             for side, div in (("home", g.get("division")), ("away", g.get("away_division") or g.get("division"))):
@@ -361,6 +379,7 @@ def gs_index() -> dict:
                     for w in _words(g[side]):
                         words.setdefault(w, set()).add((g["sid"], tid))
         _gs_index = dict(teams=teams, games=games, words=words, seasons=d.get("seasons") or {})
+        _gs_index_src = src
     return _gs_index
 
 

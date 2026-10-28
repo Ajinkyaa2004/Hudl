@@ -134,12 +134,17 @@ def session(request: Request):
     return dict(required=bool(PASSWORD), ok=ok, **({"token": _token()} if ok and PASSWORD else {}))
 
 
+# private data files the servers receive by upload and keep in step with each other; the GameSheet
+# team list lets the roster lookup find GameSheet teams whose game wasn't found
+DATA_FILES = ("knowledge.json", "aliases_learned.json", "sheet_log.json", "gamesheet_teams.json")
+
+
 @app.post("/api/admin/upload")
 async def admin_upload(name: str, request: Request):
     """Put a local data file on a deployed server (signed in): the knowledge base built from
     Club Data and learned spellings are not in the public repo."""
     global KB
-    allowed = {"knowledge.json", "aliases_learned.json", "sheet_log.json"}
+    allowed = set(DATA_FILES)
     if name not in allowed:
         raise HTTPException(400, f"Allowed: {sorted(allowed)}")
     body = await request.body()
@@ -159,7 +164,7 @@ def admin_data(name: str, since: float = 0):
     """The private data files, for the other server to copy (signed in: both servers share
     APP_PASSWORD and APP_SECRET, so each can send the other a valid session token). With `since`,
     answers 204 unless this copy is newer, so the regular check costs nothing."""
-    if name not in {"knowledge.json", "aliases_learned.json", "sheet_log.json"}:
+    if name not in DATA_FILES:
         raise HTTPException(400, "Not a data file")
     f = ROOT / "data" / name
     if not f.exists():
@@ -210,7 +215,7 @@ async def _data_sync_loop():
     while True:
         try:
             async with httpx.AsyncClient(timeout=90, cookies={"pt_session": _token()}) as c:
-                for name in ("knowledge.json", "aliases_learned.json", "sheet_log.json"):
+                for name in DATA_FILES:
                     f = ROOT / "data" / name
                     mine = f.stat().st_mtime if f.exists() else 0
                     r = await _get_retry(c, f"{DATA_FROM}/api/admin/data", params={"name": name, "since": mine})
