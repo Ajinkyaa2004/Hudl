@@ -113,27 +113,43 @@ def learn_aliases(rows, games) -> tuple[dict, Counter]:
     return learned, why
 
 
-def write_aliases(learned: dict) -> int:
-    """Merge into data/aliases_learned.json, keyed by the site's spelling as saves do. Pairs on its
-    '_never' list (spellings found wrong by hand: different teams) are never learned again."""
-    from .adapters.base import tokens as _t
+def _alias_data() -> dict:
     try:
-        data = json.loads(ALIAS_FILE.read_text())
+        return json.loads(ALIAS_FILE.read_text())
     except Exception:
-        data = {}
+        return {}
+
+
+def new_pairs(learned: dict, data: dict | None = None) -> list[tuple[str, str]]:
+    """The (site spelling, header spelling) pairs write_aliases would add: not known yet and not on
+    the '_never' list (spellings found wrong by hand: different teams)."""
+    from .adapters.base import tokens as _t
+    data = _alias_data() if data is None else data
     have = {(_t(k)[0], _t(v)[0]) for k, vs in data.items() if not k.startswith("_") for v in vs}
     have |= {(_t(a)[0], _t(b)[0]) for a, b in data.get("_never", [])}
-    n = 0
+    out = []
     for site, hdrs in learned.items():
         for hdr in hdrs:
             key = (tokens(site)[0], tokens(hdr)[0])
-            if key in have:
-                continue
-            data.setdefault(site, []).append(hdr)
-            have.add(key)
-            n += 1
+            if key not in have:
+                out.append((site, hdr))
+                have.add(key)
+    return out
+
+
+def write_aliases(learned: dict, block=()) -> int:
+    """Merge into data/aliases_learned.json, keyed by the site's spelling as saves do. Pairs in
+    `block` (an admin unticked them) go on the '_never' list instead and are never learned."""
+    data = _alias_data()
+    never = data.setdefault("_never", [])
+    for a, b in block:
+        if [a, b] not in never:
+            never.append([a, b])
+    pairs = new_pairs(learned, data)
+    for site, hdr in pairs:
+        data.setdefault(site, []).append(hdr)
     ALIAS_FILE.write_text(json.dumps(data, indent=1, ensure_ascii=False))
-    return n
+    return len(pairs)
 
 
 def learn_sources(rows) -> tuple[dict, dict]:
@@ -168,24 +184,28 @@ def merge_sources(kb: dict, comp: dict, team: dict) -> tuple[int, int]:
     return nc, nt
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--dry-run", action="store_true")
-    a = ap.parse_args()
+def plan(log=print) -> dict:
+    """Read data/progress.xlsx and work out what it would teach, without writing anything."""
     rows = list(sheet_rows())
-    print(f"{len(rows)} sheet rows")
+    log(f"{len(rows)} sheet rows")
     games = index_by_game()
-    print(f"{len(games)} games in the index")
+    log(f"{len(games)} games in the index")
     learned, why = learn_aliases(rows, games)
-    print("spellings:", dict(why))
-    for site, hdrs in sorted(learned.items(), key=lambda kv: -sum(kv[1].values()))[:40]:
-        print(f"   {site}  =  {', '.join(hdrs)}")
+    log("spellings: " + ", ".join(f"{k} {n}" for k, n in why.most_common()))
+    pairs = new_pairs(learned)
+    for site, hdr in pairs:
+        log(f"   {site}  =  {hdr}")
+    return dict(rows=rows, learned=learned, why=dict(why), pairs=pairs)
+
+
+def apply(pl: dict, block=(), log=print) -> dict:
+    """Learn what plan() found, except the spelling pairs in `block`: spellings, competition and team
+    websites, TeamLinkt sites and hokej.cz pairs. Writes the spellings file and the knowledge base."""
+    rows, learned = pl["rows"], pl["learned"]
     comp, team = learn_sources(rows)
     kb = lookup.load_kb()
     nc, nt = merge_sources(kb, comp, team)
-    print(f"sources: {nc} competitions and {nt} teams updated")
-    if a.dry_run:
-        return
+    log(f"sources: {nc} competitions and {nt} teams updated")
     # TeamLinkt sites the analysts used: learned (or refreshed) so their games are read from now on
     import re as _r
     from .adapters.teamlinkt import discover
@@ -196,18 +216,30 @@ def main():
             seen[m.group(1)] = url
     for url in seen.values():
         try:
-            discover(url)
+            discover(url, log=log)
         except Exception as e:
-            print("teamlinkt:", e)
+            log(f"teamlinkt: {e}")
     from .hokejcz import anchors_from_sheet
     have = kb.setdefault("hokejcz_anchors", {})
-    for cid, pairs in anchors_from_sheet(rows).items():
+    for cid, pairs in anchors_from_sheet(rows, log=log).items():
         have[cid] = sorted({tuple(x) for x in have.get(cid, [])} | {tuple(x) for x in pairs})
         have[cid] = [list(x) for x in have[cid]]
-    print(f"spellings added: {write_aliases(learned)} -> {ALIAS_FILE}")
+    n = write_aliases(learned, block)
+    log(f"spellings added: {n}" + (f", {len(block)} blocked" if block else ""))
     kb["sheet_learned"] = datetime.datetime.now().isoformat(timespec="seconds")
     lookup.save_kb(kb)
-    print(f"knowledge base saved -> {lookup.KNOWLEDGE}")
+    log("knowledge base saved")
+    return dict(spellings=n, blocked=len(block), competitions=nc, teams=nt)
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--dry-run", action="store_true")
+    a = ap.parse_args()
+    pl = plan()
+    if a.dry_run:
+        return
+    apply(pl)
 
 
 if __name__ == "__main__":

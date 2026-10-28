@@ -120,7 +120,7 @@ def presence(inp: PresenceIn, request: Request):
     n = u["name"] if u else _clean_name(inp.name) if not PASSWORD else ""
     if n:
         _PRESENT[n] = _time.time()
-    return dict(online=_online())
+    return dict(online=_online(), announce=_announce())
 
 
 @app.post("/api/login")
@@ -156,6 +156,22 @@ class BlockIn(BaseModel):
     blocked: bool
 
 
+def _push_file(name: str):
+    """Send a data file to the other server at once (not at the next 5-minute sync)."""
+    if not DATA_FROM or not PASSWORD:
+        return
+
+    def push():
+        import httpx
+        try:
+            httpx.post(f"{DATA_FROM}/api/admin/upload", params={"name": name}, content=(ROOT / "data" / name).read_bytes(),
+                       headers={"content-type": "application/json", "x-pt-session": _token()}, timeout=300)
+        except Exception as e:
+            print(f"[push] {name} could not reach the other server:", e, flush=True)
+    import threading
+    threading.Thread(target=push, daemon=True).start()
+
+
 def _users_changed(kicked: str = ""):
     """After a change: the person kicked out leaves the online list, and the other server gets the
     accounts at once (not at the next 5-minute sync), so nobody carries on there."""
@@ -163,18 +179,7 @@ def _users_changed(kicked: str = ""):
     if kicked:
         for k in [k for k in _PRESENT if _users._key(k) == _users._key(kicked)]:
             _PRESENT.pop(k, None)
-    if not DATA_FROM or not PASSWORD:
-        return
-
-    def push():
-        import httpx
-        try:
-            httpx.post(f"{DATA_FROM}/api/admin/upload", params={"name": "users.json"}, content=_users.FILE.read_bytes(),
-                       headers={"content-type": "application/json", "x-pt-session": _token()}, timeout=30)
-        except Exception as e:
-            print("[users] could not reach the other server:", e, flush=True)
-    import threading
-    threading.Thread(target=push, daemon=True).start()
+    _push_file("users.json")
 
 
 def _admin_call(fn, *a, kicked: str = "", **kw):
@@ -233,6 +238,209 @@ def admin_user_delete(name: str, request: Request):
     return dict(ok=True)
 
 
+# ---------------------------------------------------------------- announcement banner
+
+ANNOUNCE = ROOT / "data" / "announce.json"
+
+
+def _announce() -> "dict | None":
+    """The banner every page shows, until it is cleared or its end time passes."""
+    import json as _j, datetime as _dt
+    try:
+        a = _j.loads(ANNOUNCE.read_text())
+    except Exception:
+        return None
+    if not a.get("text"):
+        return None
+    if a.get("until") and a["until"] < _dt.datetime.now(_dt.timezone.utc).isoformat():
+        return None
+    return {k: a.get(k) for k in ("id", "text", "level", "until", "at")}
+
+
+class AnnounceIn(BaseModel):
+    text: str = ""
+    level: str = "info"       # info | warn
+    hours: float = 0          # 0: until cleared
+
+
+@app.get("/api/announce")
+def announce_get():
+    return dict(announce=_announce())
+
+
+@app.post("/api/admin/announce")
+def announce_set(inp: AnnounceIn, request: Request):
+    import json as _j, datetime as _dt
+    text = (inp.text or "").strip()[:500]
+    now = _dt.datetime.now(_dt.timezone.utc)
+    a = dict(id=_secrets.token_hex(4), text=text, level="warn" if inp.level == "warn" else "info",
+             until=(now + _dt.timedelta(hours=inp.hours)).isoformat() if text and inp.hours > 0 else None,
+             at=now.isoformat(), by=(_user(request) or {}).get("name", ""))
+    ANNOUNCE.write_text(_j.dumps(a if text else dict(text="", at=now.isoformat())))
+    _push_file("announce.json")
+    return dict(ok=True, announce=_announce())
+
+
+# ---------------------------------------------------------------- usage and live activity
+
+_LOG_CACHE: dict = {"at": 0, "rows": []}
+
+
+def _log_rows() -> list:
+    """The search log (the Google Sheet: every search on both servers, with names), cached 2 minutes."""
+    if _time.time() - _LOG_CACHE["at"] > 120:
+        from . import sheet_report
+        _LOG_CACHE.update(rows=sheet_report.log_rows(), at=_time.time())
+    return _LOG_CACHE["rows"]
+
+
+@app.get("/api/admin/usage")
+async def admin_usage(days: int = 7):
+    """Per person: searches, found / pick one / not found, average time, today and over `days`."""
+    import asyncio, collections, datetime as _dt
+    try:
+        rows = await asyncio.to_thread(_log_rows)
+    except Exception as e:
+        raise HTTPException(502, f"Could not read the search log: {e}"[:200])
+    today = (_dt.datetime.utcnow() + _dt.timedelta(hours=5, minutes=30)).date()
+    since = (today - _dt.timedelta(days=max(1, days) - 1)).isoformat()
+    per = collections.defaultdict(lambda: dict(today=0, n=0, found=0, pick=0, none=0, secs=[], last=""))
+    daily = collections.Counter()
+    for r in rows:
+        t = _re_cors.sub(r" (\d):", r" 0\1:", (r.get("Time (IST)") or "").strip())   # the log writes "6:55:32"
+        if t[:10] < since:
+            continue
+        name = (r.get("Name") or "-").strip() or "-"
+        res = (r.get("Result") or "").strip() or ("Found" if (r.get("Found") or "").strip() == "Yes" else "Nothing")
+        p = per[name]
+        p["n"] += 1
+        p["today"] += t[:10] == today.isoformat()
+        p["found" if res == "Found" else "pick" if res == "Shortlist" else "none"] += 1
+        try:
+            p["secs"].append(float(r.get("Search time (s)") or ""))
+        except ValueError:
+            pass
+        p["last"] = max(p["last"], t)
+        daily[t[:10]] += 1
+    out = []
+    for name, p in per.items():
+        sec = sorted(p.pop("secs"))
+        out.append(dict(name=name, **p, found_pct=round(100 * p["found"] / p["n"]) if p["n"] else 0,
+                        median_s=sec[len(sec) // 2] if sec else None))
+    out.sort(key=lambda x: (-x["n"], x["name"].lower()))
+    return dict(days=days, since=since, people=out, total=sum(x["n"] for x in out),
+                daily=[dict(date=d, n=daily[d]) for d in sorted(daily)])
+
+
+@app.get("/api/admin/activity")
+async def admin_activity(local: int = 0):
+    """Searches running now and the last finished ones, on this server and (unless local) the other."""
+    now = _time.time()
+    running = [dict(who=j.get("who") or "-", header=j.get("header", ""), secs=round(now - j["started"]), server=SERVER)
+               for j in list(_JOBS.values()) if j["status"] == "running" and j.get("header")]
+    recent = [dict(r, ago=round(now - r["at"])) for r in _RECENT]
+    other = None
+    if not local and DATA_FROM and PASSWORD:
+        try:
+            import httpx
+            async with httpx.AsyncClient(timeout=8) as c:
+                o = (await c.get(f"{DATA_FROM}/api/admin/activity", params={"local": 1}, headers={"x-pt-session": _token()})).json()
+            running += o.get("running", [])
+            recent += o.get("recent", [])
+            other = "ok"
+        except Exception:
+            other = "unreachable"
+    recent.sort(key=lambda r: r["ago"])
+    return dict(running=sorted(running, key=lambda r: -r["secs"]), recent=recent[:30], online=_online(), other=other)
+
+
+# ---------------------------------------------------------------- RTT sheet upload (learning)
+
+_LEARN: dict = dict(status="idle", log=[], plan=None, result=None, at=None)
+
+
+def _learn_log(line: str):
+    _LEARN["log"].append(str(line)[:300])
+    del _LEARN["log"][:-300]
+    print("[sheet]", line, flush=True)
+
+
+@app.get("/api/admin/sheet")
+def admin_sheet_state():
+    pl = _LEARN.get("plan") or {}
+    return dict(status=_LEARN["status"], log=_LEARN["log"][-80:], at=_LEARN["at"], result=_LEARN["result"],
+                rows=len(pl.get("rows") or []), why=pl.get("why"), pairs=[list(x) for x in pl.get("pairs") or []])
+
+
+@app.post("/api/admin/sheet")
+async def admin_sheet_upload(request: Request):
+    """The RTT Progress sheet (.xlsx) from the Admin screen: saved as data/progress.xlsx, then read
+    for what it would teach. Only on the main server: Render has too little memory for it."""
+    import asyncio, datetime as _dt
+    if SERVER == "render":
+        raise HTTPException(409, "The backup server can't learn from the sheet: switch the main server on and try again")
+    if _LEARN["status"] in ("planning", "applying"):
+        raise HTTPException(409, "A sheet is being read already")
+    body = await request.body()
+    if body[:2] != b"PK":
+        raise HTTPException(400, "That is not an .xlsx file")
+    (ROOT / "data" / "progress.xlsx").write_bytes(body)
+    _LEARN.update(status="planning", log=[], plan=None, result=None, at=_dt.datetime.now().isoformat(timespec="seconds"))
+    _learn_log(f"sheet received ({len(body) // 1024} KB), reading it")
+
+    async def run():
+        from . import learn_sheet
+        try:
+            _LEARN["plan"] = await asyncio.to_thread(learn_sheet.plan, _learn_log)
+            _LEARN["status"] = "ready"
+        except Exception as e:
+            _LEARN.update(status="error")
+            _learn_log(f"error: {type(e).__name__}: {e}")
+    asyncio.create_task(run())
+    return dict(ok=True)
+
+
+class SheetApplyIn(BaseModel):
+    block: list = []          # [[site spelling, header spelling], ...] the admin unticked
+    accuracy: bool = True     # then refresh the dashboard's Accuracy tab
+
+
+@app.post("/api/admin/sheet/apply")
+async def admin_sheet_apply(inp: SheetApplyIn):
+    import asyncio
+    if _LEARN["status"] != "ready" or not _LEARN.get("plan"):
+        raise HTTPException(409, "Upload a sheet first")
+    _LEARN["status"] = "applying"
+    block = [tuple(x[:2]) for x in inp.block if isinstance(x, (list, tuple)) and len(x) >= 2]
+
+    async def run():
+        global KB
+        from . import learn_sheet, sheet_report
+        from .adapters import base as _base
+        try:
+            r = await asyncio.to_thread(learn_sheet.apply, _LEARN["plan"], block, _learn_log)
+            KB = lookup.load_kb()
+            _base._ALIASES = None
+            _base.team_similarity.cache_clear()
+            for f in ("knowledge.json", "aliases_learned.json"):
+                _push_file(f)
+            _learn_log("knowledge and spellings in use here, and sent to the other server")
+            if inp.accuracy:
+                rows = await asyncio.to_thread(lambda: sheet_report.verdicts(sheet_report.log_rows()))
+                import collections
+                c = collections.Counter(x[5] for x in rows)
+                ok, wrong = c[sheet_report.V_OK], c[sheet_report.V_WRONG]
+                sent = await asyncio.to_thread(sheet_report.send, rows)
+                r["accuracy"] = f"{100 * ok / (ok + wrong):.1f}% ({ok} of {ok + wrong})" if ok + wrong else None
+                _learn_log(f"Accuracy tab refreshed: {r['accuracy']} ({sent[:60]})")
+            _LEARN.update(status="done", result=r)
+        except Exception as e:
+            _LEARN.update(status="error")
+            _learn_log(f"error: {type(e).__name__}: {e}")
+    asyncio.create_task(run())
+    return dict(ok=True)
+
+
 @app.post("/api/logout")
 def logout():
     r = JSONResponse(dict(ok=True))
@@ -250,7 +458,7 @@ def session(request: Request):
 
 # private data files the servers receive by upload and keep in step with each other; the GameSheet
 # team list lets the roster lookup find GameSheet teams whose game wasn't found
-DATA_FILES = ("knowledge.json", "aliases_learned.json", "sheet_log.json", "gamesheet_teams.json", "users.json")
+DATA_FILES = ("knowledge.json", "aliases_learned.json", "sheet_log.json", "gamesheet_teams.json", "users.json", "announce.json")
 
 
 @app.post("/api/admin/upload")
@@ -936,7 +1144,7 @@ async def _sheet_log(name: str, header: str, result: dict, seconds: float = None
         print(f"[sheet log] not sent: {str(e)[:120]}", flush=True)
 
 
-def _job_start(key: str, factory, on_done=None) -> dict:
+def _job_start(key: str, factory, on_done=None, who: str = "", header: str = "") -> dict:
     now = _time.time()
     for jid in [j for j, v in _JOBS.items() if v["status"] != "running" and now - v["started"] > 600]:
         _JOB_KEYS.pop(_JOBS[jid]["key"], None)
@@ -945,7 +1153,7 @@ def _job_start(key: str, factory, on_done=None) -> dict:
     if jid in _JOBS and (_JOBS[jid]["status"] == "running" or now - _JOBS[jid]["started"] < 20):
         return dict(job=jid)
     jid = _secrets.token_urlsafe(9)
-    _JOBS[jid] = dict(status="running", key=key, started=now)
+    _JOBS[jid] = dict(status="running", key=key, started=now, who=who, header=header)
     _JOB_KEYS[key] = jid
 
     async def run():
@@ -996,10 +1204,18 @@ async def search_start(inp: SearchIn, request: Request, rosters: bool = False):
     u = _user(request) if PASSWORD else None
     who = u["name"] if u else inp.name          # the search log names the signed-in account
     return _job_start(f"search|{rosters}|{h}", lambda: _search_with_retry(h, rosters),
-                      on_done=lambda res, secs: _after_search(who, h, res, secs))
+                      on_done=lambda res, secs: _after_search(who, h, res, secs), who=who, header=h)
+
+
+_RECENT: list = []      # the last searches finished here, newest first (Admin > Live activity)
 
 
 async def _after_search(who: str, h: str, res: dict, secs: float):
+    a = (res or {}).get("auto") or {}
+    _RECENT.insert(0, dict(at=_time.time(), who=_clean_name(who) or "-", header=h[:300], secs=secs, server=SERVER,
+                           result="Found" if a.get("verdict") == "found" else "Pick one" if a.get("verdict") == "check" and a.get("candidates") else "Not found",
+                           link=((a.get("best") or {}).get("url") or "") if a.get("verdict") == "found" else ""))
+    del _RECENT[40:]
     _recheck_note(h, res)
     await _sheet_log(who, h, res, secs)
 

@@ -8,6 +8,7 @@ __pycache__/
 data/*.xlsx
 data/knowledge.json
 data/users.json
+data/announce.json
 data/aliases_learned.json
 data/roster_probe_results.json
 data/cache/

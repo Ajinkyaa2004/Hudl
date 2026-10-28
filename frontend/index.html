@@ -136,6 +136,15 @@ a.btn2{color:var(--tx)}
 .btn2.pri:hover{background:var(--ac-hi);border-color:var(--ac-hi)}
 .btn2.danger{color:var(--no);border-color:var(--no-bg)}
 .navb[hidden]{display:none!important}
+.annbar{display:flex;gap:10px;align-items:flex-start;margin:0 0 16px;padding:11px 14px;border-radius:var(--r2);background:var(--vi-bg,var(--s2));color:var(--tx);font-size:13.5px;border:1px solid var(--line)}
+.annbar.warn{background:var(--wa-bg);border-color:var(--wa)}.annbar[hidden]{display:none}.annbar .t{flex:1;white-space:pre-wrap}.annbar button{border:0;background:none;color:var(--mu);cursor:pointer;padding:0 2px}
+.apane[hidden]{display:none}.aseg{margin-bottom:16px;flex-wrap:wrap}
+.aseg button{height:34px}
+.pairs{max-height:420px;overflow:auto;border:1px solid var(--line);border-radius:var(--r2)}
+.pairs label{display:flex;gap:10px;align-items:center;padding:8px 12px;border-bottom:1px solid var(--line);font-size:13px;cursor:pointer}
+.pairs label:last-child{border-bottom:0}.pairs .eq{color:var(--mu2)}
+.alog{font:12px var(--mono);background:var(--s2);border-radius:var(--r2);padding:10px 12px;max-height:220px;overflow:auto;white-space:pre-wrap;color:var(--mu)}
+.bars{display:flex;gap:4px;align-items:flex-end;height:70px;margin:6px 0 2px}.bars i{flex:1;background:var(--ac);border-radius:3px 3px 0 0;min-height:2px;opacity:.85}
 .btn2:disabled{opacity:.55;cursor:default}
 .iconbtn{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:9px;border:1px solid var(--line2);background:var(--s1);color:var(--mu);cursor:pointer;transition:color .15s,border-color .15s,background .15s;flex:none}
 .iconbtn:hover{color:var(--tx);border-color:var(--mu2);background:var(--s2)}.iconbtn:active{transform:scale(.97)}
@@ -491,6 +500,7 @@ kbd{font:11px var(--mono);border:1px solid var(--line2);border-bottom-width:2px;
     </header>
 
     <main id="main">
+      <div class="annbar" id="annbar" hidden role="status"><svg class="ic sm"><use href="#i-alert"/></svg><span class="t" id="anntext"></span><button id="annx" aria-label="Hide this message"><svg class="ic sm"><use href="#i-x"/></svg></button></div>
       <section class="view on" id="v-find">
         <div class="ph"><div><h1>Find a match</h1><p>Paste a HokReg header. PuckTrace looks for the match report first and checks both teams' rosters at the same time.</p></div><div class="mu2 small" id="stats"></div></div>
         <div class="search">
@@ -541,7 +551,9 @@ kbd{font:11px var(--mono);border:1px solid var(--line2);border-bottom-width:2px;
       </section>
 
       <section class="view" id="v-admin">
-        <div class="ph"><div><h1>Users</h1><p>Who can sign in to PuckTrace. Only admins see this page.</p></div><button class="btn2" id="arefresh"><svg class="ic sm"><use href="#i-refresh"/></svg>Refresh</button></div>
+        <div class="ph"><div><h1>Admin</h1><p>Users, activity and settings. Only admins see this page.</p></div><button class="btn2" id="arefresh"><svg class="ic sm"><use href="#i-refresh"/></svg>Refresh</button></div>
+        <div class="seg aseg" id="aseg"><button class="on" data-p="users">Users</button><button data-p="live">Live activity</button><button data-p="usage">Usage</button><button data-p="ann">Announcement</button><button data-p="sheet">RTT sheet</button></div>
+        <div class="apane" id="ap-users">
         <div class="sec"><div class="hd"><span class="hic"><svg class="ic sm"><use href="#i-plus"/></svg></span><h3>Add a user</h3></div><div class="bd">
           <form id="aform" autocomplete="off"><div class="fgrid">
             <label for="aname">Name</label><input class="f" id="aname" maxlength="40" placeholder="e.g. Karan Sharma" autocomplete="off">
@@ -552,6 +564,35 @@ kbd{font:11px var(--mono);border:1px solid var(--line2);border-bottom-width:2px;
         </div></div>
         <div class="sec"><div class="hd"><span class="hic"><svg class="ic sm"><use href="#i-users"/></svg></span><h3>Users</h3><span class="cnt" id="acnt"></span></div>
           <div class="scroll"><table class="tbl cards" id="atable"><thead><tr><th>Name</th><th>Status</th><th>Last sign-in</th><th></th></tr></thead><tbody></tbody></table></div></div>
+        </div>
+        <div class="apane" id="ap-live" hidden>
+          <div class="sec"><div class="hd"><span class="hic"><svg class="ic sm"><use href="#i-bolt"/></svg></span><h3>Searching now</h3><span class="cnt" id="lvcnt"></span></div><div class="bd" id="lvrun"></div></div>
+          <div class="sec"><div class="hd"><span class="hic"><svg class="ic sm"><use href="#i-pulse"/></svg></span><h3>Just finished</h3><span class="cnt">both servers · updates every 10 s</span></div>
+            <div class="scroll"><table class="tbl cards" id="lvtable"><thead><tr><th>When</th><th>Who</th><th>Header</th><th>Result</th><th>Time</th></tr></thead><tbody></tbody></table></div></div>
+        </div>
+        <div class="apane" id="ap-usage" hidden>
+          <div class="tbar"><div class="seg" id="useg"><button class="on" data-d="1">Today</button><button data-d="7">7 days</button><button data-d="30">30 days</button></div><span class="mu2 small" id="ucnt"></span></div>
+          <div class="sec"><div class="hd"><span class="hic"><svg class="ic sm"><use href="#i-pulse"/></svg></span><h3>Searches per day</h3></div><div class="bd"><div class="bars" id="ubars"></div><div class="mu2 small" id="ubarlbl"></div></div></div>
+          <div class="sec"><div class="scroll"><table class="tbl cards" id="utable"><thead><tr><th>Name</th><th>Searches</th><th>Today</th><th>Found</th><th>Pick one</th><th>Not found</th><th>Median time</th><th>Last search</th></tr></thead><tbody></tbody></table></div></div>
+          <div class="mu2 small" style="margin-top:8px">From the search log (both servers). Names before 29 Oct are the ones people typed in.</div>
+        </div>
+        <div class="apane" id="ap-ann" hidden>
+          <div class="sec"><div class="hd"><span class="hic"><svg class="ic sm"><use href="#i-alert"/></svg></span><h3>Message on everyone's screen</h3></div><div class="bd">
+            <div id="anncur" class="mu small" style="margin-bottom:12px"></div>
+            <textarea class="f" id="anntxt" maxlength="500" placeholder="e.g. The home server restarts at 2 pm for 5 minutes. Searches carry on on the backup."></textarea>
+            <div class="factions" style="flex-wrap:wrap">
+              <select class="f" id="annlvl" style="width:auto"><option value="info">Information</option><option value="warn">Warning (orange)</option></select>
+              <select class="f" id="annhrs" style="width:auto"><option value="1">for 1 hour</option><option value="4">for 4 hours</option><option value="24" selected>for 1 day</option><option value="168">for 1 week</option><option value="0">until I clear it</option></select>
+              <button class="btn2 pri" id="annpub"><svg class="ic sm"><use href="#i-check"/></svg>Publish</button><button class="btn2" id="annclr">Clear</button><span class="msg" id="annmsg"></span></div>
+          </div></div>
+        </div>
+        <div class="apane" id="ap-sheet" hidden>
+          <div class="sec"><div class="hd"><span class="hic"><svg class="ic sm"><use href="#i-doc"/></svg></span><h3>Learn from the RTT sheet</h3></div><div class="bd">
+            <div class="note" style="margin-bottom:12px"><svg class="ic sm"><use href="#i-help"/></svg><span>Download the RTT Progress sheet as .xlsx and choose it here. PuckTrace reads it (a few minutes) and lists the new team spellings it would learn: untick any that join two different teams, then Apply. It also learns each league's website, then refreshes the Accuracy tab.</span></div>
+            <div class="factions" style="flex-wrap:wrap;margin-top:0"><input type="file" id="shfile" accept=".xlsx"><button class="btn2 pri" id="shup"><svg class="ic sm"><use href="#i-plus"/></svg>Upload and read</button><span class="msg" id="shmsg"></span></div>
+            <div id="shstate" style="margin-top:12px"></div>
+          </div></div>
+        </div>
       </section>
 
       <section class="view" id="v-vpn">
@@ -781,7 +822,13 @@ async function copy(t,btn){try{await navigator.clipboard.writeText(t);toast('Lin
 let MY_NAME=null;try{MY_NAME=localStorage.getItem('pt-name')||null}catch(e){}
 function showOnline(list){const e=$('#sst-online');if(!e)return;if(!list||!list.length){e.textContent='';return}
   const names=list.map(n=>n===MY_NAME?`${n} (you)`:n);e.textContent=`Online now (${list.length}): ${names.join(', ')}`}
-async function heartbeat(){if(!MY_NAME||$('#login').classList.contains('on'))return;try{const r=await post('/presence',{name:MY_NAME});showOnline(r.online)}catch(e){}}
+async function heartbeat(){if(!MY_NAME||$('#login').classList.contains('on'))return;try{const r=await post('/presence',{name:MY_NAME});showOnline(r.online);showAnn(r.announce)}catch(e){}}
+/* the admin's announcement: on every page until it ends; each person can hide one message */
+let ANN=null;
+function showAnn(a){ANN=a||null;let hid='';try{hid=localStorage.getItem('pt-ann-hidden')||''}catch(e){}
+  const b=$('#annbar');if(!a||!a.text||hid===a.id){b.hidden=true;return}
+  b.className='annbar'+(a.level==='warn'?' warn':'');$('#anntext').textContent=a.text;b.hidden=false}
+$('#annx').onclick=()=>{if(ANN)try{localStorage.setItem('pt-ann-hidden',ANN.id)}catch(e){}$('#annbar').hidden=true};
 /* each person signs in with their own name and password; the server says whose session it is */
 function showLogin(){$('#lname').value=MY_NAME||'';$('#login').classList.add('on');setTimeout(()=>(MY_NAME?$('#lpw'):$('#lname')).focus(),50)}
 /* the Admin screen lives on its own address (admin.pucktrace.actorix.in): there it opens first and is
@@ -820,7 +867,7 @@ themeLabel();
 $$('[data-v]').forEach(b=>b.onclick=()=>show(b.dataset.v));
 function show(v){$$('[data-v]').forEach(b=>b.classList.toggle('on',b.dataset.v===v));$$('.view').forEach(s=>s.classList.toggle('on',s.id==='v-'+v));
   closePreview();window.scrollTo({top:0});
-  if(v==='saved')loadSaved();if(v==='sources')loadSources();if(v==='vpn')loadVpn();if(v==='status')loadStatus();if(v==='admin')loadAdmin();if(v==='find'&&matchMedia('(hover:hover)').matches)$('#q').focus()}
+  if(v==='saved')loadSaved();if(v==='sources')loadSources();if(v==='vpn')loadVpn();if(v==='status')loadStatus();if(v==='admin')adminPane(APANE);if(v==='find'&&matchMedia('(hover:hover)').matches)$('#q').focus()}
 
 /* ---------- status ---------- */
 async function loadSwitches(){
@@ -1119,7 +1166,64 @@ function showPw(name,pw,what){$('#ares').innerHTML=`<div class="note" style="mar
 $('#aform').onsubmit=async e=>{e.preventDefault();$('#amsg').className='msg';$('#amsg').textContent='';
   try{const r=await post('/admin/users',{name:$('#aname').value,password:$('#apw').value});$('#aname').value='';$('#apw').value='';showPw(r.name,r.password,'Account created');loadAdmin()}
   catch(err){$('#amsg').className='msg err';$('#amsg').textContent=err.message}};
-$('#arefresh').onclick=()=>loadAdmin();
+let APANE='users',LVT=0;
+function adminPane(p){APANE=p;$$('#aseg button').forEach(b=>b.classList.toggle('on',b.dataset.p===p));$$('.apane').forEach(x=>x.hidden=x.id!=='ap-'+p);
+  clearInterval(LVT);if(p==='users')loadAdmin();if(p==='live'){loadLive();LVT=setInterval(()=>{if($('#v-admin').classList.contains('on')&&APANE==='live')loadLive();else clearInterval(LVT)},10000)}
+  if(p==='usage')loadUsage();if(p==='ann')loadAnn();if(p==='sheet')loadSheet()}
+$$('#aseg button').forEach(b=>b.onclick=()=>adminPane(b.dataset.p));
+$('#arefresh').onclick=()=>adminPane(APANE);
+const ago=s=>s<60?`${s}s ago`:s<3600?`${Math.round(s/60)} min ago`:`${Math.round(s/3600)} h ago`;
+const resBadge=r=>`<span class="badge ${r==='Found'?'ok':r==='Pick one'?'wa':'no'}">${esc(r)}</span>`;
+async function loadLive(){
+  let d;try{d=await api('/admin/activity')}catch(e){$('#lvrun').innerHTML=`<div class="mu">${esc(e.message)}</div>`;return}
+  $('#lvcnt').textContent=`${d.running.length} running · ${d.online.length} online`+(d.other==='unreachable'?' · other server not answering':'');
+  $('#lvrun').innerHTML=d.running.length?d.running.map(r=>`<div style="padding:6px 0;border-bottom:1px solid var(--line)"><b style="font-weight:600">${esc(r.who)}</b> <span class="mu small">· ${r.secs}s · ${esc(r.server)}</span><div class="mono small mu">${esc(r.header)}</div></div>`).join(''):'<div class="mu small">Nobody is searching right now.</div>';
+  $('#lvtable tbody').innerHTML=d.recent.map(r=>`<tr><td class="mu small mono">${ago(r.ago)}</td><td data-l="Who"><b style="font-weight:600">${esc(r.who)}</b></td><td data-l="Header" class="small mono">${esc(r.header)}</td>
+    <td data-l="Result">${resBadge(r.result)}${r.link?`<div class="small"><a href="${esc(r.link)}" target="_blank" rel="noopener">${esc(host(r.link))}</a></div>`:''}</td><td data-l="Time" class="mu small mono">${r.secs==null?'':r.secs+'s'}</td></tr>`).join('')||'<tr><td colspan=5 class="mu">No searches since the servers started.</td></tr>'}
+let UDAYS=1;$$('#useg button').forEach(b=>b.onclick=()=>{UDAYS=+b.dataset.d;$$('#useg button').forEach(x=>x.classList.toggle('on',x===b));loadUsage()});
+let UREQ=0;
+async function loadUsage(){
+  $('#ucnt').textContent='Reading the search log…';const me=++UREQ;
+  let d;try{d=await api('/admin/usage?days='+Math.max(UDAYS,1))}catch(e){if(me===UREQ)$('#ucnt').textContent=e.message;return}
+  if(me!==UREQ)return;   // a newer choice (Today / 7 / 30 days) is on its way
+  $('#ucnt').textContent=`${d.total.toLocaleString()} searches by ${d.people.length} people since ${d.since}`;
+  const days=d.daily.slice(-30),mx=Math.max(1,...days.map(x=>x.n));
+  $('#ubars').innerHTML=days.map(x=>`<i style="height:${Math.round(100*x.n/mx)}%" title="${esc(x.date)}: ${x.n}"></i>`).join('');
+  $('#ubarlbl').textContent=days.length?`${days[0].date} … ${days[days.length-1].date} · busiest day ${mx}`:'';
+  const pct=(a,n)=>n?Math.round(100*a/n)+'%':'—';
+  $('#utable tbody').innerHTML=d.people.map(u=>`<tr><td><b style="font-weight:600">${esc(u.name)}</b></td><td data-l="Searches" class="mono">${u.n}</td><td data-l="Today" class="mono">${u.today}</td>
+    <td data-l="Found" class="mono">${u.found} <span class="mu2">(${pct(u.found,u.n)})</span></td><td data-l="Pick one" class="mono">${u.pick} <span class="mu2">(${pct(u.pick,u.n)})</span></td>
+    <td data-l="Not found" class="mono">${u.none} <span class="mu2">(${pct(u.none,u.n)})</span></td><td data-l="Median time" class="mono">${u.median_s==null?'—':u.median_s+'s'}</td><td data-l="Last search" class="mu small mono">${esc(u.last)}</td></tr>`).join('')||'<tr><td colspan=8 class="mu">No searches in this period.</td></tr>'}
+async function loadAnn(){let d;try{d=await api('/announce')}catch(e){return}const a=d.announce;
+  $('#anncur').innerHTML=a?`Showing now${a.until?` until ${esc(new Date(a.until).toLocaleString())}`:' until cleared'}: <b>${esc(a.text)}</b>`:'No message is showing.';if(a){$('#anntxt').value=a.text;$('#annlvl').value=a.level||'info'}}
+$('#annpub').onclick=async()=>{const t=$('#anntxt').value.trim();if(!t){$('#annmsg').className='msg err';$('#annmsg').textContent='Write a message first';return}
+  try{const r=await post('/admin/announce',{text:t,level:$('#annlvl').value,hours:+$('#annhrs').value});try{localStorage.removeItem('pt-ann-hidden')}catch(e){}showAnn(r.announce);$('#annmsg').className='msg ok';$('#annmsg').textContent='Published: everyone sees it within a minute';loadAnn()}
+  catch(e){$('#annmsg').className='msg err';$('#annmsg').textContent=e.message}};
+$('#annclr').onclick=async()=>{try{await post('/admin/announce',{text:''});showAnn(null);$('#anntxt').value='';$('#annmsg').className='msg ok';$('#annmsg').textContent='Cleared';loadAnn()}catch(e){$('#annmsg').className='msg err';$('#annmsg').textContent=e.message}};
+/* the sheet goes straight to the main server (it is too big for the way through Vercel) */
+async function nasCall(path,opts={}){const r=await fetch(NAS_DIRECT+path,{credentials:'same-origin',cache:'no-store',...opts,headers:{...hdrs(!(opts.body instanceof Blob)),...(opts.headers||{})}});
+  let j={};try{j=await r.json()}catch(e){}if(!r.ok)throw new Error(j.detail||('Server error '+r.status));return j}
+let SHT=0;
+async function loadSheet(){clearTimeout(SHT);let d;try{d=await nasCall('/admin/sheet')}catch(e){$('#shstate').innerHTML=`<div class="note">${ic('alert')}<span>${esc(e.message)} (the sheet is read on the main server)</span></div>`;return}
+  const busy=d.status==='planning'||d.status==='applying';
+  const word={idle:'No sheet read since the server started.',planning:'Reading the sheet…',ready:'Read. Check the spellings below, then Apply.',applying:'Learning…',done:'Done.',error:'Stopped with an error (see below).'}[d.status]||d.status;
+  let h=`<div style="margin-bottom:8px"><b>${esc(word)}</b>${d.at?` <span class="mu small">· sheet from ${esc(d.at.replace('T',' '))}</span>`:''}${d.rows?` <span class="mu small">· ${d.rows.toLocaleString()} rows</span>`:''}</div>`;
+  if(d.status==='ready'){
+    h+=d.pairs.length?`<div class="mu small" style="margin-bottom:6px">${d.pairs.length} new spelling${d.pairs.length>1?'s':''}: the site's name = the header's name. Untick a pair that joins two different teams.</div>
+      <div class="pairs">${d.pairs.map((p,i)=>`<label><input type="checkbox" checked data-i="${i}"><span>${esc(p[0])}</span><span class="eq">=</span><span>${esc(p[1])}</span></label>`).join('')}</div>`:'<div class="mu small">No new spellings in this sheet.</div>';
+    h+=`<div class="factions" style="flex-wrap:wrap"><label class="small" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="shacc" checked>Refresh the Accuracy tab afterwards</label><button class="btn2 pri" id="shapply">${ic('check')}Apply</button></div>`}
+  if(d.result)h+=`<div class="note" style="background:var(--ok-bg);color:var(--tx);margin-top:8px">${ic('check')}<span>${d.result.spellings} spellings learned${d.result.blocked?`, ${d.result.blocked} blocked`:''} · websites for ${d.result.competitions} competitions and ${d.result.teams} teams${d.result.accuracy?` · accuracy ${esc(d.result.accuracy)}`:''}</span></div>`;
+  if(d.log.length)h+=`<details ${busy||d.status==='error'?'open':''} style="margin-top:10px"><summary class="small mu">Details</summary><div class="alog">${esc(d.log.join('\n'))}</div></details>`;
+  $('#shstate').innerHTML=h;$('#shup').disabled=busy;
+  const ap=$('#shapply');if(ap)ap.onclick=async()=>{const block=$$('.pairs input:not(:checked)').map(c=>d.pairs[+c.dataset.i]);
+    if(!confirm(`Learn ${d.pairs.length-block.length} spelling${d.pairs.length-block.length===1?'':'s'}${block.length?` and block ${block.length}`:''}?`))return;
+    try{await nasCall('/admin/sheet/apply',{method:'POST',body:JSON.stringify({block,accuracy:$('#shacc').checked})});loadSheet()}catch(e){toast(e.message,'err')}};
+  if(busy&&$('#v-admin').classList.contains('on')&&APANE==='sheet')SHT=setTimeout(loadSheet,3000)}
+$('#shup').onclick=async()=>{const f=$('#shfile').files[0];$('#shmsg').className='msg';$('#shmsg').textContent='';
+  if(!f){$('#shmsg').className='msg err';$('#shmsg').textContent='Choose the .xlsx file first';return}
+  $('#shmsg').textContent=`Uploading ${Math.round(f.size/1048576)} MB…`;
+  try{await nasCall('/admin/sheet',{method:'POST',body:f,headers:{'content-type':'application/octet-stream'}});$('#shmsg').textContent='';loadSheet()}
+  catch(e){$('#shmsg').className='msg err';$('#shmsg').textContent=e.message}};
 async function loadAdmin(){
   let d;try{d=await api('/admin/users')}catch(e){$('#atable tbody').innerHTML=`<tr><td colspan=4 class="mu">${esc(e.message)}</td></tr>`;return}
   const st=u=>u.blocked?'<span class="badge no">Blocked</span>':u.online?'<span class="badge ok">Online now</span>':'<span class="badge mu">Not online</span>';
