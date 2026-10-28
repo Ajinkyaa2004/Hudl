@@ -16,8 +16,9 @@ app = FastAPI(title="PuckTrace")
 KB = lookup.load_kb()
 
 # ---------------------------------------------------------------- access
-# Set APP_PASSWORD on a deployed server: every /api call then needs the session cookie that
-# /api/login gives for the right password. Locally (no APP_PASSWORD) everything is open.
+# Set APP_PASSWORD on a deployed server: every /api call then needs a session. People sign in with
+# their own name and password (backend/users.py, data/users.json); APP_PASSWORD with no name gives
+# the service session the servers and the backup job use. Locally (no APP_PASSWORD) everything is open.
 import hashlib as _hl, hmac as _hm, os as _os, time as _time
 from fastapi import Request
 from fastapi.responses import JSONResponse
@@ -28,7 +29,17 @@ OPEN = {"/api/login", "/api/session", "/api/healthz"}
 
 
 def _token() -> str:
-    return _hm.new(_SECRET, b"pucktrace-session:" + PASSWORD.encode(), _hl.sha256).hexdigest()
+    """The service session: server to server, the backup job and uploads (never given to a page)."""
+    return _hm.new(_SECRET, b"pucktrace-service:" + PASSWORD.encode(), _hl.sha256).hexdigest()
+
+
+def _given(request: Request) -> str:
+    return request.cookies.get("pt_session", "") or request.headers.get("x-pt-session", "")
+
+
+def _user(request: Request) -> "dict | None":
+    from . import users as _users
+    return _users.user_of(_SECRET, _given(request))
 
 
 def _signed_in(request: Request) -> bool:
@@ -36,8 +47,7 @@ def _signed_in(request: Request) -> bool:
     (the page calling the NAS straight from the browser, where cookies of another site don't go)."""
     if not PASSWORD:
         return True
-    given = request.cookies.get("pt_session", "") or request.headers.get("x-pt-session", "")
-    return _hm.compare_digest(given, _token())
+    return _hm.compare_digest(_given(request), _token()) or _user(request) is not None
 
 
 # the page may call this server straight from the browser (not only through Vercel), so Vercel's
@@ -62,6 +72,9 @@ async def _guard(request: Request, call_next):
         r = _R(status_code=204)
     elif PASSWORD and request.url.path.startswith("/api/") and request.url.path not in OPEN and not _signed_in(request):
         r = JSONResponse({"detail": "Sign in required"}, status_code=401)
+    elif PASSWORD and request.url.path.startswith("/api/admin/") and not (
+            _hm.compare_digest(_given(request), _token()) or (_user(request) or {}).get("admin")):
+        r = JSONResponse({"detail": "Only an admin can do this"}, status_code=403)
     else:
         r = await call_next(request)
     r.headers["x-pt-server"] = SERVER
@@ -100,9 +113,11 @@ def _online() -> list:
 
 
 @app.post("/api/presence")
-def presence(inp: PresenceIn):
-    """The page calls this every minute with the user's name; the answer is everyone online."""
-    n = _clean_name(inp.name)
+def presence(inp: PresenceIn, request: Request):
+    """The page calls this every minute; the answer is everyone online. The name is the signed-in
+    account's (the typed one only on a server without accounts)."""
+    u = _user(request) if PASSWORD else None
+    n = u["name"] if u else _clean_name(inp.name) if not PASSWORD else ""
     if n:
         _PRESENT[n] = _time.time()
     return dict(online=_online())
@@ -112,11 +127,19 @@ def presence(inp: PresenceIn):
 def login(inp: LoginIn, request: Request):
     if not PASSWORD:
         return dict(ok=True)
-    if not _hm.compare_digest(inp.password.encode(), PASSWORD.encode()):
-        raise HTTPException(401, "Wrong password")
-    r = JSONResponse(dict(ok=True, token=_token()))
+    from . import users as _users
+    if not inp.name.strip():
+        # no name: the service sign-in (servers, the backup job, uploads); the page always sends a name
+        if not _hm.compare_digest(inp.password.encode(), PASSWORD.encode()):
+            raise HTTPException(401, "Wrong password")
+        return dict(ok=True, token=_token())
+    u = _users.verify(inp.name, inp.password)
+    if not u:
+        raise HTTPException(401, "Wrong name or password")
+    tok = _users.token_for(_SECRET, u)
+    r = JSONResponse(dict(ok=True, token=tok, name=u["name"], admin=bool(u.get("admin"))))
     secure = request.headers.get("x-forwarded-proto", request.url.scheme) == "https"
-    r.set_cookie("pt_session", _token(), max_age=30 * 86400, httponly=True, samesite="lax", secure=secure)
+    r.set_cookie("pt_session", tok, max_age=30 * 86400, httponly=True, samesite="lax", secure=secure)
     return r
 
 
@@ -129,14 +152,15 @@ def logout():
 
 @app.get("/api/session")
 def session(request: Request):
-    ok = _signed_in(request)
-    # a signed-in page gets the token too, to call the NAS directly with it (pages signed in before this)
-    return dict(required=bool(PASSWORD), ok=ok, **({"token": _token()} if ok and PASSWORD else {}))
+    u = _user(request) if PASSWORD else None
+    # a signed-in page gets its token too, to call the NAS directly with it; only a person's session counts here
+    return dict(required=bool(PASSWORD), ok=bool(u) or not PASSWORD,
+                **({"token": _given(request), "name": u["name"], "admin": bool(u.get("admin"))} if u else {}))
 
 
 # private data files the servers receive by upload and keep in step with each other; the GameSheet
 # team list lets the roster lookup find GameSheet teams whose game wasn't found
-DATA_FILES = ("knowledge.json", "aliases_learned.json", "sheet_log.json", "gamesheet_teams.json")
+DATA_FILES = ("knowledge.json", "aliases_learned.json", "sheet_log.json", "gamesheet_teams.json", "users.json")
 
 
 @app.post("/api/admin/upload")
@@ -875,11 +899,12 @@ async def _search_with_retry(header: str, rosters: bool) -> dict:
 
 
 @app.post("/api/search/start")
-async def search_start(inp: SearchIn, rosters: bool = False):
+async def search_start(inp: SearchIn, request: Request, rosters: bool = False):
     if not lookup.parse_header(inp.header):
         raise HTTPException(400, "Could not read this header. Use: Team 1 vs Team 2 | Competition | YYYY-MM-DD")
     h = inp.header.strip()
-    who = inp.name
+    u = _user(request) if PASSWORD else None
+    who = u["name"] if u else inp.name          # the search log names the signed-in account
     return _job_start(f"search|{rosters}|{h}", lambda: _search_with_retry(h, rosters),
                       on_done=lambda res, secs: _after_search(who, h, res, secs))
 

@@ -617,8 +617,8 @@ kbd{font:11px var(--mono);border:1px solid var(--line2);border-bottom-width:2px;
 <div class="login" id="login"><form class="lcard" id="lform">
   <div class="brand" style="justify-content:center;padding:0 0 6px;font-size:22px"><svg width="34" height="34"><use href="#i-puck"/></svg><span>Puck<b>Trace</b></span></div>
   <div class="mu small" style="text-align:center;margin-bottom:20px">Match reports and rosters for RTT</div>
-  <input class="f" id="lname" type="text" placeholder="Your name" autocomplete="name" maxlength="40" style="margin-bottom:8px">
-  <input class="f" id="lpw" type="password" placeholder="Team password" autocomplete="current-password">
+  <input class="f" id="lname" type="text" placeholder="Your name" autocomplete="username" maxlength="40" style="margin-bottom:8px">
+  <input class="f" id="lpw" type="password" placeholder="Your password" autocomplete="current-password">
   <button class="btn" type="submit" style="width:100%;margin-top:12px">Sign in</button>
   <div class="msg err" id="lmsg" style="margin-top:10px;text-align:center"></div>
   <div class="lby"><a href="https://actorix.in" target="_blank" rel="noopener" title="Actorix website" style="display:inline-flex;align-items:center;gap:6px"><span class="axlogo" role="img" aria-label="Actorix logo" style="width:18px;height:18px"></span>Built by <b>Actorix</b> · Mumbai, India</a><br><a href="mailto:actorix.business@gmail.com">actorix.business@gmail.com</a> · <a href="tel:+919136433771">+91 91364 33771</a></div>
@@ -764,12 +764,13 @@ let MY_NAME=null;try{MY_NAME=localStorage.getItem('pt-name')||null}catch(e){}
 function showOnline(list){const e=$('#sst-online');if(!e)return;if(!list||!list.length){e.textContent='';return}
   const names=list.map(n=>n===MY_NAME?`${n} (you)`:n);e.textContent=`Online now (${list.length}): ${names.join(', ')}`}
 async function heartbeat(){if(!MY_NAME||$('#login').classList.contains('on'))return;try{const r=await post('/presence',{name:MY_NAME});showOnline(r.online)}catch(e){}}
-/* needPw=false: already signed in, only the name is missing (first visit after this was added) */
-function showLogin(needPw=true){$('#lpw').style.display=needPw?'':'none';$('#lname').value=MY_NAME||'';$('#login').classList.add('on');setTimeout(()=>(MY_NAME&&needPw?$('#lpw'):$('#lname')).focus(),50)}
+/* each person signs in with their own name and password; the server says whose session it is */
+function showLogin(){$('#lname').value=MY_NAME||'';$('#login').classList.add('on');setTimeout(()=>(MY_NAME?$('#lpw'):$('#lname')).focus(),50)}
+function setMe(n){if(!n)return;MY_NAME=n;try{localStorage.setItem('pt-name',n)}catch(e){}}
 $('#lform').onsubmit=async e=>{e.preventDefault();$('#lmsg').textContent='';
   const name=$('#lname').value.trim().replace(/\s+/g,' ').slice(0,40);if(!name){$('#lmsg').textContent='Please enter your name';$('#lname').focus();return}
-  try{if($('#lpw').style.display!=='none')await post('/login',{password:$('#lpw').value,name});
-    MY_NAME=name;try{localStorage.setItem('pt-name',name)}catch(e){}
+  if(!$('#lpw').value){$('#lmsg').textContent='Please enter your password';$('#lpw').focus();return}
+  try{const j=await post('/login',{password:$('#lpw').value,name});setMe(j.name||name);
     $('#login').classList.remove('on');$('#lpw').value='';stats();heartbeat();if(q.value.trim()&&!CUR)find()}
   catch(err){$('#lmsg').textContent=err.message||'Wrong password'}};
 // a refresh starts clean: no header is restored or searched again
@@ -782,7 +783,7 @@ const _wt=setTimeout(()=>wake(1),2500);   // a slow first answer: say so
    ask a same-site way for the token once, so nobody has to type the password again */
 const tokenOnce=TOKEN||NAS_DIRECT==='/api'?Promise.resolve():Promise.any(['/api-backup','/api'].map(b=>
   fetch(b+'/session',{credentials:'same-origin',cache:'no-store'}).then(r=>r.json()).then(j=>{if(!j.token)throw 0;setToken(j.token)}))).catch(()=>{});
-Promise.all([pingNas(15000),tokenOnce]).then(([n])=>{if(!(n&&n.ok&&n.knowledge_base)){API_BASE='/api-backup';API_BACKUP_UNTIL=Date.now()+300000;noteSwitch('the page opened and found no NAS')}checkServers(n);return api('/session')}).then(s=>{clearTimeout(_wt);wake(0);if(s.required&&!s.ok)showLogin();else if(!MY_NAME)showLogin(false);else{heartbeat();if(Q0){q.value=Q0;chips(Q0);find()}}}).catch(()=>{clearTimeout(_wt);wake(0)});
+Promise.all([pingNas(15000),tokenOnce]).then(([n])=>{if(!(n&&n.ok&&n.knowledge_base)){API_BASE='/api-backup';API_BACKUP_UNTIL=Date.now()+300000;noteSwitch('the page opened and found no NAS')}checkServers(n);return api('/session')}).then(s=>{clearTimeout(_wt);wake(0);if(s.required&&!s.ok)showLogin();else{setMe(s.name);heartbeat();if(Q0){q.value=Q0;chips(Q0);find()}}}).catch(()=>{clearTimeout(_wt);wake(0)});
 
 /* ---------- theme ---------- */
 function themeLabel(){$$('.tlabel').forEach(l=>l.textContent=document.documentElement.dataset.theme==='dark'?'Dark':'Light')}
