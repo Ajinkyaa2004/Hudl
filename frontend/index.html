@@ -1159,8 +1159,8 @@ async function loadSaved(){
 /* ---------- admin: users ---------- */
 /* a new password is shown once, here, for the admin to pass on; PuckTrace keeps only its hash */
 function showPw(name,pw,what){$('#ares').innerHTML=`<div class="note" style="margin-top:14px;background:var(--ok-bg);color:var(--tx)">${ic('check')}<div><b>${esc(what)} for ${esc(name)}.</b> Give them these now: the password is shown only once.
-  <div class="mono" style="margin:8px 0;font-size:14px">Name: <b>${esc(name)}</b><br>Password: <b>${esc(pw)}</b></div>
-  <button class="btn2" data-copy="${esc(`PuckTrace sign-in\nName: ${name}\nPassword: ${pw}\nhttps://pucktrace.actorix.in`)}">${ic('copy')}Copy name and password</button></div></div>`;
+  <div class="mono" style="margin:8px 0;font-size:14px">Username: <b>${esc(name)}</b><br>Password: <b>${esc(pw)}</b></div>
+  <button class="btn2" data-copy="${esc(`PuckTrace sign-in\nUsername: ${name}\nPassword: ${pw}\nhttps://pucktrace.actorix.in`)}">${ic('copy')}Copy username and password</button></div></div>`;
   $$('#ares [data-copy]').forEach(b=>b.onclick=()=>copy(b.dataset.copy,b))}
 $('#aform').onsubmit=async e=>{e.preventDefault();$('#amsg').className='msg';$('#amsg').textContent='';
   try{const r=await post('/admin/users',{name:$('#aname').value,password:$('#apw').value});$('#aname').value='';$('#apw').value='';showPw(r.name,r.password,'Account created');loadAdmin()}
