@@ -38,13 +38,14 @@ def _given(request: Request) -> str:
 
 
 def _user(request: Request) -> "dict | None":
+    """The person signed in: their session comes only in the x-pt-session header, from the page's
+    own tab storage, so closing the tab signs them out (no cookie keeps them signed in)."""
     from . import users as _users
-    return _users.user_of(_SECRET, _given(request))
+    return _users.user_of(_SECRET, request.headers.get("x-pt-session", ""))
 
 
 def _signed_in(request: Request) -> bool:
-    """The session cookie (pages on the same site), or the same value in the x-pt-session header
-    (the page calling the NAS straight from the browser, where cookies of another site don't go)."""
+    """A person's session (header), or the service session (header or cookie: the servers' sync)."""
     if not PASSWORD:
         return True
     return _hm.compare_digest(_given(request), _token()) or _user(request) is not None
@@ -139,8 +140,7 @@ def login(inp: LoginIn, request: Request):
     _users.note_login(u["name"])
     tok = _users.token_for(_SECRET, u)
     r = JSONResponse(dict(ok=True, token=tok, name=u["name"], admin=bool(u.get("admin"))))
-    secure = request.headers.get("x-forwarded-proto", request.url.scheme) == "https"
-    r.set_cookie("pt_session", tok, max_age=30 * 86400, httponly=True, samesite="lax", secure=secure)
+    r.delete_cookie("pt_session")         # a cookie from before (30 days) no longer signs anyone in
     return r
 
 
@@ -453,7 +453,7 @@ def session(request: Request):
     u = _user(request) if PASSWORD else None
     # a signed-in page gets its token too, to call the NAS directly with it; only a person's session counts here
     return dict(required=bool(PASSWORD), ok=bool(u) or not PASSWORD,
-                **({"token": _given(request), "name": u["name"], "admin": bool(u.get("admin"))} if u else {}))
+                **({"token": request.headers.get("x-pt-session", ""), "name": u["name"], "admin": bool(u.get("admin"))} if u else {}))
 
 
 # private data files the servers receive by upload and keep in step with each other; the GameSheet

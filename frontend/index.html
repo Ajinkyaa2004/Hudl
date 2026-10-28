@@ -703,8 +703,10 @@ function apiBase(){if(!onNas(API_BASE)&&Date.now()>API_BACKUP_UNTIL){API_BASE=NA
 function useBackup(){if(onNas(API_BASE)){API_BASE='/api-backup';API_BACKUP_UNTIL=Date.now()+300000;noteSwitch('a search or request to the NAS failed');setTimeout(()=>checkServers(),500);return true}return false}
 function otherNasWay(){if(NAS_DIRECT==='/api')return;NAS=NAS===NAS_DIRECT?'/api':NAS_DIRECT;if(onNas(API_BASE))API_BASE=NAS}
 /* the sign-in travels as a header (a cookie of this site doesn't reach the NAS's own address) */
-let TOKEN=null;try{TOKEN=localStorage.getItem('pt-token')||null}catch(e){}
-function setToken(t){if(!t)return;TOKEN=t;try{localStorage.setItem('pt-token',t)}catch(e){}}
+/* the sign-in lives in this tab only (sessionStorage): a reload keeps it, closing the tab or the
+   browser ends it, and a new tab asks for the password again */
+let TOKEN=null;try{localStorage.removeItem('pt-token');TOKEN=sessionStorage.getItem('pt-token')||null}catch(e){}
+function setToken(t){if(!t)return;TOKEN=t;try{sessionStorage.setItem('pt-token',t)}catch(e){}}
 function hdrs(json=true){const h={};if(json)h['content-type']='application/json';if(TOKEN)h['x-pt-session']=TOKEN;return h}
 /* why the page left the NAS: the last failure on each way in is noted; a move to the backup is kept
    in this browser and reported to the NAS once it answers again (Status > Moves to the backup) */
@@ -852,10 +854,7 @@ const Q0=null;
 const _wt=setTimeout(()=>wake(1),2500);   // a slow first answer: say so
 /* before anything else, a quick look at the home NAS: when it is off, the page starts on the backup
    instead of waiting on it; the full status (both servers) follows in the footer */
-/* a page signed in before the NAS was called directly has the sign-in only as a cookie of this site:
-   ask a same-site way for the token once, so nobody has to type the password again */
-const tokenOnce=TOKEN||NAS_DIRECT==='/api'?Promise.resolve():Promise.any(['/api-backup','/api'].map(b=>
-  fetch(b+'/session',{credentials:'same-origin',cache:'no-store'}).then(r=>r.json()).then(j=>{if(!j.token)throw 0;setToken(j.token)}))).catch(()=>{});
+const tokenOnce=Promise.resolve();
 Promise.all([pingNas(15000),tokenOnce]).then(([n])=>{if(!(n&&n.ok&&n.knowledge_base)){API_BASE='/api-backup';API_BACKUP_UNTIL=Date.now()+300000;noteSwitch('the page opened and found no NAS')}checkServers(n);return api('/session')}).then(s=>{clearTimeout(_wt);wake(0);if(s.required&&!s.ok)showLogin();else{setMe(s.name,s.admin);heartbeat();if(Q0){q.value=Q0;chips(Q0);find()}}}).catch(()=>{clearTimeout(_wt);wake(0)});
 
 /* ---------- theme ---------- */
