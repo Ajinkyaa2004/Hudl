@@ -784,12 +784,20 @@ function showOnline(list){const e=$('#sst-online');if(!e)return;if(!list||!list.
 async function heartbeat(){if(!MY_NAME||$('#login').classList.contains('on'))return;try{const r=await post('/presence',{name:MY_NAME});showOnline(r.online)}catch(e){}}
 /* each person signs in with their own name and password; the server says whose session it is */
 function showLogin(){$('#lname').value=MY_NAME||'';$('#login').classList.add('on');setTimeout(()=>(MY_NAME?$('#lpw'):$('#lname')).focus(),50)}
-function setMe(n,admin){if(n){MY_NAME=n;try{localStorage.setItem('pt-name',n)}catch(e){}}$$('.adm').forEach(b=>b.hidden=!admin)}
+/* the Admin screen lives on its own address (admin.pucktrace.actorix.in): there it opens first and is
+   only for admin accounts; the team's address never shows it */
+const ADMIN_SITE=/^admin\./.test(location.hostname);
+if(ADMIN_SITE){document.title='PuckTrace Admin';const t=$('#lform .mu.small');if(t)t.textContent='Admin sign-in'}
+function setMe(n,admin){if(n){MY_NAME=n;try{localStorage.setItem('pt-name',n)}catch(e){}}$$('.adm').forEach(b=>b.hidden=!(admin&&ADMIN_SITE));
+  if(!ADMIN_SITE)return;
+  if(admin){show('admin');return}
+  $('#lmsg').textContent='This address is for admins only. The team uses pucktrace.actorix.in';$('#login').classList.add('on')}
 $('#lform').onsubmit=async e=>{e.preventDefault();$('#lmsg').textContent='';
   const name=$('#lname').value.trim().replace(/\s+/g,' ').slice(0,40);if(!name){$('#lmsg').textContent='Please enter your name';$('#lname').focus();return}
   if(!$('#lpw').value){$('#lmsg').textContent='Please enter your password';$('#lpw').focus();return}
-  try{const j=await post('/login',{password:$('#lpw').value,name});setMe(j.name||name,j.admin);
-    $('#login').classList.remove('on');$('#lpw').value='';stats();heartbeat();if(q.value.trim()&&!CUR)find()}
+  try{const j=await post('/login',{password:$('#lpw').value,name});$('#lpw').value='';
+    if(ADMIN_SITE&&!j.admin){setMe(j.name||name,false);return}   // the admin address stays closed to the team
+    $('#login').classList.remove('on');setMe(j.name||name,j.admin);stats();heartbeat();if(q.value.trim()&&!CUR)find()}
   catch(err){$('#lmsg').textContent=err.message||'Wrong password'}};
 // a refresh starts clean: no header is restored or searched again
 try{if(location.search){history.replaceState(null,'',location.pathname)}}catch(e){}

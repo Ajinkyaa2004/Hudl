@@ -53,7 +53,7 @@ def _signed_in(request: Request) -> bool:
 # the page may call this server straight from the browser (not only through Vercel), so Vercel's
 # own name lookup of the NAS, which fails for hours at a time, is not in the way
 import re as _re_cors
-CORS_ORIGIN = _re_cors.compile(r"https://pucktrace\.actorix\.in|https://[a-z0-9-]+\.vercel\.app|http://(localhost|127\.0\.0\.1)(:\d+)?")
+CORS_ORIGIN = _re_cors.compile(r"https://(admin\.)?pucktrace\.actorix\.in|https://[a-z0-9-]+\.vercel\.app|http://(localhost|127\.0\.0\.1)(:\d+)?")
 CORS_HEADERS = {"access-control-allow-methods": "GET, POST, DELETE, OPTIONS",
                 "access-control-allow-headers": "content-type, x-pt-session",
                 "access-control-max-age": "7200", "access-control-allow-private-network": "true"}
