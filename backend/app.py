@@ -136,11 +136,101 @@ def login(inp: LoginIn, request: Request):
     u = _users.verify(inp.name, inp.password)
     if not u:
         raise HTTPException(401, "Wrong name or password")
+    _users.note_login(u["name"])
     tok = _users.token_for(_SECRET, u)
     r = JSONResponse(dict(ok=True, token=tok, name=u["name"], admin=bool(u.get("admin"))))
     secure = request.headers.get("x-forwarded-proto", request.url.scheme) == "https"
     r.set_cookie("pt_session", tok, max_age=30 * 86400, httponly=True, samesite="lax", secure=secure)
     return r
+
+
+# ---------------------------------------------------------------- the Admin screen (admin accounts only:
+# every /api/admin/ route is refused to anyone else by _guard)
+
+class UserIn(BaseModel):
+    name: str = ""
+    password: str = ""        # empty: PuckTrace makes one
+
+
+class BlockIn(BaseModel):
+    blocked: bool
+
+
+def _users_changed(kicked: str = ""):
+    """After a change: the person kicked out leaves the online list, and the other server gets the
+    accounts at once (not at the next 5-minute sync), so nobody carries on there."""
+    from . import users as _users
+    if kicked:
+        for k in [k for k in _PRESENT if _users._key(k) == _users._key(kicked)]:
+            _PRESENT.pop(k, None)
+    if not DATA_FROM or not PASSWORD:
+        return
+
+    def push():
+        import httpx
+        try:
+            httpx.post(f"{DATA_FROM}/api/admin/upload", params={"name": "users.json"}, content=_users.FILE.read_bytes(),
+                       headers={"content-type": "application/json", "x-pt-session": _token()}, timeout=30)
+        except Exception as e:
+            print("[users] could not reach the other server:", e, flush=True)
+    import threading
+    threading.Thread(target=push, daemon=True).start()
+
+
+def _admin_call(fn, *a, kicked: str = "", **kw):
+    try:
+        out = fn(*a, **kw)
+    except KeyError as e:
+        raise HTTPException(404, str(e).strip("'"))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    _users_changed(kicked)
+    return out
+
+
+@app.get("/api/admin/users")
+def admin_users(request: Request):
+    from . import users as _users
+    online = {_users._key(n) for n in _online()}
+    me = (_user(request) or {}).get("name", "")
+    rows = [dict(_users.public(u), online=_users._key(u["name"]) in online, me=_users._key(u["name"]) == _users._key(me))
+            for u in _users.users().values()]
+    return dict(users=sorted(rows, key=lambda r: (not r["admin"], not r["online"], r["name"].lower())))
+
+
+@app.post("/api/admin/users")
+def admin_user_add(inp: UserIn):
+    from . import users as _users
+    pw = _admin_call(_users.add, inp.name, inp.password or None)
+    return dict(ok=True, name=_users.clean_name(inp.name), password=pw)
+
+
+@app.post("/api/admin/users/{name}/password")
+def admin_user_password(name: str, inp: UserIn):
+    from . import users as _users
+    pw = _admin_call(_users.new_password, name, inp.password or None, kicked=name)
+    return dict(ok=True, name=name, password=pw)
+
+
+@app.post("/api/admin/users/{name}/signout")
+def admin_user_signout(name: str):
+    from . import users as _users
+    _admin_call(_users.sign_out, name, kicked=name)
+    return dict(ok=True)
+
+
+@app.post("/api/admin/users/{name}/block")
+def admin_user_block(name: str, inp: BlockIn, request: Request):
+    from . import users as _users
+    _admin_call(_users.set_blocked, name, inp.blocked, me=(_user(request) or {}).get("name", ""), kicked=name if inp.blocked else "")
+    return dict(ok=True)
+
+
+@app.delete("/api/admin/users/{name}")
+def admin_user_delete(name: str, request: Request):
+    from . import users as _users
+    _admin_call(_users.delete, name, me=(_user(request) or {}).get("name", ""), kicked=name)
+    return dict(ok=True)
 
 
 @app.post("/api/logout")

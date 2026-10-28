@@ -135,6 +135,7 @@ a.btn2{color:var(--tx)}
 .btn2.pri{background:var(--ac);color:var(--on-ac);border-color:var(--ac);font-weight:600}
 .btn2.pri:hover{background:var(--ac-hi);border-color:var(--ac-hi)}
 .btn2.danger{color:var(--no);border-color:var(--no-bg)}
+.navb[hidden]{display:none!important}
 .btn2:disabled{opacity:.55;cursor:default}
 .iconbtn{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:9px;border:1px solid var(--line2);background:var(--s1);color:var(--mu);cursor:pointer;transition:color .15s,border-color .15s,background .15s;flex:none}
 .iconbtn:hover{color:var(--tx);border-color:var(--mu2);background:var(--s2)}.iconbtn:active{transform:scale(.97)}
@@ -466,6 +467,7 @@ kbd{font:11px var(--mono);border:1px solid var(--line2);border-bottom-width:2px;
       <button class="navb" data-v="sources"><svg class="ic"><use href="#i-db"/></svg>Sources</button>
       <button class="navb" data-v="vpn"><svg class="ic"><use href="#i-shield"/></svg>VPN sites</button>
       <button class="navb" data-v="status"><svg class="ic"><use href="#i-pulse"/></svg>Status</button>
+      <button class="navb adm" data-v="admin" hidden><svg class="ic"><use href="#i-users"/></svg>Admin</button>
     </nav>
     <div class="foot">
       <div class="kpis-mini" id="sidestats"></div>
@@ -483,6 +485,7 @@ kbd{font:11px var(--mono);border:1px solid var(--line2);border-bottom-width:2px;
         <button class="navb" data-v="sources">Sources</button>
         <button class="navb" data-v="vpn">VPN sites</button>
         <button class="navb" data-v="status">Status</button>
+        <button class="navb adm" data-v="admin" hidden>Admin</button>
       </nav>
       <button class="theme round" data-theme-toggle aria-label="Switch light or dark mode"><svg class="ic sm moon"><use href="#i-moon"/></svg><svg class="ic sm sun"><use href="#i-sun"/></svg></button>
     </header>
@@ -535,6 +538,20 @@ kbd{font:11px var(--mono);border:1px solid var(--line2);border-bottom-width:2px;
         <div class="sec"><div class="hd"><span class="hic"><svg class="ic sm"><use href="#i-pulse"/></svg></span><h3>Source checks</h3><span class="cnt" id="stcnt"></span></div>
           <div class="bd" style="padding-bottom:0"><div class="note" style="margin-bottom:14px"><svg class="ic sm"><use href="#i-help"/></svg><span>Each source is asked for one known game every day. A failed check means the site changed or is down, so its games may be missed until it's fixed.</span></div></div>
           <div class="scroll"><table class="tbl cards" id="sttable"><thead><tr><th>Source</th><th>Result</th><th>How</th><th>Time</th></tr></thead><tbody></tbody></table></div></div>
+      </section>
+
+      <section class="view" id="v-admin">
+        <div class="ph"><div><h1>Users</h1><p>Who can sign in to PuckTrace. Only admins see this page.</p></div><button class="btn2" id="arefresh"><svg class="ic sm"><use href="#i-refresh"/></svg>Refresh</button></div>
+        <div class="sec"><div class="hd"><span class="hic"><svg class="ic sm"><use href="#i-plus"/></svg></span><h3>Add a user</h3></div><div class="bd">
+          <form id="aform" autocomplete="off"><div class="fgrid">
+            <label for="aname">Name</label><input class="f" id="aname" maxlength="40" placeholder="e.g. Karan Sharma" autocomplete="off">
+            <label for="apw">Password</label><input class="f mono" id="apw" placeholder="Leave empty: PuckTrace makes one" autocomplete="new-password">
+          </div>
+          <div class="factions"><button class="btn2 pri" type="submit"><svg class="ic sm"><use href="#i-plus"/></svg>Create user</button><span class="msg" id="amsg"></span></div></form>
+          <div id="ares"></div>
+        </div></div>
+        <div class="sec"><div class="hd"><span class="hic"><svg class="ic sm"><use href="#i-users"/></svg></span><h3>Users</h3><span class="cnt" id="acnt"></span></div>
+          <div class="scroll"><table class="tbl cards" id="atable"><thead><tr><th>Name</th><th>Status</th><th>Last sign-in</th><th></th></tr></thead><tbody></tbody></table></div></div>
       </section>
 
       <section class="view" id="v-vpn">
@@ -592,6 +609,7 @@ kbd{font:11px var(--mono);border:1px solid var(--line2);border-bottom-width:2px;
     <button class="navb" data-v="sources"><svg class="ic"><use href="#i-db"/></svg>Sources</button>
     <button class="navb" data-v="vpn"><svg class="ic"><use href="#i-shield"/></svg>VPN</button>
     <button class="navb" data-v="status"><svg class="ic"><use href="#i-pulse"/></svg>Status</button>
+    <button class="navb adm" data-v="admin" hidden><svg class="ic"><use href="#i-users"/></svg>Admin</button>
   </nav>
 </div>
 
@@ -766,11 +784,11 @@ function showOnline(list){const e=$('#sst-online');if(!e)return;if(!list||!list.
 async function heartbeat(){if(!MY_NAME||$('#login').classList.contains('on'))return;try{const r=await post('/presence',{name:MY_NAME});showOnline(r.online)}catch(e){}}
 /* each person signs in with their own name and password; the server says whose session it is */
 function showLogin(){$('#lname').value=MY_NAME||'';$('#login').classList.add('on');setTimeout(()=>(MY_NAME?$('#lpw'):$('#lname')).focus(),50)}
-function setMe(n){if(!n)return;MY_NAME=n;try{localStorage.setItem('pt-name',n)}catch(e){}}
+function setMe(n,admin){if(n){MY_NAME=n;try{localStorage.setItem('pt-name',n)}catch(e){}}$$('.adm').forEach(b=>b.hidden=!admin)}
 $('#lform').onsubmit=async e=>{e.preventDefault();$('#lmsg').textContent='';
   const name=$('#lname').value.trim().replace(/\s+/g,' ').slice(0,40);if(!name){$('#lmsg').textContent='Please enter your name';$('#lname').focus();return}
   if(!$('#lpw').value){$('#lmsg').textContent='Please enter your password';$('#lpw').focus();return}
-  try{const j=await post('/login',{password:$('#lpw').value,name});setMe(j.name||name);
+  try{const j=await post('/login',{password:$('#lpw').value,name});setMe(j.name||name,j.admin);
     $('#login').classList.remove('on');$('#lpw').value='';stats();heartbeat();if(q.value.trim()&&!CUR)find()}
   catch(err){$('#lmsg').textContent=err.message||'Wrong password'}};
 // a refresh starts clean: no header is restored or searched again
@@ -783,7 +801,7 @@ const _wt=setTimeout(()=>wake(1),2500);   // a slow first answer: say so
    ask a same-site way for the token once, so nobody has to type the password again */
 const tokenOnce=TOKEN||NAS_DIRECT==='/api'?Promise.resolve():Promise.any(['/api-backup','/api'].map(b=>
   fetch(b+'/session',{credentials:'same-origin',cache:'no-store'}).then(r=>r.json()).then(j=>{if(!j.token)throw 0;setToken(j.token)}))).catch(()=>{});
-Promise.all([pingNas(15000),tokenOnce]).then(([n])=>{if(!(n&&n.ok&&n.knowledge_base)){API_BASE='/api-backup';API_BACKUP_UNTIL=Date.now()+300000;noteSwitch('the page opened and found no NAS')}checkServers(n);return api('/session')}).then(s=>{clearTimeout(_wt);wake(0);if(s.required&&!s.ok)showLogin();else{setMe(s.name);heartbeat();if(Q0){q.value=Q0;chips(Q0);find()}}}).catch(()=>{clearTimeout(_wt);wake(0)});
+Promise.all([pingNas(15000),tokenOnce]).then(([n])=>{if(!(n&&n.ok&&n.knowledge_base)){API_BASE='/api-backup';API_BACKUP_UNTIL=Date.now()+300000;noteSwitch('the page opened and found no NAS')}checkServers(n);return api('/session')}).then(s=>{clearTimeout(_wt);wake(0);if(s.required&&!s.ok)showLogin();else{setMe(s.name,s.admin);heartbeat();if(Q0){q.value=Q0;chips(Q0);find()}}}).catch(()=>{clearTimeout(_wt);wake(0)});
 
 /* ---------- theme ---------- */
 function themeLabel(){$$('.tlabel').forEach(l=>l.textContent=document.documentElement.dataset.theme==='dark'?'Dark':'Light')}
@@ -794,7 +812,7 @@ themeLabel();
 $$('[data-v]').forEach(b=>b.onclick=()=>show(b.dataset.v));
 function show(v){$$('[data-v]').forEach(b=>b.classList.toggle('on',b.dataset.v===v));$$('.view').forEach(s=>s.classList.toggle('on',s.id==='v-'+v));
   closePreview();window.scrollTo({top:0});
-  if(v==='saved')loadSaved();if(v==='sources')loadSources();if(v==='vpn')loadVpn();if(v==='status')loadStatus();if(v==='find'&&matchMedia('(hover:hover)').matches)$('#q').focus()}
+  if(v==='saved')loadSaved();if(v==='sources')loadSources();if(v==='vpn')loadVpn();if(v==='status')loadStatus();if(v==='admin')loadAdmin();if(v==='find'&&matchMedia('(hover:hover)').matches)$('#q').focus()}
 
 /* ---------- status ---------- */
 async function loadSwitches(){
@@ -1082,6 +1100,38 @@ async function loadSaved(){
     <td data-l="Report">${x.protocol?`<a href="${esc(x.protocol)}" target="_blank" rel="noopener">${short(x.protocol)}</a>`:'<span class="mu small">rosters only</span>'}</td>
     <td data-l="Rosters">${[x.t1link,x.t2link].filter(Boolean).map(u=>`<a href="${esc(u)}" target="_blank" rel="noopener">${short(u)}</a>`).join('<br>')}</td><td data-l="Saved" class="mu small mono">${esc(x.saved_at.replace('T',' '))}</td></tr>`).join('')||`<tr><td colspan=4><div class="note">${ic('bookmark')}<span>Nothing saved yet. Use <b>Save for next time</b> under a search result.</span></div></td></tr>`;
   $$('#htable tr.click').forEach(tr=>tr.onclick=e=>{if(e.target.closest('a'))return;q.value=tr.dataset.h;chips(q.value);show('find');find()});
+}
+
+/* ---------- admin: users ---------- */
+/* a new password is shown once, here, for the admin to pass on; PuckTrace keeps only its hash */
+function showPw(name,pw,what){$('#ares').innerHTML=`<div class="note" style="margin-top:14px;background:var(--ok-bg);color:var(--tx)">${ic('check')}<div><b>${esc(what)} for ${esc(name)}.</b> Give them these now: the password is shown only once.
+  <div class="mono" style="margin:8px 0;font-size:14px">Name: <b>${esc(name)}</b><br>Password: <b>${esc(pw)}</b></div>
+  <button class="btn2" data-copy="${esc(`PuckTrace sign-in\nName: ${name}\nPassword: ${pw}\nhttps://pucktrace.actorix.in`)}">${ic('copy')}Copy name and password</button></div></div>`;
+  $$('#ares [data-copy]').forEach(b=>b.onclick=()=>copy(b.dataset.copy,b))}
+$('#aform').onsubmit=async e=>{e.preventDefault();$('#amsg').className='msg';$('#amsg').textContent='';
+  try{const r=await post('/admin/users',{name:$('#aname').value,password:$('#apw').value});$('#aname').value='';$('#apw').value='';showPw(r.name,r.password,'Account created');loadAdmin()}
+  catch(err){$('#amsg').className='msg err';$('#amsg').textContent=err.message}};
+$('#arefresh').onclick=()=>loadAdmin();
+async function loadAdmin(){
+  let d;try{d=await api('/admin/users')}catch(e){$('#atable tbody').innerHTML=`<tr><td colspan=4 class="mu">${esc(e.message)}</td></tr>`;return}
+  const st=u=>u.blocked?'<span class="badge no">Blocked</span>':u.online?'<span class="badge ok">Online now</span>':'<span class="badge mu">Not online</span>';
+  $('#acnt').textContent=`${d.users.length} · ${d.users.filter(u=>u.online).length} online`;
+  $('#atable tbody').innerHTML=d.users.map(u=>`<tr data-n="${esc(u.name)}"><td><b style="font-weight:600">${esc(u.name)}</b>${u.me?' <span class="mu small">(you)</span>':''}${u.admin?' <span class="badge vi">Admin</span>':''}<div class="mu small">added ${esc(u.created||'—')}</div></td>
+    <td data-l="Status">${st(u)}${u.signed_out?`<div class="mu small">last kicked ${esc(u.signed_out)}</div>`:''}</td>
+    <td data-l="Last sign-in" class="mu small mono">${esc(u.last_login||'never')}</td>
+    <td>${u.admin?'':`<div class="acts" style="flex-wrap:wrap"><button class="btn2" data-a="signout">Sign out</button><button class="btn2" data-a="password">New password</button>
+      <button class="btn2" data-a="block">${u.blocked?'Unblock':'Block'}</button><button class="btn2 danger" data-a="delete">Delete</button></div>`}</td></tr>`).join('')||'<tr><td colspan=4 class="mu">No users yet.</td></tr>';
+  $$('#atable button[data-a]').forEach(b=>b.onclick=async()=>{const n=b.closest('tr').dataset.n,a=b.dataset.a,p='/admin/users/'+encodeURIComponent(n);
+    const ask={signout:`Sign ${n} out of PuckTrace now? They can sign in again with their password.`,
+      password:`Make a new password for ${n}? They are signed out at once and the old password stops working.`,
+      block:b.textContent==='Block'?`Block ${n}? They are signed out at once and can't sign in until you unblock them.`:`Unblock ${n}? They can sign in again with their password.`,
+      delete:`Delete ${n}'s account? They are signed out at once and can't sign in.`}[a];
+    if(!confirm(ask))return;
+    try{if(a==='signout'){await post(p+'/signout',{});toast(`${n} signed out`,'ok')}
+      else if(a==='password'){const r=await post(p+'/password',{});showPw(n,r.password,'New password');window.scrollTo({top:0,behavior:'smooth'})}
+      else if(a==='block'){await post(p+'/block',{blocked:b.textContent==='Block'});toast(b.textContent==='Block'?`${n} blocked`:`${n} unblocked`,'ok')}
+      else{await api(p,{method:'DELETE'});toast(`${n} deleted`,'ok')}
+      loadAdmin()}catch(e){toast(e.message,'err')}})
 }
 
 /* ---------- sources ---------- */

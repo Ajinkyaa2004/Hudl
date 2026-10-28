@@ -46,7 +46,7 @@ def _hash(password: str, salt: str) -> str:
 
 def verify(name: str, password: str) -> dict | None:
     u = users().get(_key(name))
-    if not u or not password:
+    if not u or not password or u.get("blocked"):
         return None
     return u if hmac.compare_digest(_hash(password, u["salt"]), u["hash"]) else None
 
@@ -69,11 +69,114 @@ def user_of(secret: bytes, token: str) -> dict | None:
     except Exception:
         return None
     u = users().get(_key(name))
-    return u if u and hmac.compare_digest(sig, _sig(secret, u)) else None
+    return u if u and not u.get("blocked") and hmac.compare_digest(sig, _sig(secret, u)) else None
 
 
 def _save(d: dict):
     FILE.write_text(json.dumps({"users": d}, indent=1, ensure_ascii=False))
+
+
+# ---------------------------------------------------------------- admin actions (the Admin screen)
+# A session is signed over the password hash and "v": a new password, or "v" + 1 (sign out), ends
+# every session of that person at once; a blocked person can't sign in or use a session.
+
+ALPHABET = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789"   # no 0/O, 1/l/I
+
+
+def gen_password() -> str:
+    """Easy to read out and type: three groups of four, e.g. 'Kq7m-x4Pz-9wRt'."""
+    return "-".join("".join(secrets.choice(ALPHABET) for _ in range(4)) for _ in range(3))
+
+
+def clean_name(name: str) -> str:
+    return re.sub(r"\s+", " ", (name or "").strip())[:40]
+
+
+def public(u: dict) -> dict:
+    return {k: u.get(k) for k in ("name", "admin", "blocked", "created", "last_login", "signed_out")}
+
+
+def _now() -> str:
+    """India time, whatever the server's own clock zone is."""
+    import datetime
+    return (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=5, minutes=30)).strftime("%Y-%m-%d %H:%M")
+
+
+def _get(d: dict, name: str) -> dict:
+    u = d.get(_key(name))
+    if not u:
+        raise KeyError(f"No user called {name}")
+    return u
+
+
+def add(name: str, password: str | None = None) -> str:
+    name = clean_name(name)
+    if not name:
+        raise ValueError("Give the user a name")
+    d = dict(users())
+    if _key(name) in d:
+        raise ValueError(f"{d[_key(name)]['name']} already exists")
+    pw = password or gen_password()
+    if len(pw) < 6:
+        raise ValueError("The password needs at least 6 characters")
+    salt = secrets.token_hex(16)
+    d[_key(name)] = dict(name=name, salt=salt, hash=_hash(pw, salt), admin=False, v=1, created=_now())
+    _save(d)
+    return pw
+
+
+def new_password(name: str, password: str | None = None) -> str:
+    d = dict(users())
+    u = dict(_get(d, name))
+    pw = password or gen_password()
+    if len(pw) < 6:
+        raise ValueError("The password needs at least 6 characters")
+    u["salt"] = secrets.token_hex(16)
+    u["hash"] = _hash(pw, u["salt"])
+    u["v"] = int(u.get("v", 1)) + 1
+    u["signed_out"] = _now()
+    d[_key(name)] = u
+    _save(d)
+    return pw
+
+
+def sign_out(name: str):
+    d = dict(users())
+    u = dict(_get(d, name))
+    u["v"] = int(u.get("v", 1)) + 1
+    u["signed_out"] = _now()
+    d[_key(name)] = u
+    _save(d)
+
+
+def set_blocked(name: str, blocked: bool, me: str = ""):
+    d = dict(users())
+    u = dict(_get(d, name))
+    if blocked and (_key(name) == _key(me) or u.get("admin")):
+        raise ValueError("An admin account can't be blocked")
+    u["blocked"] = bool(blocked)
+    if blocked:
+        u["v"] = int(u.get("v", 1)) + 1
+        u["signed_out"] = _now()
+    d[_key(name)] = u
+    _save(d)
+
+
+def delete(name: str, me: str = ""):
+    d = dict(users())
+    u = _get(d, name)
+    if _key(name) == _key(me) or u.get("admin"):
+        raise ValueError("An admin account can't be deleted here")
+    d.pop(_key(name))
+    _save(d)
+
+
+def note_login(name: str):
+    d = dict(users())
+    u = d.get(_key(name))
+    if u:
+        d[_key(name)] = dict(u, last_login=_now())
+        _save(d)
 
 
 def main():
