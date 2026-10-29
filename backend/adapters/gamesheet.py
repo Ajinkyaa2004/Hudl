@@ -87,6 +87,8 @@ def clean(n: str) -> str:
     """GameSheet repeats the age group ("Cleveland Barons 16U 16U") and appends the division
     ("Jr Sun Devils 11U Elite 12U" is an 11U team in the 12U division)."""
     n = re.sub(r"\s+", " ", n or "").strip()
+    # New England girls' leagues write the age before the division: "Islanders HC 16 Major 1" is 16U
+    n = re.sub(r"\b(\d{2})\s+(?:Major|Minor|Tier|FS|Elite|Select)\s+\d\b", r"\1U", n, flags=re.I)
     n = re.sub(r"\b(\d{1,2}U)\s+\1\b", r"\1", n)
     n = re.sub(r"\s*-?\s*\b(Pool|Group)\s+\w+\s*$", "", n).strip()
     if len(re.findall(r"\b\d{1,2}U\b|\bU\d{1,2}\b", n, re.I)) >= 2:

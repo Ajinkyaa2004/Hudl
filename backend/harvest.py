@@ -17,6 +17,44 @@ DATA = Path(__file__).resolve().parent.parent / "data"
 TEST_SEASON = re.compile(r"\b(test|testing|demo)\b|\bzz+-", re.I)
 
 
+def fix_start_utc(games: list[dict]) -> int:
+    """GameSheet's by-day list keeps a moved game's old UTC start next to its new local time
+    (Ohio AAA v Cleveland Barons: local 14:50, UTC 12:00), so the game looked hours away from the
+    header and was never answered. A UTC start that no North American clock gives (UTC equal to
+    local time, behind it, or an hour ahead) is worked out again from the local time with the
+    offset of the season's other games within 10 days (summer time included); with none to go by
+    it is dropped rather than kept wrong. Seasons on European clocks are left alone."""
+    import collections
+
+    def off(g):
+        try:
+            return (datetime.datetime.fromisoformat(g["start_utc"]) - datetime.datetime.fromisoformat(f"{g['date']}T{g['time']}")).total_seconds() / 3600
+        except Exception:
+            return None
+    ok = lambda o: o is not None and 2.5 <= o <= 11
+    by = collections.defaultdict(list)
+    for g in games:
+        o = off(g)
+        if ok(o):
+            by[g.get("sid")].append((g["date"], o))
+    fixed = 0
+    for g in games:
+        o = off(g)
+        if o is None or ok(o):
+            continue
+        season = by.get(g.get("sid"), [])
+        if not season:
+            continue                     # no game of the season on a North American clock (Europe): leave it
+        near = [x for d, x in season if abs((datetime.date.fromisoformat(d) - datetime.date.fromisoformat(g["date"])).days) <= 10]
+        if near:
+            mode = collections.Counter(round(x * 2) / 2 for x in near).most_common(1)[0][0]
+            g["start_utc"] = (datetime.datetime.fromisoformat(f"{g['date']}T{g['time']}") + datetime.timedelta(hours=mode)).strftime("%Y-%m-%dT%H:%M")
+        else:
+            g["start_utc"] = None
+        fixed += 1
+    return fixed
+
+
 def gamesheet_rows(games: list[dict]) -> list[dict]:
     from .adapters.gamesheet import clean
     out = []
@@ -83,6 +121,7 @@ async def harvest_gamesheet(log=print) -> dict:
         for g in fs:
             if g.get("association"):
                 g["season_name"] = f"{g['season_name'].strip()} » {g['association'].strip()}"
+        moved = fix_start_utc(fs)
         rows = gamesheet_rows(fs)
         with gameindex._lock:      # these rows carry no score: keep the one already known
             c = gameindex.conn()
@@ -93,7 +132,7 @@ async def harvest_gamesheet(log=print) -> dict:
         for r in rows:
             r["score"] = r["score"] or have.get(r["url"])
         n += gameindex.add_games(rows)
-        log(f"GameSheet by day: {len(rows)} games from {len({g['sid'] for g in fs})} more seasons")
+        log(f"GameSheet by day: {len(rows)} games from {len({g['sid'] for g in fs})} more seasons, {moved} start times corrected")
         with gameindex._lock:      # test seasons listed before they were filtered out
             tests = [u for u, lg in gameindex.conn().execute("select url, league from games where source = 'GameSheet'").fetchall()
                      if TEST_SEASON.search(lg or "")]
