@@ -3,7 +3,8 @@ other subdomains), Statewide Florida Hockey League (sfhlhockey.com), Boston Brea
 (boston-breakout.kreezee-sports.com). Each site has a public JSON API:
   api.kreezee.com/api/solution/{sid}/config            -> defaultSeasonId
   {host}/api/v2/solutions/{sid}/seasons/{season}/matches/dates?startDate=..&endDate=..
-Report: {host}/scores/game-{id} (same id as handlers/GameSheet.ashx?gameId={id}).
+Report: {host}/handlers/GameSheet.ashx?gameId={id}, the official game sheet as a PDF (the game page
+{host}/scores/game-{id} shows nothing on some sites, sfhlhockey.com among them).
 Sites are listed in data/kreezee_sites.json."""
 from __future__ import annotations
 import asyncio, datetime, json, re
@@ -18,7 +19,14 @@ from .na_util import local_date, clock24, swap_words, division_age, age_close, s
 DATA = Path(__file__).resolve().parent.parent.parent / "data" / "kreezee_sites.json"
 CONFIG = "https://api.kreezee.com/api/solution/{sid}/config"
 MATCHES = "https://{host}/api/v2/solutions/{sid}/seasons/{season}/matches/dates?startDate={a}%2000:00:00&endDate={b}%2023:59:59"
-REPORT = "https://{host}/scores/game-{gid}"
+REPORT = "https://{host}/handlers/GameSheet.ashx?gameId={gid}"
+_OLD_LINK = re.compile(r"^(https?://[^/]+)/scores/game-(\d+)/?$")
+
+
+def fix_link(url: str) -> str:
+    """A Kreezee game-page link remembered before (the game list, saved answers) -> its PDF sheet."""
+    m = _OLD_LINK.match(url or "")
+    return f"{m.group(1)}/handlers/GameSheet.ashx?gameId={m.group(2)}" if m else url
 PREFIX = re.compile(r"^\d{2}[:\-][0-9A-Za-z]+-\s*")          # '26:14ABK-TBHC Blue' -> 'TBHC Blue'
 GENERIC = re.compile(r"usa hockey|hockey canada|friendl|test tag|\b1\dU\b|\bu1\d\b", re.I)
 

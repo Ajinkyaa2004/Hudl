@@ -11,6 +11,11 @@ import re
 from .base import Adapter, header_utc
 
 LEAGUES = [
+    # the women's entry first: league_for takes the first match
+    dict(match=re.compile(r"Alberta Colleges Athletic Conference.*\((?:W|F)\)|\bACAC\b.*(?:women|female|\(W\))", re.I), site="acac.ab.ca",
+         name="ACAC women's hockey", url="https://www.acac.ab.ca/sports/wice/2026-27/schedule", tz="America/Edmonton", tz_name="Alberta"),
+    dict(match=re.compile(r"Alberta Colleges Athletic Conference|\bACAC\b", re.I), site="acac.ab.ca",
+         name="ACAC men's hockey", url="https://www.acac.ab.ca/sports/mice/2026-27/schedule", tz="America/Edmonton", tz_name="Alberta"),
     dict(match=re.compile(r"\bRSEQ\b", re.I), site="scolaire.rseqhockey.com", name="RSEQ hockey scolaire",
          url="https://scolaire.rseqhockey.com/fr/-rseq/schedule-stats-standings", tz="America/Toronto", tz_name="Québec",
          pdf="https://pdf.play.spordle.com/game/"),

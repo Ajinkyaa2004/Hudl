@@ -354,8 +354,10 @@ async def search_full(header, kb, rosters=True):
     from . import hokejcz
     if mem and mem["confirmed"]:
         # you saved this game's report before: answer at once
+        from .adapters.kreezee import fix_link
+        url = fix_link(mem["url"])            # a link saved in an older form (Kreezee game page -> its PDF sheet)
         auto = dict(verdict="found", candidates=[], adapters=[], seconds=0, fast=True, remembered=True,
-                    best=dict(url=mem["url"], site=domain(mem["url"]), source=mem["source"] or "saved", home=p["t1"], away=p["t2"], date=p["date"],
+                    best=dict(url=url, site=domain(url), source=mem["source"] or "saved", home=p["t1"], away=p["t2"], date=p["date"],
                               confidence=1.0, team_scores=[1.0, 1.0], kind="protocol", reasons=["you saved this report for this game earlier"]))
         auto = hokejcz.apply(auto, kb)        # a ceskyhokej.cz link saved before is answered with hokej.cz
     else:

@@ -217,6 +217,9 @@ def decide(parsed: dict, cands: list) -> dict:
     """Score-ranked candidates -> Found (one strong game) / Check / None."""
     # the same game from the index and from its live source: keep the live one, since the
     # source may mark it uncertain (e.g. a game on the day before the header's)
+    from .kreezee import fix_link
+    for c in cands:                      # links remembered in an older form
+        c["url"] = fix_link(c.get("url") or "")
     live_urls = {c["url"] for c in cands if c.get("via") != "index"}
     cands = [c for c in cands if not (c.get("via") == "index" and c["url"] in live_urls)]
     # a blocked league's schedule first: other sources' look-alikes for its games are other games
