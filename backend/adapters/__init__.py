@@ -208,6 +208,8 @@ def _exact_enough(parsed: dict, c: dict) -> bool:
     from .base import TIME_MATCH
     if "home and away are swapped on the site" in c.get("reasons", []):
         return False          # the same pair may have played twice at that time (NHL split squads)
+    if any("written differently" in r for r in c.get("reasons", [])):
+        return False          # the opponent only half matches: the live sources may know the real game (a header a day off)
     if TIME_MATCH in c.get("reasons", []):
         return True
     if header_utc(parsed) and c.get("start_utc"):
@@ -339,7 +341,9 @@ def decide(parsed: dict, cands: list) -> dict:
         # start time is the game, provided exactly one such game exists
         anch = [c for c in cands if anchored(c) and c.get("kind", "protocol") == "protocol"]
         if len(anch) == 1:
-            anch[0]["reasons"] = anch[0]["reasons"] + ["one team and the exact start time match; the other team's name is written differently"]
+            note = "one team and the exact start time match; the other team's name is written differently"
+            if note not in anch[0]["reasons"]:    # the index's candidates are decided twice
+                anch[0]["reasons"] = anch[0]["reasons"] + [note]
             if min(anch[0]["team_scores"]) >= 0.5:
                 strong_ones = anch
             else:

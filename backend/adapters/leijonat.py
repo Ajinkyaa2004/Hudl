@@ -36,7 +36,12 @@ class Leijonat(Adapter):
         # the default list leaves out friendlies ("Harjoitusottelut"), which have their own level ids
         levels = await get_json(LEVELS.format(season=season), ttl=24 * 3600) or []
         friendly_ids = [str(l["LevelID"]) for l in levels if "arjoitus" in str(l.get("LevelName", ""))]
-        calls = [get_json(API.format(season=season, date=parsed["date"], level=lv), ttl=1800) for lv in ["-1"] + friendly_ids]
+        # the day before and after too: a header's date is sometimes a day off (the sheet's date is
+        # the analysis date), and the time-of-day match then still finds the game
+        import datetime
+        d0 = datetime.date.fromisoformat(parsed["date"])
+        days = [(d0 + datetime.timedelta(days=i)).isoformat() for i in (0, -1, 1)]
+        calls = [get_json(API.format(season=season, date=d, level=lv), ttl=1800) for d in days for lv in ["-1"] + friendly_ids]
         data = []
         for res in await asyncio.gather(*calls, return_exceptions=True):
             if isinstance(res, list):
@@ -44,13 +49,14 @@ class Leijonat(Adapter):
         for level in data or []:
             lname = level.get("LevelName", "")
             for g in level.get("Games", []):
+                gdate = g.get("GameDateDB") or parsed["date"]
                 home = g.get("HomeTeamTempName") or g.get("HomeTeamAbbrv") or ""
                 away = g.get("AwayTeamTempName") or g.get("AwayTeamAbbrv") or ""
                 score = f"{g.get('HomeGoals')}-{g.get('AwayGoals')}" if g.get("GameStatus") in (2, 3) else None
                 cand = dict(source=self.name, site=self.site, league=f"{lname} {g.get('SubSerieName') or ''}".strip(), home=home, away=away,
-                            date=parsed["date"], score=score, status=None, kind="protocol", adapter=self.name,
+                            date=gdate, score=score, status=None, kind="protocol", adapter=self.name,
                             url=REPORT.format(season=season, gid=g["GameID"]), note="team names on this site are short forms",
-                            start_utc=local_to_utc(parsed["date"], (g.get("GameTime") or "")[:5], "Europe/Helsinki"))
+                            start_utc=local_to_utc(gdate, (g.get("GameTime") or "")[:5], "Europe/Helsinki"))
                 score_candidate(cand, parsed, lname)
                 if min(cand["team_scores"]) >= 0.6:
                     out.append(cand)
