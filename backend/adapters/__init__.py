@@ -3,6 +3,7 @@ candidate games; the runner scores them and decides Found / Check."""
 from __future__ import annotations
 import asyncio, time, re
 from .base import strong, header_utc, anchored
+from .. import fetch
 from .hockeytech import HockeyTech
 from .gamesheet import GameSheet
 from .gamesheet_live import GameSheetLive
@@ -171,7 +172,10 @@ async def run_all(parsed: dict, tm: dict, kb: dict) -> dict:
             t.cancel()
         for a, t in zip(tried, tasks):
             if t.done() and not t.cancelled() and t.exception() is None:
-                results.append(dict(adapter=a.name, site=a.site, ok=True, candidates=t.result()))
+                if not t.result() and fetch.site_down(a.site, started):
+                    results.append(dict(adapter=a.name, site=a.site, ok=False, error="not answering", candidates=[]))
+                else:
+                    results.append(dict(adapter=a.name, site=a.site, ok=True, candidates=t.result()))
             elif t.done() and not t.cancelled() and t.exception() is not None:
                 results.append(dict(adapter=a.name, site=a.site, ok=False, error=str(t.exception())[:120], candidates=[]))
             else:

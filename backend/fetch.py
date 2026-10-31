@@ -215,8 +215,21 @@ async def _fetch(url, ttl, timeout, headers, sem, keep=True):
         if ttl >= 3600:
             await asyncio.to_thread(_disk_put, url, r.text)
         return r.text
+    except (httpx.ConnectError, httpx.ConnectTimeout, httpx.RemoteProtocolError):
+        _DOWN[httpx.URL(url).host] = time.time()   # the site itself refused, not just one slow page
+        return None
     except Exception:
         return None
+
+
+_DOWN: dict[str, float] = {}
+
+
+def site_down(site: str, since: float) -> bool:
+    """Did a host of this site (hockey.by, or a subdomain of it) refuse a connection since `since`?
+    A search that got nothing from such a site reports it as not answering, not as checked."""
+    site = site.lower().lstrip(".")
+    return any(t >= since and (h == site or h.endswith("." + site)) for h, t in _DOWN.items())
 
 
 async def get_json(url: str, ttl: int = 600, timeout: float = 20.0, keep: bool = True):
