@@ -44,12 +44,13 @@ from .echl import Echl
 from .teamlinkt import TeamLinkt
 from .mmjhl import Mmjhl
 from .blocked import Blocked
+from .winnipegaa import WinnipegAA
 
 INDEX = Index()
 _CZ = CeskyHokej()
 ADAPTERS = [SweHockey(), HockeyTech(), GameSheetLive(), HockeyNo(), Sihf(), Leijonat(), CeskyHokej(), Deb(), Liiga(), Nhl(), Del2(), SportsAdmin(), Ligasy(),
             TimeToScore(), Khl(), HockeyBy(), Chl(), EsportsCz(), HockeyData(), PennyDel(), UkHockey(), HockeyFrance(), Onlajny(),
-            ItaliaHockey(), Lhf(), RampTournament(), HockeySlovakia(), Ramp(), Regystra(), Kreezee(), Ayhl(), DigitalShift(), NCAA(), Nwahl(), Echl(), TeamLinkt(), Mmjhl(), Blocked()]
+            ItaliaHockey(), Lhf(), RampTournament(), HockeySlovakia(), Ramp(), Regystra(), Kreezee(), Ayhl(), DigitalShift(), NCAA(), Nwahl(), Echl(), TeamLinkt(), Mmjhl(), WinnipegAA(), Blocked()]
 BUDGET_S = 30
 WEB = WebSearch()
 WEB_SEARCH = True     # last resort when no source knows the game; the replay turns it off

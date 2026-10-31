@@ -294,6 +294,10 @@ def _same_age(a: set, b: set) -> bool:
     years_a, years_b = {t for t in a if len(t) == 4}, {t for t in b if len(t) == 4}
     if years_a and years_b:
         return years_a == years_b
+    # a team entered in two age groups ("Bourget College U19/U22 Volts") and a site that names one
+    # of them ("College Bourget 19U")
+    if not years_a and not years_b and ((len(a) > 1 and b <= a) or (len(b) > 1 and a <= b)):
+        return True
     return bool(ages(a) & ages(b)) and (bool(years_a) != bool(years_b))
 
 
