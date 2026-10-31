@@ -83,6 +83,9 @@ async def schedule(client, lg, scope: dict, until: str) -> list[dict]:
     return out
 
 
+GENERIC = re.compile(r"usa hockey|hockey canada|friendl|exhibition|showcase|tournament|can/?am|lake placid|nashville", re.I)
+
+
 class DigitalShift(Adapter):
     name = "digitalshift"
     site = "hockeyshift.com"
@@ -97,7 +100,10 @@ class DigitalShift(Adapter):
             names = (parsed["t1"] + " | " + parsed["t2"]).lower().replace("junior", "jr").replace("jr.", "jr")
             # leagues whose games come with generic headers ("USA Hockey 16U") are known by their clubs
             club = any(t in names for t in lg.get("teams", []))
-            if linked or club or any(w in c for w in lg.get("comp", [])):
+            # a tournament host (Can/Am: Lake Placid, Nashville) gets travel teams under generic headers
+            # ("USA Hockey 14U"): tried whenever one of its events is on, see _league_games
+            events = lg.get("events") and GENERIC.search(c)
+            if linked or club or events or any(w in c for w in lg.get("comp", [])):
                 hits.append(lg)
         return hits
 
@@ -112,6 +118,15 @@ class DigitalShift(Adapter):
         f = await _get(client, lg, "partials/stats/filters", {"type": "league", "id": lg["league"]}, ttl=6 * 3600) or {}
         season = (f.get("season") or {}).get("selected_id")
         tours = [o["id"] for o in ((f.get("tournament") or {}).get("options") or []) if isinstance(o, dict)]
+        if lg.get("events"):
+            # only the events on around the header's date ("Nashville, TN - October 30 - November 1, 2026")
+            from .gamesheet import name_dates
+            d = datetime.date.fromisoformat(parsed["date"])
+            lo, hi = (d - datetime.timedelta(days=1)).isoformat(), (d + datetime.timedelta(days=1)).isoformat()
+            tours = [o["id"] for o in ((f.get("tournament") or {}).get("options") or []) if isinstance(o, dict)
+                     and (r := name_dates(str(o.get("name") or ""))) and r[0] <= hi and r[1] >= lo]
+            if not tours:
+                return []
         seasons = [season] if season else []
         if lg.get("all_seasons_of_year"):
             # the site's default can be a season without games yet (the post-season): read every

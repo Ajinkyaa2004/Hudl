@@ -1,6 +1,7 @@
 """liiga.fi (Finland, top league): public JSON of every game in a season, including
 pre-season friendlies. Game ids are the same as the Finnish federation's."""
 from __future__ import annotations
+import re
 import asyncio, datetime
 from ..fetch import get_json
 from .base import Adapter, score_candidate, days_apart
@@ -15,12 +16,25 @@ def season_for(date: str) -> int:
     return d.year + 1 if d.month >= 5 else d.year
 
 
+def _junior(parsed: dict) -> bool:
+    """A junior header (Kärpät U18 in the U18 SM-sarja): leijonat.fi's, never Liiga's, even when
+    the club's learned websites include liiga.fi (the senior pair plays the same days)."""
+    from .base import tokens
+    c = parsed["comp"].lower()
+    return bool(tokens(parsed["t1"])[1] or tokens(parsed["t2"])[1]
+                or re.search(r"\bu\s?(?:1[4-9]|20)\b|\b(?:1[4-9]|20)\s?u\b|junior|nuorten|sm-sarja", c))
+
+
 class Liiga(Adapter):
     name = "liiga"
     site = "liiga.fi"
 
     def applies(self, parsed, tm, kb):
         c = parsed["comp"].lower()
+        # Liiga is the senior league: a junior header (Kärpät U18 in the U18 SM-sarja) belongs to
+        # leijonat.fi, and the senior pair's game on the same days is a different game
+        if _junior(parsed):
+            return False
         if "liiga" in c or "finland" in c or "finnish" in c or "friendl" in c or "champions" in c:
             return True
         for key in ("t1n", "t2n"):
@@ -30,6 +44,8 @@ class Liiga(Adapter):
         return False
 
     async def find(self, parsed, tm, kb):
+        if _junior(parsed):
+            return []
         season = season_for(parsed["date"])
         lists = await asyncio.gather(*[get_json(API.format(t=t, season=season), ttl=6 * 3600, timeout=40) for t in TOURNAMENTS], return_exceptions=True)
         out = []

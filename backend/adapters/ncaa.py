@@ -21,15 +21,23 @@ SCHOOLS = {"rit": "Rochester Institute of Technology", "liu": "Long Island Unive
            "colorado col.": "Colorado College", "umass lowell": "UMass Lowell Massachusetts Lowell River Hawks",
            "massachusetts": "UMass Massachusetts Minutemen", "saint michael's": "St. Michael's College", "post": "Post",
            "concordia-montreal": "Concordia", "minnesota st.": "Minnesota State Mankato", "minn. duluth": "Minnesota Duluth",
-           "rensselaer": "Rensselaer Polytechnic Institute RPI"}
+           "rensselaer": "Rensselaer Polytechnic Institute RPI", "westconn": "Western Connecticut State WestConn",
+           "mcla": "Massachusetts College of Liberal Arts MCLA", "wis.-stout": "Wisconsin-Stout", "st. mary's (minn.)": "Saint Mary's"}
 WORDS = [(r"\bAlas\.", "Alaska"), (r"\bMinn\.", "Minnesota"), (r"\bMich\.", "Michigan"), (r"\bCol\.", "College"),
          (r"\bU\.", "University"), (r"\bNeb\.", "Nebraska"), (r"\bSt\.$", "State"), (r"\bSt\. (?=\S+$)", "St. ")]
+
+
+# SUNY campuses: the NCAA writes "Oswego St.", headers "SUNY-Oswego Lakers"
+SUNY = {"oswego", "plattsburgh", "cortland", "brockport", "potsdam", "buffalo", "fredonia", "geneseo", "morrisville", "canton"}
 
 
 def school(short: str) -> str:
     s = html.unescape(short.encode().decode("unicode_escape") if "\\u" in short else short).strip()
     if s.lower() in SCHOOLS:
         return SCHOOLS[s.lower()]
+    m = re.fullmatch(r"([A-Za-z]+) St\.", s)
+    if m and m.group(1).lower() in SUNY:
+        return f"SUNY-{m.group(1)} {m.group(1)} State"
     s = re.sub(r"\s*\((?:[A-Z]{2}|CAN)\)\s*$", "", s)          # "Miami (OH)", "Brock (CAN)"
     if re.search(r"\bSt\.$", s):                               # "Penn St." -> "Penn State"; "St. Lawrence" stays
         s = re.sub(r"\bSt\.$", "State", s)
@@ -40,7 +48,9 @@ def school(short: str) -> str:
 
 def parse(page: str) -> list[dict]:
     out = []
-    for m in CONTEST.finditer(page or ""):
+    # the page embeds its JSON with escaped quotes (\u0022) and slashes: plain JSON for the patterns
+    page = (page or "").replace("\\u0022", '"').replace("\\/", "/")
+    for m in CONTEST.finditer(page):
         teams = TEAM.findall(m.group(4))
         if len(teams) != 2:
             continue
