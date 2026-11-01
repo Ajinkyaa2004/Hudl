@@ -692,16 +692,19 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 /* the server sleeps on the free plan and can be briefly unreachable while it wakes or restarts:
    502/503/504 and network errors are retried with a "waking up" banner instead of failing */
 function wake(on){$('#wake').classList.toggle('on',!!on)}
-/* two servers: the main one (home NAS) and a backup (Render) at /api-backup. The NAS has two ways
-   in: straight from the browser (NAS_DIRECT) and through Vercel (/api). Vercel's own name lookup of
-   the NAS fails for hours at a time, so the page uses whichever way answers. When neither does,
-   the page switches to the backup for 5 minutes, then tries the NAS again */
-const NAS_DIRECT=location.hostname.endsWith('actorix.in')?'https://nas.actorix.in/api':'/api';   // the NAS's permanent Cloudflare Tunnel (starts with the NAS); /api through Vercel goes via Tailscale
+/* two servers: the main one (home NAS) and a backup (Render). On pucktrace.actorix.in the page
+   calls both by their own addresses (the NAS through its Cloudflare Tunnel), so it works from any
+   static host (Cloudflare Pages) with no forwarding. Elsewhere (a vercel.app address, a local test)
+   it uses the host's forwards: /api for the NAS and /api-backup for Render. When the NAS doesn't
+   answer, the page switches to the backup for 5 minutes, then tries the NAS again */
+const DIRECT=location.hostname.endsWith('actorix.in');
+const NAS_DIRECT=DIRECT?'https://nas.actorix.in/api':'/api';
+const BACKUP=DIRECT?'https://pucktrace-api-8u5i.onrender.com/api':'/api-backup';
 let NAS=NAS_DIRECT,API_BASE=NAS,API_BACKUP_UNTIL=0;
-const onNas=b=>b!=='/api-backup';
+const onNas=b=>b!==BACKUP;
 function apiBase(){if(!onNas(API_BASE)&&Date.now()>API_BACKUP_UNTIL){API_BASE=NAS;setTimeout(noteBack,0)}return API_BASE}
-function useBackup(){if(onNas(API_BASE)){API_BASE='/api-backup';API_BACKUP_UNTIL=Date.now()+300000;noteSwitch('a search or request to the NAS failed');setTimeout(()=>checkServers(),500);return true}return false}
-function otherNasWay(){if(NAS_DIRECT==='/api')return;NAS=NAS===NAS_DIRECT?'/api':NAS_DIRECT;if(onNas(API_BASE))API_BASE=NAS}
+function useBackup(){if(onNas(API_BASE)){API_BASE=BACKUP;API_BACKUP_UNTIL=Date.now()+300000;noteSwitch('a search or request to the NAS failed');setTimeout(()=>checkServers(),500);return true}return false}
+function otherNasWay(){}   // one way in to the NAS (it had a second one through Vercel)
 /* the sign-in travels as a header (a cookie of this site doesn't reach the NAS's own address) */
 /* the sign-in lives in this tab only (sessionStorage): a reload keeps it, closing the tab or the
    browser ends it, and a new tab asks for the password again */
@@ -711,7 +714,7 @@ function hdrs(json=true){const h={};if(json)h['content-type']='application/json'
 /* why the page left the NAS: the last failure on each way in is noted; a move to the backup is kept
    in this browser and reported to the NAS once it answers again (Status > Moves to the backup) */
 const LASTFAIL={};
-function wayName(b){return b===NAS_DIRECT&&NAS_DIRECT!=='/api'?'direct':'through Vercel'}
+function wayName(b){return DIRECT?'direct':'through the host'}
 function noteFail(base,why){if(onNas(base))LASTFAIL[wayName(base)]={why,t:Date.now()}}
 let PENDING=[];try{PENDING=JSON.parse(localStorage.getItem('pt-switches')||'[]')}catch(e){}
 function saveSw(){try{localStorage.setItem('pt-switches',JSON.stringify(PENDING.slice(-50)))}catch(e){}}
@@ -732,22 +735,14 @@ async function ping1(base,ms){
   catch(e){noteFail(base,e.name==='AbortError'?`status check: no answer within ${ms/1000} s`:`status check: could not connect (${e.message})`);return null}finally{clearTimeout(t)}}
 async function ping(base,ms){for(let i=0;i<3;i++){const r=await ping1(base,ms);if(r)return r;await sleep(400)}return null
 }
-/* the NAS by both ways at once; the first that answers becomes the way in */
-async function pingNas(ms){
-  if(NAS_DIRECT==='/api')return ping('/api',ms);
-  for(let i=0;i<3;i++){
-    const r=await new Promise(res=>{let left=2;const done=(way,v)=>{if(v&&v.ok){res([way,v]);return}if(--left===0)res(null)};
-      ping1(NAS_DIRECT,ms).then(v=>done(NAS_DIRECT,v));ping1('/api',ms).then(v=>done('/api',v))});
-    if(r){if(NAS!==r[0]){NAS=r[0];if(onNas(API_BASE))API_BASE=NAS}return r[1]}
-    await sleep(400)}
-  return null}
+async function pingNas(ms){return ping(NAS_DIRECT,ms)}
 async function checkServers(nasKnown){
-  const [nas,bk]=await Promise.all([nasKnown!==undefined?nasKnown:pingNas(30000),ping('/api-backup',45000)]);
+  const [nas,bk]=await Promise.all([nasKnown!==undefined?nasKnown:pingNas(30000),ping(BACKUP,45000)]);
   const nasOk=!!(nas&&nas.ok),nasReady=nasOk&&nas.knowledge_base,bkOk=!!(bk&&bk.ok),bkFull=bkOk&&bk.knowledge_base;
   if(nasOk&&!nasReady)noteFail(NAS,'the NAS answered but was still loading its data');
   if(nasReady)nasOkNow();
   if(nasReady&&!onNas(API_BASE)){API_BASE=NAS;API_BACKUP_UNTIL=0;noteBack()}   // the NAS is back: use it straight away
-  else if(!nasReady&&bkOk&&onNas(API_BASE)&&nasFailing()){API_BASE='/api-backup';API_BACKUP_UNTIL=Date.now()+300000;noteSwitch('the status check every minute found no NAS')}   // NAS down: no search waits on it
+  else if(!nasReady&&bkOk&&onNas(API_BASE)&&nasFailing()){API_BASE=BACKUP;API_BACKUP_UNTIL=Date.now()+300000;noteSwitch('the status check every minute found no NAS')}   // NAS down: no search waits on it
   if(nasReady)flushSw();
   let s,hl,sub;
   if(nasReady){s='ok';hl='Running on Home NAS';sub='All good. Your results come from the home NAS.'}
@@ -762,7 +757,7 @@ async function checkServers(nasKnown){
 }
 setInterval(()=>{checkServers();heartbeat()},60000);
 /* the NAS stays the server through short gaps (a restart, a network blip): the page keeps retrying
-   it, alternating the two ways in, and turns to the backup only after it has failed for 45 s */
+   it, and turns to the backup only after it has failed for 45 s */
 const NAS_GRACE=45000;let NAS_FAIL_SINCE=0;
 function nasFailing(){if(!NAS_FAIL_SINCE)NAS_FAIL_SINCE=Date.now();return Date.now()-NAS_FAIL_SINCE>NAS_GRACE}
 function nasOkNow(){NAS_FAIL_SINCE=0}
@@ -855,7 +850,7 @@ const _wt=setTimeout(()=>wake(1),2500);   // a slow first answer: say so
 /* before anything else, a quick look at the home NAS: when it is off, the page starts on the backup
    instead of waiting on it; the full status (both servers) follows in the footer */
 const tokenOnce=Promise.resolve();
-Promise.all([pingNas(15000),tokenOnce]).then(([n])=>{if(!(n&&n.ok&&n.knowledge_base)){API_BASE='/api-backup';API_BACKUP_UNTIL=Date.now()+300000;noteSwitch('the page opened and found no NAS')}checkServers(n);return api('/session')}).then(s=>{clearTimeout(_wt);wake(0);if(s.required&&!s.ok)showLogin();else{setMe(s.name,s.admin);heartbeat();if(Q0){q.value=Q0;chips(Q0);find()}}}).catch(()=>{clearTimeout(_wt);wake(0)});
+Promise.all([pingNas(15000),tokenOnce]).then(([n])=>{if(!(n&&n.ok&&n.knowledge_base)){API_BASE=BACKUP;API_BACKUP_UNTIL=Date.now()+300000;noteSwitch('the page opened and found no NAS')}checkServers(n);return api('/session')}).then(s=>{clearTimeout(_wt);wake(0);if(s.required&&!s.ok)showLogin();else{setMe(s.name,s.admin);heartbeat();if(Q0){q.value=Q0;chips(Q0);find()}}}).catch(()=>{clearTimeout(_wt);wake(0)});
 
 /* ---------- theme ---------- */
 function themeLabel(){$$('.tlabel').forEach(l=>l.textContent=document.documentElement.dataset.theme==='dark'?'Dark':'Light')}
