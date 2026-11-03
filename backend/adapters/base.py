@@ -335,6 +335,9 @@ def ___team_similarity(header_name: str, site_name: str, context: str = "") -> t
         reason = f"site shows age group {sorted(sa or ca)}, header has none"
     else:
         reason = "age group matches" if ha else "no age group"
+    # "Female"/"Girls" is a gender mark, not a level: a site's "Greenfoot Capitals (Female)" is the
+    # header's "Greenfoot Capitals U18 AAA" (whether the game is a girls' one is checked separately)
+    hl, sl = hl - {"female"}, sl - {"female"}
     if hl and sl and hl != sl:
         conflict = ({"aa", "aaa"} <= (hl | sl) and not ({"aa", "aaa"} <= hl or {"aa", "aaa"} <= sl)) or not (hl <= sl or sl <= hl)
         if conflict:

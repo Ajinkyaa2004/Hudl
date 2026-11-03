@@ -19,6 +19,10 @@ LEAGUES = [
     dict(match=re.compile(r"\bRSEQ\b", re.I), site="scolaire.rseqhockey.com", name="RSEQ hockey scolaire",
          url="https://scolaire.rseqhockey.com/fr/-rseq/schedule-stats-standings", tz="America/Toronto", tz_name="Québec",
          pdf="https://pdf.play.spordle.com/game/"),
+    # LHEQ (Quebec M13/M15 AAA Elite, Relève and the M13/M15 AAA leagues): a Spordle page like RSEQ's
+    dict(match=re.compile(r"\bLHEQ\b|Quebec M1[35] AAA (?:Elite|Hockey League|Releve|Relève)", re.I), site="masculin.lheq.ca",
+         name="LHEQ (Ligue de hockey d'excellence du Québec)", url="https://masculin.lheq.ca/fr/schedule", tz="America/Toronto", tz_name="Québec",
+         pdf="https://pdf.play.spordle.com/game/"),
     dict(match=re.compile(r"\bWinnipeg AAA\b", re.I), site="winnipegaaa.com", name="Winnipeg AAA Hockey",
          url="https://winnipegaaa.com/schedule", tz="America/Winnipeg", tz_name="Winnipeg"),
 ]
@@ -52,7 +56,7 @@ class Blocked(Adapter):
         how = (f"find {parsed['t1']} vs {parsed['t2']}" + (f" ({when})" if when else f" on {date}")
                + " on its schedule and open the game")
         if lg.get("pdf"):
-            how += "; its match sheet is pdf.play.spordle.com/game/ + the game number on the RSEQ page (type it below)"
+            how += "; its match sheet is pdf.play.spordle.com/game/ + the game number in the page address (type it below)"
         return [dict(source=self.name, adapter=self.name, site=lg["site"], league=lg["name"], home=parsed["t1"], away=parsed["t2"],
                      date=date, when=when, kind="schedule", url=lg["url"], confidence=0.5, team_scores=[0.0, 0.0],
                      blocked=lg["site"], pdf=lg.get("pdf"),
