@@ -57,6 +57,26 @@ function when_(v) {
   return m ? new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]) : null;
 }
 function fmt_(t, f) { return Utilities.formatDate(t, 'Asia/Kolkata', f); }
+// Account names (admin screen). Before accounts (to 28 Oct) people typed any name, so "Navya Yellela",
+// "Navya" and "navya" are one person: a logged name is folded onto the account whose name it starts
+// with (first word), plus the few spellings below. Add a line to ACCOUNTS when a new account is made.
+var ACCOUNTS = ['Actorix', 'Aditya', 'Ajat', 'Aqib', 'Atharva', 'Avinash Pandit', 'Bhavya', 'Chaitanya', 'Dipesh', 'Dmitrii',
+                'Harsh', 'Hitesh', 'Imran', 'Isha', 'Karan Sonawane', 'Karan sharma', 'Kunal', 'Kushal', 'Kusum', 'Maaz', 'Navya',
+                'Neha', 'Ninad', 'Pravin', 'Punit', 'Rahul', 'Raj', 'Raj Kadam', 'Ram', 'Roshan', 'Saloni', 'Shivkumar', 'Vaibhav',
+                'Vishal', 'Vivek', 'Yash'];
+var ALSO = {'ajinkya': 'Actorix', 'rosh': 'Roshan', 'ra': 'Raj', 'r': 'Raj', 'ninal': 'Ninad', 'vishal.jethva': 'Vishal',
+            'vishal jethva': 'Vishal', 'karan sharma': 'Karan sharma', 'karan': 'Karan sharma'};
+var NONAME = {'': 1, '-': 1, 'abc': 1, 'noname': 1, 'test (delete me)': 1, '(no name)': 1};
+function person_(name) {
+  var n = String(name || '').trim(), k = n.toLowerCase();
+  if (NONAME[k]) return '(no name)';
+  if (ALSO[k]) return ALSO[k];
+  for (var i = 0; i < ACCOUNTS.length; i++) if (ACCOUNTS[i].toLowerCase() === k) return ACCOUNTS[i];
+  var first = k.split(/\s+/)[0];
+  for (var j = 0; j < ACCOUNTS.length; j++) if (ACCOUNTS[j].toLowerCase() === first) return ACCOUNTS[j];
+  return n;
+}
+
 function res_(r) {
   var x = String(r[7] || '').trim();
   if (x === 'Found' || (!x && String(r[3]).trim() === 'Yes')) return 'Found';
@@ -68,8 +88,8 @@ function buildDashboard() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var log = logSheet_(ss);
   var rows = log.getDataRange().getValues().slice(1).filter(function (r) { return r[2]; }).map(function (r) {
-    return {t: when_(r[0]), name: String(r[1] || '').trim() || '(no name)', header: String(r[2]), res: res_(r),
-            secs: parseFloat(r[6]), server: String(r[5] || '') || 'unknown', site: String(r[8] || '')};
+    return {t: when_(r[0]), name: person_(r[1]), header: String(r[2]), res: res_(r),
+            secs: parseFloat(r[6]), server: String(r[5] || '') || 'unknown', site: String(r[8] || ''), id: String(r[10] || '')};
   }).filter(function (r) { return r.t; });
 
   // ---- numbers
@@ -80,21 +100,33 @@ function buildDashboard() {
   var med = secs.length ? secs[Math.floor(secs.length / 2)] : 0;
   var today = fmt_(new Date(), 'yyyy-MM-dd');
   var todayRows = rows.filter(function (r) { return fmt_(r.t, 'yyyy-MM-dd') === today; });
+  var since14 = new Date(Date.now() - 14 * 86400000);
   var todayFound = todayRows.filter(function (r) { return r.res === 'Found'; }).length;
   var ppl = {};
   rows.forEach(function (r) {
     var k = r.name.toLowerCase();
-    var p = ppl[k] || (ppl[k] = {name: r.name, n: 0, 'Found': 0, 'Pick one': 0, 'Not found': 0, s: 0, sn: 0, last: r.t});
-    p.n++; p[r.res]++; if (!isNaN(r.secs)) { p.s += r.secs; p.sn++; } if (r.t > p.last) p.last = r.t;
+    var p = ppl[k] || (ppl[k] = {name: r.name, n: 0, n14: 0, 'Found': 0, 'Pick one': 0, 'Not found': 0, s: 0, sn: 0, last: r.t});
+    p.n++; p[r.res]++; if (r.t >= since14) p.n14++;
+    if (!isNaN(r.secs)) { p.s += r.secs; p.sn++; } if (r.t > p.last) p.last = r.t;
   });
-  var plist = Object.keys(ppl).map(function (k) { return ppl[k]; }).sort(function (a, b) { return b.n - a.n; });
+  // named people only; most active in the last two weeks first (new people show up at once)
+  var plist = Object.keys(ppl).map(function (k) { return ppl[k]; }).filter(function (p) { return p.name !== '(no name)'; })
+                .sort(function (a, b) { return (b.n14 - a.n14) || (b.n - a.n); });
+  var active14 = plist.filter(function (p) { return p.n14 > 0; }).length;
   var ACC = ['Correct (same game as the analyst)', 'Wrong (different game from the analyst)', 'Missed (a report existed, PuckTrace did not find it)',
              'Found on a different website from the analyst (not compared)', 'Cannot check yet (analyst used a screenshot or has no link yet)',
              'No report anywhere (the analyst found none either)'];
   var ACC_SHORT = ['Correct', 'Wrong', 'Missed (report existed)', 'Found on another website', 'Cannot check yet', 'No report anywhere'];
   var ac = ACC.map(function () { return 0; });
-  var accSheet = ss.getSheetByName('Accuracy');
-  if (accSheet) accSheet.getDataRange().getValues().slice(1).forEach(function (r) { var i = ACC.indexOf(r[5]); if (i >= 0) ac[i]++; });
+  var accSheet = ss.getSheetByName('Accuracy'), verdictOf = {};
+  if (accSheet) accSheet.getDataRange().getValues().slice(1).forEach(function (r) { var i = ACC.indexOf(r[5]); if (i >= 0) { ac[i]++; verdictOf[String(r[0])] = i; } });
+  // each Not found search split by what the RTT sheet says about that game
+  var nf = {missed: 0, noreport: 0, unchecked: 0};
+  rows.forEach(function (r) {
+    if (r.res !== 'Not found') return;
+    var v = verdictOf[r.id];
+    if (v === 2) nf.missed++; else if (v === 4 || v === 5) nf.noreport++; else nf.unchecked++;
+  });
   var checked = ac[0] + ac[1];
 
   // ---- hidden data tab (the charts read from it, the dashboard stays clean)
@@ -108,7 +140,9 @@ function buildDashboard() {
     dRow += body.length + 3;
     return r;
   }
-  var dRes = put(['Result', 'Searches'], [['Found', cnt['Found']], ['Pick one', cnt['Pick one']], ['Not found', cnt['Not found']]]);
+  var dRes = put(['Result', 'Searches'], [['Found', cnt['Found']], ['Pick one', cnt['Pick one']],
+                 ['Not found: a report existed (missed)', nf.missed], ['Not found: no public report (screenshot, paper, none)', nf.noreport],
+                 ['Not found: not checked yet', nf.unchecked]]);
   var dAcc = put(['Verdict', 'Games'], ACC_SHORT.map(function (k, i) { return [k, ac[i]]; }));
   var days = {}, dorder = [];
   rows.forEach(function (r) {
@@ -167,10 +201,10 @@ function buildDashboard() {
     sh.getRange(5, col, 4, 2).setHorizontalAlignment('left');
   }
   sh.setRowHeight(4, 12); sh.setRowHeight(5, 24); sh.setRowHeights(6, 2, 24); sh.setRowHeight(8, 22);
-  card(1, 'Searches', n, 'since the log started', T.navy);
+  card(1, 'Searches', n, 'by ' + plist.length + ' people · ' + active14 + ' active in the last 2 weeks', T.navy);
   card(3, 'Found automatically', n ? Math.round(100 * cnt['Found'] / n) + '%' : '–', cnt['Found'] + ' of ' + n + ' searches', T.found);
   card(5, 'Answers correct', checked ? (100 * ac[0] / checked).toFixed(1) + '%' : '–', checked ? ac[0] + ' of ' + checked + ' checked games' : 'after the next RTT sheet', T.teal);
-  card(7, 'People using it', plist.length, plist.length ? 'most active: ' + plist[0].name : '', T.purple);
+  card(7, 'Missed reports', n ? (100 * nf.missed / n).toFixed(1) + '%' : '–', nf.missed + ' searches where a report existed · target 0', T.none);
   card(9, 'Typical search', med.toFixed(1) + ' s', '9 in 10 under ' + (secs.length ? secs[Math.floor(secs.length * 0.9)].toFixed(0) : 0) + ' s', T.blue);
   card(11, 'Today', todayRows.length, todayRows.length ? todayFound + ' found (' + Math.round(100 * todayFound / todayRows.length) + '%)' : 'no searches yet', T.orange);
 
@@ -195,8 +229,9 @@ function buildDashboard() {
   var PIE = {pieHole: 0.55, pieSliceText: 'percentage', pieSliceTextStyle: {color: '#ffffff', fontSize: 12}, legend: {position: 'right', textStyle: {color: T.ink, fontSize: 12}}};
   function merge_(a, b) { var o = {}; for (var k in a) o[k] = a[k]; for (var j in b) o[j] = b[j]; return o; }
 
-  section(10, 'Overview', 'Found = PuckTrace gave the report itself · Pick one = it showed possible games · Not found = nothing. Right-hand chart: answers compared with the report link in the RTT sheet.');
-  chart(Charts.ChartType.PIE, dRes, 12, 1, merge_(PIE, {title: 'What PuckTrace answered', colors: [T.found, T.pick, T.none]}));
+  section(10, 'Overview', 'Found = PuckTrace gave the report itself · Pick one = it showed possible games · Not found is split by the RTT sheet: missed (a public report existed) or no public report (screenshot, paper, none).');
+  chart(Charts.ChartType.PIE, dRes, 12, 1, merge_(PIE, {title: 'What PuckTrace answered', colors: [T.found, T.pick, T.none, '#cbd5e1', T.grey],
+        legend: {position: 'right', textStyle: {color: T.ink, fontSize: 10}}}));
   chart(Charts.ChartType.PIE, dAcc, 12, 7, merge_(PIE, {title: checked ? 'Were the answers right?  ' + (100 * ac[0] / checked).toFixed(1) + '% correct' : 'Were the answers right?',
         colors: [T.found, T.wrong, T.none, T.sky, '#cbd5e1', T.grey]}));
 
@@ -241,11 +276,11 @@ function buildDashboard() {
   function bar(v, color) { return '=SPARKLINE(' + v + ',{"charttype","bar";"max",1;"color1","' + color + '"})'; }
   var resColor = function (v) { return v === 'Found' ? T.found : v === 'Pick one' ? T.pick : T.none; };
 
-  r = table(r, 'Leaderboard', [{h: '#', w: 1}, {h: 'Person', w: 3}, {h: 'Searches', w: 1}, {h: 'Found', w: 1}, {h: 'Found rate', w: 3},
-            {h: 'Avg time', w: 1}, {h: 'Last search', w: 2}],
-            plist.slice(0, 15).map(function (p, i) {
+  r = table(r, 'Leaderboard (everyone, most active in the last 2 weeks first)', [{h: '#', w: 1}, {h: 'Person', w: 3}, {h: 'Last 2 weeks', w: 1},
+            {h: 'All time', w: 1}, {h: 'Found', w: 1}, {h: 'Found rate', w: 2}, {h: 'Avg time', w: 1}, {h: 'Last search', w: 2}],
+            plist.map(function (p, i) {
               var rate = p.n ? p['Found'] / p.n : 0;
-              return [i + 1, p.name, p.n, p['Found'], bar(rate.toFixed(3), rate >= 0.7 ? T.found : rate >= 0.5 ? T.pick : T.none),
+              return [i + 1, p.name, p.n14, p.n, p['Found'], bar(rate.toFixed(3), rate >= 0.7 ? T.found : rate >= 0.5 ? T.pick : T.none),
                       p.sn ? (p.s / p.sn).toFixed(1) + ' s' : '', fmt_(p.last, 'dd MMM HH:mm')];
             }));
   var hdr = function (x) { return x.length > 95 ? x.slice(0, 92) + '…' : x; };
