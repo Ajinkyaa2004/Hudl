@@ -543,7 +543,7 @@ kbd{font:11px var(--mono);border:1px solid var(--line2);border-bottom-width:2px;
         <div class="ph"><div><h1>Status</h1><p id="stwhen">Loading…</p></div><button class="btn2" id="strun"><svg class="ic sm"><use href="#i-refresh"/></svg><span>Check sources now</span></button></div>
         <div id="stknow"></div>
         <div class="sec"><div class="hd"><span class="hic"><svg class="ic sm"><use href="#i-pulse"/></svg></span><h3>Moves to the backup</h3><span class="cnt" id="swcnt"></span></div>
-          <div class="bd" style="padding-bottom:0"><div class="note" style="margin-bottom:14px"><svg class="ic sm"><use href="#i-help"/></svg><span>Every time a page moved from the home NAS to the backup (Render), with the reason it saw on each way in, and whether the NAS server itself was running then. "Running" means the server was fine and the way to it failed.</span></div>
+          <div class="bd" style="padding-bottom:0"><div class="note" style="margin-bottom:14px"><svg class="ic sm"><use href="#i-help"/></svg><span>Every time a page moved from the main server to the backup (Render), with the reason it saw on each way in, and whether the main server itself was running then. "Running" means the server was fine and the way to it failed.</span></div>
           <div class="scroll"><table class="tbl cards" id="swtable"><thead><tr><th>When</th><th>Who</th><th>Back after</th><th>NAS server</th><th>Why</th></tr></thead><tbody></tbody></table></div></div></div>
         <div class="sec"><div class="hd"><span class="hic"><svg class="ic sm"><use href="#i-pulse"/></svg></span><h3>Source checks</h3><span class="cnt" id="stcnt"></span></div>
           <div class="bd" style="padding-bottom:0"><div class="note" style="margin-bottom:14px"><svg class="ic sm"><use href="#i-help"/></svg><span>Each source is asked for one known game every day. A failed check means the site changed or is down, so its games may be missed until it's fixed.</span></div></div>
@@ -672,7 +672,7 @@ kbd{font:11px var(--mono);border:1px solid var(--line2);border-bottom-width:2px;
     <button class="btn2 danger" id="cdel-ok">Delete</button>
   </div>
 </dialog>
-<div class="wake" id="wake"><span class="spin"></span><span>Connecting… if the home NAS doesn't answer, the backup server takes over.</span></div>
+<div class="wake" id="wake"><span class="spin"></span><span>Connecting… if the main server doesn't answer, the backup server takes over.</span></div>
 <div class="login" id="login"><form class="lcard" id="lform">
   <div class="brand" style="justify-content:center;padding:0 0 6px;font-size:22px"><svg width="34" height="34"><use href="#i-puck"/></svg><span>Puck<b>Trace</b></span></div>
   <div class="mu small" style="text-align:center;margin-bottom:20px">Match reports and rosters for RTT</div>
@@ -692,7 +692,7 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 /* the server sleeps on the free plan and can be briefly unreachable while it wakes or restarts:
    502/503/504 and network errors are retried with a "waking up" banner instead of failing */
 function wake(on){$('#wake').classList.toggle('on',!!on)}
-/* two servers: the main one (home NAS) and a backup (Render). On pucktrace.actorix.in the page
+/* two servers: the main one (the office PC) and a backup (Render). On pucktrace.actorix.in the page
    calls both by their own addresses (the NAS through its Cloudflare Tunnel), so it works from any
    static host (Cloudflare Pages) with no forwarding. Elsewhere (a vercel.app address, a local test)
    it uses the host's forwards: /api for the NAS and /api-backup for Render. When the NAS doesn't
@@ -736,6 +736,16 @@ async function ping1(base,ms){
 async function ping(base,ms){for(let i=0;i<3;i++){const r=await ping1(base,ms);if(r)return r;await sleep(400)}return null
 }
 async function pingNas(ms){return ping(NAS_DIRECT,ms)}
+/* the name the footer shows for whichever server answered: the office PC ("Hudl PC"), the home
+   NAS or Render. Each health answer carries server_label; when a server is silent the last name
+   it gave is kept, so the footer never guesses */
+let MAIN_NAME='the main server',BK_NAME='Render';
+function srvName(h,isBackup){
+  const l=h&&(h.server_label||h.server);
+  let n=null;
+  if(l==='pc')n='Hudl PC';else if(l==='render')n='Render';else if(l==='nas')n='Home NAS';else if(l==='local')n='this PC';
+  if(n){if(isBackup)BK_NAME=n;else MAIN_NAME=n}
+  return isBackup?BK_NAME:MAIN_NAME}
 async function checkServers(nasKnown){
   const [nas,bk]=await Promise.all([nasKnown!==undefined?nasKnown:pingNas(30000),ping(BACKUP,45000)]);
   const nasOk=!!(nas&&nas.ok),nasReady=nasOk&&nas.knowledge_base,bkOk=!!(bk&&bk.ok),bkFull=bkOk&&bk.knowledge_base;
@@ -745,15 +755,16 @@ async function checkServers(nasKnown){
   else if(!nasReady&&bkOk&&onNas(API_BASE)&&nasFailing()){API_BASE=BACKUP;API_BACKUP_UNTIL=Date.now()+300000;noteSwitch('the status check every minute found no NAS')}   // NAS down: no search waits on it
   if(nasReady)flushSw();
   let s,hl,sub;
-  if(nasReady){s='ok';hl='Running on Home NAS';sub='All good. Your results come from the home NAS.'}
-  else if(nasOk&&bkOk){s='warn';hl='Home NAS is starting';sub='Results come from the backup server (Render) until it is ready. Same accuracy.'}
-  else if(bkOk){s='warn';hl='Running on backup (Render)';sub=bkFull?'The home NAS is off or not answering. Results come from Render, just as accurate, sometimes a little slower.':'The home NAS is off or not answering. Render is answering but still loading its knowledge; results may be weaker for a few minutes.'}
-  else if(nasOk){s='warn';hl='Running on Home NAS';sub='The NAS is answering but still loading its data. The backup server is not answering.'}
-  else{s='bad';hl='No server is answering';sub='Check the internet connection and press Find again. If it stays like this, the NAS and the backup are both down.'}
-  const ls=$('#lsst');if(ls){ls.dataset.s=s;$('#lsst-hl').textContent=hl;$('#lsst-det').textContent=s==='ok'?'Results come from the home NAS.':s==='bad'?'Check the internet connection.':'Results come from the backup (Render), same accuracy.'}
+  const nm=srvName(nas),bn=srvName(bk,true);
+  if(nasReady){s='ok';hl='Running on '+nm;sub='All good. Your results come from '+nm+'.'}
+  else if(nasOk&&bkOk){s='warn';hl=nm+' is starting';sub='Results come from the backup server ('+bn+') until it is ready. Same accuracy.'}
+  else if(bkOk){s='warn';hl='Running on backup ('+bn+')';sub=bkFull?'The main server is off or not answering. Results come from '+bn+', just as accurate, sometimes a little slower.':'The main server is off or not answering. '+bn+' is answering but still loading its knowledge; results may be weaker for a few minutes.'}
+  else if(nasOk){s='warn';hl='Running on '+nm;sub=nm+' is answering but still loading its data. The backup server is not answering.'}
+  else{s='bad';hl='No server is answering';sub='Check the internet connection and press Find again. If it stays like this, the main server and the backup are both down.'}
+  const ls=$('#lsst');if(ls){ls.dataset.s=s;$('#lsst-hl').textContent=hl;$('#lsst-det').textContent=s==='ok'?'Results come from '+nm+'.':s==='bad'?'Check the internet connection.':'Results come from the backup ('+bn+'), same accuracy.'}
   const st=$('#sst');if(!st)return;st.dataset.s=s;$('#sst-hl').textContent=hl;$('#sst-sub').textContent=sub;
   const tm=new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
-  $('#sst-det').textContent=`Home NAS: ${nasReady?'online':nasOk?'starting':'offline'} · Backup: ${bkFull?'ready':bkOk?'loading knowledge':'not answering'} · checked ${tm}`;
+  $('#sst-det').textContent=`${nm}: ${nasReady?'online':nasOk?'starting':'offline'} · Backup: ${bkFull?'ready':bkOk?'loading knowledge':'not answering'} · checked ${tm}`;
 }
 setInterval(()=>{checkServers();heartbeat()},60000);
 /* the NAS stays the server through short gaps (a restart, a network blip): the page keeps retrying
@@ -888,7 +899,7 @@ async function loadStatus(){
   }catch(e){$('#stwhen').textContent='Could not load status: '+e.message}
 }
 $('#strun').onclick=async()=>{const b=$('#strun'),t=b.querySelector('span');
-  if(!onNas(apiBase())){toast('The source check runs on the home NAS only. Try again when the footer says Running on Home NAS.','warn');return}
+  if(!onNas(apiBase())){toast('The source check runs on the main server only. Try again when the footer says the server is online.','warn');return}
   b.disabled=true;t.textContent='Checking… about two minutes';
   try{await post('/health/run',{},{timeout:0})}catch(e){if(e.status===409)toast(e.message,'warn')}
   b.disabled=false;t.textContent='Check sources now';loadStatus()};

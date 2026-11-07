@@ -62,6 +62,9 @@ CORS_HEADERS = {"access-control-allow-methods": "GET, POST, DELETE, OPTIONS",
 
 # which server answered, shown on the page: the home NAS (the Docker image sets APP_VERSION) or the Render backup
 SERVER = "render" if _os.environ.get("RENDER") else ("nas" if _os.environ.get("APP_VERSION") else "local")
+# the name the page shows. The office PC runs the same code as the NAS (APP_VERSION is set), so it
+# is named by SERVER_LABEL when given, else by the OS: a Windows host is the office PC.
+SERVER_LABEL = _os.environ.get("SERVER_LABEL") or ("pc" if _os.name == "nt" else SERVER)
 
 
 @app.middleware("http")
@@ -599,7 +602,7 @@ def _rss_mb() -> int:
 def healthz():
     # open (no sign-in): only whether the published game list is loaded, no names or headers
     gl = globals().get("GAME_LIST") or {}
-    return dict(ok=True, server=SERVER, game_list=gl.get("games", 0), game_list_at=gl.get("at"), game_list_from=gl.get("source"), knowledge_base=len(KB.get("teams") or {}) > 0,
+    return dict(ok=True, server=SERVER, server_label=SERVER_LABEL, game_list=gl.get("games", 0), game_list_at=gl.get("at"), game_list_from=gl.get("source"), knowledge_base=len(KB.get("teams") or {}) > 0,
                 version=(_os.environ.get("APP_VERSION") or _os.environ.get("RENDER_GIT_COMMIT", ""))[:7] or None,
                 kb_teams=len(KB.get("teams") or {}), uptime_s=int(_time.time() - _STARTED), rss_mb=_rss_mb(),
                 searches=sum(1 for v in _JOBS.values() if v["status"] == "running"), max_searches=_max_searches(),
