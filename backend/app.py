@@ -830,6 +830,9 @@ def switches_add(inp: SwitchesIn):
         reasons = e.get("reasons") if isinstance(e.get("reasons"), dict) else {}
         lines.append(_j.dumps(dict(at=clean(e.get("at"), 40), back_at=clean(e.get("back_at"), 40), name=_clean_name(e.get("name") or ""),
                                    trigger=clean(e.get("trigger"), 80), reasons={clean(k, 20): clean(v) for k, v in list(reasons.items())[:4]},
+                                   kind=clean(e.get("kind"), 10) or None,
+                                   backup_ok=e.get("backup_ok") if isinstance(e.get("backup_ok"), bool) else None,
+                                   online=e.get("online") if isinstance(e.get("online"), bool) else None,
                                    received=_time.strftime("%Y-%m-%dT%H:%M:%S"), server=SERVER), ensure_ascii=False))
     if lines:
         try:
