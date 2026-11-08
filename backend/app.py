@@ -588,13 +588,33 @@ _STARTED = _time.time()
 
 
 def _rss_mb() -> int:
-    """Memory in use by this process, from /proc on Linux."""
+    """Memory in use by this process: /proc on Linux, the working set on Windows."""
     try:
         for line in open("/proc/self/status"):
             if line.startswith("VmRSS:"):
                 return int(line.split()[1]) // 1024
     except Exception:
         pass
+    if _os.name == "nt":
+        # The office PC runs Windows, where /proc does not exist; without this the health endpoint
+        # reported 0 MB and the load test had no memory number to judge.
+        try:
+            import ctypes, ctypes.wintypes as _wt
+
+            class _PMC(ctypes.Structure):
+                _fields_ = [("cb", _wt.DWORD), ("PageFaultCount", _wt.DWORD),
+                            ("PeakWorkingSetSize", ctypes.c_size_t), ("WorkingSetSize", ctypes.c_size_t),
+                            ("QuotaPeakPagedPoolUsage", ctypes.c_size_t), ("QuotaPagedPoolUsage", ctypes.c_size_t),
+                            ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t), ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
+                            ("PagefileUsage", ctypes.c_size_t), ("PeakPagefileUsage", ctypes.c_size_t)]
+
+            pmc = _PMC()
+            pmc.cb = ctypes.sizeof(_PMC)
+            handle = ctypes.windll.kernel32.GetCurrentProcess()
+            if ctypes.windll.psapi.GetProcessMemoryInfo(handle, ctypes.byref(pmc), pmc.cb):
+                return int(pmc.WorkingSetSize // (1024 * 1024))
+        except Exception:
+            pass
     return 0
 
 
