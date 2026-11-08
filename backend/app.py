@@ -1067,21 +1067,24 @@ def admin_diag_fix(inp: FixIn):
         _net_save(state)
 
     elif action == "cloudflared_test":
-        # Run a second connector for 12 s with the requested transport and read its own log. It shares
-        # the tunnel with the service, so this proves whether the transport works without stopping
-        # the site. The process is killed before returning.
+        # Run a second connector for 12 s and read its own output. It shares the tunnel with the
+        # service, so this proves the flags and the transport without stopping the site. Note the
+        # order: --protocol, --loglevel and --logfile are global options, so they come BEFORE `tunnel`.
         exe = "C:\\Program Files (x86)\\cloudflared\\cloudflared.exe"
         log = "C:\\programdata\\cloudflared\\test.log"
+        err = "C:\\programdata\\cloudflared\\test.err"
         proto = (inp.extra or "http2").strip().lower()
         out["protocol"] = proto
-        _win_ps(f"New-Item -ItemType Directory -Force 'C:\\programdata\\cloudflared' | Out-Null;"
-                f" Remove-Item '{log}' -ErrorAction SilentlyContinue")
+        _win_ps("New-Item -ItemType Directory -Force 'C:\\programdata\\cloudflared' | Out-Null;"
+                f" Remove-Item '{log}','{err}' -ErrorAction SilentlyContinue")
         out["log"] = _win_ps(
-            f"$p = Start-Process -FilePath '{exe}' -ArgumentList 'tunnel','run','--token-file','C:\\programdata\\cloudflared\\token',"
-            f"'--protocol','{proto}','--loglevel','info','--logfile','{log}' -PassThru -WindowStyle Hidden;"
+            f"$p = Start-Process -FilePath '{exe}' -ArgumentList '--protocol','{proto}','--loglevel','info','--logfile','{log}',"
+            "'tunnel','run','--token-file','C:\\programdata\\cloudflared\\token'"
+            f" -PassThru -WindowStyle Hidden -RedirectStandardError '{err}';"
             " Start-Sleep -Seconds 12;"
             " 'exited=' + $p.HasExited;"
-            f" if (Test-Path '{log}') {{ Get-Content '{log}' -Tail 40 }} else {{ 'no log file written' }};"
+            f" '--- stderr ---'; if (Test-Path '{err}') {{ Get-Content '{err}' -Tail 30 }};"
+            f" '--- logfile ---'; if (Test-Path '{log}') {{ Get-Content '{log}' -Tail 30 }} else {{ 'no log file' }};"
             " if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force; 'stopped the test connector' }", 60)
         return out
 
@@ -1094,11 +1097,17 @@ def admin_diag_fix(inp: FixIn):
             state["cloudflared_imagepath"] = image
             _net_save(state)
         log = "C:\\ProgramData\\cloudflared\\cloudflared.log"
-        new = image
-        if "--logfile" not in new:
-            new += f' --logfile "{log}" --loglevel info'
-        if action == "cloudflared_http2" and "--protocol" not in new:
-            new += " --protocol " + ((inp.extra or "http2").strip().lower())
+        # insert the global options before the subcommand: appending them after `run` makes
+        # cloudflared exit at once with an unknown-flag error
+        head, sep, rest = image.partition('" tunnel ')
+        if not sep:
+            raise HTTPException(409, f"cannot find the tunnel subcommand: {image[:120]}")
+        flags = ""
+        if "--logfile" not in image:
+            flags += f' --loglevel info --logfile "{log}"'
+        if action == "cloudflared_http2" and "--protocol" not in image:
+            flags += " --protocol " + ((inp.extra or "http2").strip().lower())
+        new = f'{head}"{flags} tunnel {rest}' if flags else image
         if new == image:
             out["changed"] = "nothing to change; already set"
         else:
