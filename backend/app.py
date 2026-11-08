@@ -985,7 +985,7 @@ def admin_diag_fix(inp: FixIn):
         out["links"] = _links()
         out["metrics"] = _win_ps("Get-NetIPInterface -AddressFamily IPv4 | Where-Object { $_.InterfaceAlias -in 'Ethernet','Wi-Fi' } |"
                                  " ForEach-Object { $_.InterfaceAlias + '=' + $_.InterfaceMetric }")
-        out["cloudflared_image_path"] = _win_ps(f"(Get-ItemProperty '{_CF_KEY}').ImagePath").strip().strip('"')
+        out["cloudflared_image_path"] = _win_ps(f"(Get-ItemProperty '{_CF_KEY}').ImagePath").strip()
         out["saved"] = state
         return out
 
@@ -1028,8 +1028,10 @@ def admin_diag_fix(inp: FixIn):
         _net_save(state)
 
     elif action in ("cloudflared_log", "cloudflared_http2"):
-        image = _win_ps(f"(Get-ItemProperty '{_CF_KEY}').ImagePath").strip().strip('"')
+        image = _win_ps(f"(Get-ItemProperty '{_CF_KEY}').ImagePath").strip()
         out["image_path_before"] = image
+        if not image.startswith('"') or 'cloudflared.exe"' not in image:
+            raise HTTPException(409, f"unexpected service arguments, not touching them: {image[:120]}")
         if "cloudflared_imagepath" not in state:
             state["cloudflared_imagepath"] = image
             _net_save(state)
