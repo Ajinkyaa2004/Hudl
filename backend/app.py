@@ -829,6 +829,9 @@ def admin_diag(deep: int = 0):
         "events": ("Get-WinEvent -FilterHashtable @{LogName='Application';StartTime=(Get-Date).AddDays(-3)} -ErrorAction SilentlyContinue |"
                    " Where-Object { $_.ProviderName -match 'cloudflared' -or $_.Message -match 'cloudflared' } |"
                    " Select-Object -First 15 TimeCreated,Id,LevelDisplayName,Message | Format-List | Out-String", 40),
+        "service_errors": ("Get-WinEvent -FilterHashtable @{LogName='System';StartTime=(Get-Date).AddDays(-2)} -ErrorAction SilentlyContinue |"
+                           " Where-Object { $_.ProviderName -eq 'Service Control Manager' -and $_.Message -match 'Cloudflared' } |"
+                           " Select-Object -First 20 TimeCreated,Id,LevelDisplayName,Message | Format-List | Out-String", 40),
     }
     if deep:
         jobs["uplink"] = ("Test-Connection 1.1.1.1 -Count 20 -ErrorAction SilentlyContinue |"
@@ -988,6 +991,7 @@ def _revert(state):
 
 class FixIn(BaseModel):
     action: str
+    extra: str = ""
 
 
 @app.post("/api/admin/diag/fix")
@@ -1062,6 +1066,25 @@ def admin_diag_fix(inp: FixIn):
         state["nic_power"] = True
         _net_save(state)
 
+    elif action == "cloudflared_test":
+        # Run a second connector for 12 s with the requested transport and read its own log. It shares
+        # the tunnel with the service, so this proves whether the transport works without stopping
+        # the site. The process is killed before returning.
+        exe = "C:\\Program Files (x86)\\cloudflared\\cloudflared.exe"
+        log = "C:\\programdata\\cloudflared\\test.log"
+        proto = (inp.extra or "http2").strip().lower()
+        out["protocol"] = proto
+        _win_ps(f"New-Item -ItemType Directory -Force 'C:\\programdata\\cloudflared' | Out-Null;"
+                f" Remove-Item '{log}' -ErrorAction SilentlyContinue")
+        out["log"] = _win_ps(
+            f"$p = Start-Process -FilePath '{exe}' -ArgumentList 'tunnel','run','--token-file','C:\\programdata\\cloudflared\\token',"
+            f"'--protocol','{proto}','--loglevel','info','--logfile','{log}' -PassThru -WindowStyle Hidden;"
+            " Start-Sleep -Seconds 12;"
+            " 'exited=' + $p.HasExited;"
+            f" if (Test-Path '{log}') {{ Get-Content '{log}' -Tail 40 }} else {{ 'no log file written' }};"
+            " if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force; 'stopped the test connector' }", 60)
+        return out
+
     elif action in ("cloudflared_log", "cloudflared_http2"):
         image = _win_ps(f"(Get-ItemProperty '{_CF_KEY}').ImagePath").strip()
         out["image_path_before"] = image
@@ -1075,7 +1098,7 @@ def admin_diag_fix(inp: FixIn):
         if "--logfile" not in new:
             new += f' --logfile "{log}" --loglevel info'
         if action == "cloudflared_http2" and "--protocol" not in new:
-            new += " --protocol http2"
+            new += " --protocol " + ((inp.extra or "http2").strip().lower())
         if new == image:
             out["changed"] = "nothing to change; already set"
         else:
