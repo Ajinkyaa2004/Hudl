@@ -597,7 +597,9 @@ def _rss_mb() -> int:
         pass
     if _os.name == "nt":
         # The office PC runs Windows, where /proc does not exist; without this the health endpoint
-        # reported 0 MB and the load test had no memory number to judge.
+        # reported 0 MB and the load test had no memory number to judge. Explicit signatures matter:
+        # GetCurrentProcess returns the pseudo-handle -1, and without restype=c_void_p ctypes passes
+        # it as a 32-bit int, which Windows rejects as an invalid handle.
         try:
             import ctypes, ctypes.wintypes as _wt
 
@@ -610,8 +612,16 @@ def _rss_mb() -> int:
 
             pmc = _PMC()
             pmc.cb = ctypes.sizeof(_PMC)
-            handle = ctypes.windll.kernel32.GetCurrentProcess()
-            if ctypes.windll.psapi.GetProcessMemoryInfo(handle, ctypes.byref(pmc), pmc.cb):
+            k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+            k32.GetCurrentProcess.restype = ctypes.c_void_p
+            handle = k32.GetCurrentProcess()
+            try:
+                fn = ctypes.WinDLL("psapi", use_last_error=True).GetProcessMemoryInfo
+            except OSError:
+                fn = k32.K32GetProcessMemoryInfo
+            fn.argtypes = [ctypes.c_void_p, ctypes.POINTER(_PMC), _wt.DWORD]
+            fn.restype = _wt.BOOL
+            if fn(handle, ctypes.byref(pmc), pmc.cb):
                 return int(pmc.WorkingSetSize // (1024 * 1024))
         except Exception:
             pass
