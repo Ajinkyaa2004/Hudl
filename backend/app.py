@@ -762,7 +762,7 @@ def admin_diag(deep: int = 0):
             p = subprocess.run(args, capture_output=True, timeout=timeout,
                                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
             text = (p.stdout or b"") + (b"\n" + p.stderr if p.stderr else b"")
-            return text.decode("utf-8", "replace").strip()[:8000]
+            return text.decode("utf-8", "replace").strip()[:20000]
         except FileNotFoundError:
             return f"not found: {args[0]}"
         except Exception as e:                        # a blocked command must not fail the report
@@ -773,11 +773,15 @@ def admin_diag(deep: int = 0):
                     "-Command", script], timeout)
 
     def probe(url, tries=3):
+        # a browser name matters: Cloudflare's managed rules answer 403 to Python's default agent,
+        # which would look like an outage
+        browser = {"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                                 "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"}
         got = []
         for _ in range(tries):
             t0 = _t.time()
             try:
-                with urllib.request.urlopen(url, timeout=8) as r:
+                with urllib.request.urlopen(urllib.request.Request(url, headers=browser), timeout=8) as r:
                     r.read()
                     got.append(dict(status=r.status, ms=round((_t.time() - t0) * 1000)))
             except Exception as e:
@@ -796,30 +800,42 @@ def admin_diag(deep: int = 0):
                     "Get-CimInstance Win32_OperatingSystem | Select TotalVisibleMemorySize,FreePhysicalMemory,LastBootUpTime | ConvertTo-Json -Compress;"
                     "Get-PSDrive C | Select Used,Free | ConvertTo-Json -Compress", 25),
         "adapters": ("Get-NetAdapter | Select Name,Status,LinkSpeed,MediaType,InterfaceDescription | ConvertTo-Json -Compress", 25),
-        "adapter_power": ("Get-NetAdapter | Where-Object Status -eq 'Up' | ForEach-Object { $p = Get-NetAdapterPowerManagement -Name $_.Name -ErrorAction SilentlyContinue;"
-                          " [pscustomobject]@{Name=$_.Name; AllowComputerToTurnOffDevice=$p.AllowComputerToTurnOffDevice} } | ConvertTo-Json -Compress", 25),
+        "routes": ("Find-NetRoute -RemoteIPAddress 1.1.1.1 | Select-Object InterfaceAlias,IPAddress,NextHop,RouteMetric,InterfaceMetric | ConvertTo-Json -Compress;"
+                   "Get-NetIPConfiguration | ForEach-Object { [pscustomobject]@{ If=$_.InterfaceAlias; IPv4=(@($_.IPv4Address.IPAddress) -join ',');"
+                   " Gateway=(@($_.IPv4DefaultGateway.NextHop) -join ',') } } | ConvertTo-Json -Compress", 25),
+        "adapter_power": ("Get-NetAdapter | Where-Object Status -eq 'Up' | ForEach-Object { $n = $_.Name;"
+                          " $p = Get-NetAdapterPowerManagement -Name $n -ErrorAction SilentlyContinue;"
+                          " '{0} | turn-off-device={1} | sleep-on-disconnect={2}' -f $n, $p.AllowComputerToTurnOffDevice, $p.DeviceSleepOnDisconnect }", 25),
         "wifi": ("netsh wlan show interfaces", 15),
+        "power": ("powercfg /a;"
+                  "powercfg /q SCHEME_CURRENT 19cbb8fa-5279-450e-9fac-8a3d5fedd0c1 | Select-String -Pattern 'Power Saving Mode|Current AC|Current DC|Index'", 20),
+        "ports": ("Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue | Where-Object { $_.LocalPort -in 80,443,8000,7844 } |"
+                  " Select-Object LocalAddress,LocalPort,OwningProcess | Sort-Object LocalPort | Format-Table -AutoSize | Out-String", 20),
         "cloudflared_service": ("Get-Service *cloudflared* | Select Name,Status,StartType | ConvertTo-Json -Compress;"
                                 "Get-CimInstance Win32_Process -Filter \"Name='cloudflared.exe'\" | Select ProcessId,CommandLine | ConvertTo-Json -Compress", 25),
         "cloudflared_version": ("$c = (Get-Command cloudflared.exe -ErrorAction SilentlyContinue).Source;"
                                 "if (-not $c) { $c = (Get-ChildItem 'C:\\Program Files*\\cloudflared\\cloudflared.exe','C:\\PuckTrace\\cloudflared.exe' -ErrorAction SilentlyContinue | Select-Object -First 1).FullName };"
                                 "if ($c) { \"exe: $c\"; & $c --version 2>&1 } else { 'cloudflared.exe not found' }", 20),
-        "cloudflared_logs": ("$f = Get-ChildItem " + ",".join(f"'{d}'" for d in _DIAG_FILES) +
-                             " -Filter *.log -Recurse -ErrorAction SilentlyContinue | Sort-Object LastWriteTime;"
-                             "$f | Select-Object FullName,Length,LastWriteTime | Format-Table -AutoSize | Out-String;"
-                             "foreach ($x in $f) { \"`n== $($x.FullName) ==\";"
-                             " Get-Content $x.FullName -Tail 3000 | Select-String -Pattern 'ERR|error|warn|retry|reconnect|timeout|502|503|504|Unable|failed|Registered tunnel|connection' |"
-                             " Select-Object -Last 40 | ForEach-Object { $_.Line } }", 40),
+        "cloudflared_logs": ("$d = " + ",".join(f"'{x}'" for x in _DIAG_FILES) + ";"
+                             "Get-ChildItem 'C:\\ProgramData\\cloudflared' -ErrorAction SilentlyContinue | Select-Object Name,Length,LastWriteTime | Format-Table -AutoSize | Out-String;"
+                             "$f = Get-ChildItem $d -Filter 'cloudflared*.log' -ErrorAction SilentlyContinue | Sort-Object LastWriteTime;"
+                             "if (-not $f) { 'no cloudflared log file: the service logs to the Windows Event Log' }"
+                             "foreach ($x in $f) { \"`n== $($x.FullName) ==\"; Get-Content $x.FullName -Tail 1500 |"
+                             " Select-String -Pattern 'ERR|error|warn|retry|reconnect|timeout|502|503|504|Unable|failed|Registered tunnel' |"
+                             " Select-Object -Last 50 | ForEach-Object { $_.Line } }", 30),
+        "cloudflared_events": ("$e = Get-WinEvent -ProviderName Cloudflared -MaxEvents 150 -ErrorAction SilentlyContinue;"
+                               "if (-not $e) { 'no events from the Cloudflared provider' } else { $e |"
+                               " ForEach-Object { '{0} | {1} | {2} | {3}' -f $_.TimeCreated.ToString('yyyy-MM-dd HH:mm:ss'), $_.Id, $_.LevelDisplayName, ($_.Message -replace '\\s+',' ') } }", 40),
         "events": ("Get-WinEvent -FilterHashtable @{LogName='Application';StartTime=(Get-Date).AddDays(-3)} -ErrorAction SilentlyContinue |"
                    " Where-Object { $_.ProviderName -match 'cloudflared' -or $_.Message -match 'cloudflared' } |"
-                   " Select-Object -First 25 TimeCreated,Id,LevelDisplayName,Message | Format-List | Out-String", 40),
+                   " Select-Object -First 15 TimeCreated,Id,LevelDisplayName,Message | Format-List | Out-String", 40),
     }
     if deep:
         jobs["uplink"] = ("Test-Connection 1.1.1.1 -Count 20 -ErrorAction SilentlyContinue |"
                           " Measure-Object -Property ResponseTime -Average -Minimum -Maximum | Format-List | Out-String", 40)
 
     out = {}
-    with ThreadPoolExecutor(max_workers=6) as pool:
+    with ThreadPoolExecutor(max_workers=8) as pool:
         futures = {k: pool.submit(ps, script, timeout) for k, (script, timeout) in jobs.items()}
         for k, f in futures.items():
             out[k] = _redact(f.result())
