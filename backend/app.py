@@ -912,6 +912,24 @@ def _site_ok(tries=5):
     return dict(ok=ok, fails=fails, last=last)
 
 
+def _site_wait(seconds=90):
+    """Wait for the public name to answer after a change that restarts the tunnel. A connector needs
+    up to a minute to register; probing too early caused a false revert on the first attempt."""
+    import urllib.request
+    t0 = _time.time()
+    last = None
+    while _time.time() - t0 < seconds:
+        try:
+            with urllib.request.urlopen(urllib.request.Request(
+                    "https://nas.actorix.in/api/healthz", headers=_BROWSER_UA), timeout=8) as r:
+                r.read()
+                return dict(ok=1, fails=0, waited_s=round(_time.time() - t0))
+        except Exception as e:
+            last = f"{type(e).__name__}: {e}"
+        _time.sleep(2)
+    return dict(ok=0, fails=1, waited_s=round(_time.time() - t0), last=last)
+
+
 def _net_state():
     import json as _j
     try:
@@ -1027,6 +1045,23 @@ def admin_diag_fix(inp: FixIn):
         state["wifi_performance"] = True
         _net_save(state)
 
+    elif action == "nic_power":
+        # "Allow the computer to turn off this device to save power" is not exposed by
+        # Set-NetAdapterPowerManagement on this Windows build; the WMI power class is.
+        script = (
+            "$ids = @();"
+            " $ids += (Get-NetAdapter -Name 'Wi-Fi' -ErrorAction SilentlyContinue).PnpDeviceID;"
+            " $ids += (Get-NetAdapter -Name 'Ethernet' -ErrorAction SilentlyContinue).PnpDeviceID;"
+            " $ids = @($ids | Where-Object { $_ });"
+            " Get-WmiObject -Namespace root\\wmi -Class MSPower_DeviceEnable -ErrorAction SilentlyContinue |"
+            " ForEach-Object { $o = $_; foreach ($id in $ids) { if ($o.InstanceName -like \"*$id*\") {"
+            " $o.Enable = $false; [void]$o.Put(); 'off=' + $o.InstanceName } } };"
+            " Get-WmiObject -Namespace root\\wmi -Class MSPower_DeviceEnable -ErrorAction SilentlyContinue |"
+            " ForEach-Object { $_.InstanceName + ' enabled=' + $_.Enable }")
+        out["changed"] = _win_ps(script)
+        state["nic_power"] = True
+        _net_save(state)
+
     elif action in ("cloudflared_log", "cloudflared_http2"):
         image = _win_ps(f"(Get-ItemProperty '{_CF_KEY}').ImagePath").strip()
         out["image_path_before"] = image
@@ -1046,18 +1081,16 @@ def admin_diag_fix(inp: FixIn):
         else:
             _win_ps("New-Item -ItemType Directory -Force 'C:\\ProgramData\\cloudflared' | Out-Null")
             out["changed"] = _win_ps(f"Set-ItemProperty -Path '{_CF_KEY}' -Name ImagePath -Value '{new}';"
-                                     "Restart-Service Cloudflared -Force; Start-Sleep -Seconds 10; (Get-Service Cloudflared).Status")
-        # a service restart needs longer than a route change before the tunnel answers again
-        _time.sleep(4)
-
+                                     "Restart-Service Cloudflared -Force; Start-Sleep -Seconds 3; (Get-Service Cloudflared).Status")
+        # a restarting connector needs up to a minute to register; the wait below decides
     else:
         raise HTTPException(400, f"unknown action {action!r}")
 
-    after = _site_ok(5)
+    after = _site_wait(75) if action.startswith("cloudflared_") else _site_ok(5)
     out["after"] = after
     if after["fails"] and action in ("prefer_ethernet", "cloudflared_log", "cloudflared_http2"):
         out["reverted"] = _revert(state)
-        out["after_revert"] = _site_ok(3)
+        out["after_revert"] = _site_wait(75)
     return out
 
 
