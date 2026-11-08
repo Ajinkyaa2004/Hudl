@@ -732,6 +732,106 @@ async def admin_game_list():
     return Response(_EXPORT.read_bytes(), media_type="application/gzip")
 
 
+# ---------------------------------------------------------------- tunnel and machine diagnostics
+# The Status page says "the PC was up, the way in was not" but cannot say *why*. This reports what
+# the machine itself can see: the cloudflared service and its command line, the tail of its log, the
+# network adapter and its power saving, memory and disk, and the app's health down two paths. It is
+# read-only and admin-only, and it never reads env.cmd or prints a secret.
+_DIAG_FILES = ("C:\\PuckTrace\\logs", "C:\\ProgramData\\cloudflared",
+               "C:\\Windows\\System32\\config\\systemprofile\\.cloudflared", "C:\\cloudflared")
+import re as _re
+_REDACT = _re.compile(r"(?i)^\s*(tunnelsecret|secret|token|password|api[-_]?token)\b")
+
+
+def _redact(text: str) -> str:
+    out = []
+    for line in (text or "").splitlines():
+        out.append("***" if _REDACT.search(line) else line)
+    return "\n".join(out)
+
+
+@app.get("/api/admin/diag")
+def admin_diag(deep: int = 0):
+    """Admin only. Read-only look at the machine that serves PuckTrace: cloudflared, its log, the
+    adapter, power saving, memory and disk, plus the app reached locally and through the tunnel."""
+    import shutil, subprocess, time as _t, urllib.request
+    from concurrent.futures import ThreadPoolExecutor
+
+    def run(args, timeout=25):
+        try:
+            p = subprocess.run(args, capture_output=True, timeout=timeout,
+                               creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+            text = (p.stdout or b"") + (b"\n" + p.stderr if p.stderr else b"")
+            return text.decode("utf-8", "replace").strip()[:8000]
+        except FileNotFoundError:
+            return f"not found: {args[0]}"
+        except Exception as e:                        # a blocked command must not fail the report
+            return f"{type(e).__name__}: {e}"
+
+    def ps(script, timeout=25):
+        return run([shutil.which("powershell") or "powershell", "-NoProfile", "-NonInteractive",
+                    "-Command", script], timeout)
+
+    def probe(url, tries=3):
+        got = []
+        for _ in range(tries):
+            t0 = _t.time()
+            try:
+                with urllib.request.urlopen(url, timeout=8) as r:
+                    r.read()
+                    got.append(dict(status=r.status, ms=round((_t.time() - t0) * 1000)))
+            except Exception as e:
+                got.append(dict(status=getattr(e, "code", None), ms=round((_t.time() - t0) * 1000),
+                                error=f"{type(e).__name__}: {e}"))
+            _t.sleep(0.4)
+        return dict(url=url, tries=got,
+                    fails=sum(1 for g in got if g.get("error") or (g.get("status") or 500) >= 500))
+
+    if _os.name != "nt":
+        return dict(server=SERVER, label=SERVER_LABEL, at=_time.strftime("%Y-%m-%dT%H:%M:%S"),
+                    note="this is not the office PC; nothing to read here", probes=[])
+
+    jobs = {
+        "machine": ("Get-CimInstance Win32_ComputerSystem | Select Manufacturer,Model,TotalPhysicalMemory | ConvertTo-Json -Compress;"
+                    "Get-CimInstance Win32_OperatingSystem | Select TotalVisibleMemorySize,FreePhysicalMemory,LastBootUpTime | ConvertTo-Json -Compress;"
+                    "Get-PSDrive C | Select Used,Free | ConvertTo-Json -Compress", 25),
+        "adapters": ("Get-NetAdapter | Select Name,Status,LinkSpeed,MediaType,InterfaceDescription | ConvertTo-Json -Compress", 25),
+        "adapter_power": ("Get-NetAdapter | Where-Object Status -eq 'Up' | ForEach-Object { $p = Get-NetAdapterPowerManagement -Name $_.Name -ErrorAction SilentlyContinue;"
+                          " [pscustomobject]@{Name=$_.Name; AllowComputerToTurnOffDevice=$p.AllowComputerToTurnOffDevice} } | ConvertTo-Json -Compress", 25),
+        "wifi": ("netsh wlan show interfaces", 15),
+        "cloudflared_service": ("Get-Service *cloudflared* | Select Name,Status,StartType | ConvertTo-Json -Compress;"
+                                "Get-CimInstance Win32_Process -Filter \"Name='cloudflared.exe'\" | Select ProcessId,CommandLine | ConvertTo-Json -Compress", 25),
+        "cloudflared_version": ("$c = (Get-Command cloudflared.exe -ErrorAction SilentlyContinue).Source;"
+                                "if (-not $c) { $c = (Get-ChildItem 'C:\\Program Files*\\cloudflared\\cloudflared.exe','C:\\PuckTrace\\cloudflared.exe' -ErrorAction SilentlyContinue | Select-Object -First 1).FullName };"
+                                "if ($c) { \"exe: $c\"; & $c --version 2>&1 } else { 'cloudflared.exe not found' }", 20),
+        "cloudflared_logs": ("$f = Get-ChildItem " + ",".join(f"'{d}'" for d in _DIAG_FILES) +
+                             " -Filter *.log -Recurse -ErrorAction SilentlyContinue | Sort-Object LastWriteTime;"
+                             "$f | Select-Object FullName,Length,LastWriteTime | Format-Table -AutoSize | Out-String;"
+                             "foreach ($x in $f) { \"`n== $($x.FullName) ==\";"
+                             " Get-Content $x.FullName -Tail 3000 | Select-String -Pattern 'ERR|error|warn|retry|reconnect|timeout|502|503|504|Unable|failed|Registered tunnel|connection' |"
+                             " Select-Object -Last 40 | ForEach-Object { $_.Line } }", 40),
+        "events": ("Get-WinEvent -FilterHashtable @{LogName='Application';StartTime=(Get-Date).AddDays(-3)} -ErrorAction SilentlyContinue |"
+                   " Where-Object { $_.ProviderName -match 'cloudflared' -or $_.Message -match 'cloudflared' } |"
+                   " Select-Object -First 25 TimeCreated,Id,LevelDisplayName,Message | Format-List | Out-String", 40),
+    }
+    if deep:
+        jobs["uplink"] = ("Test-Connection 1.1.1.1 -Count 20 -ErrorAction SilentlyContinue |"
+                          " Measure-Object -Property ResponseTime -Average -Minimum -Maximum | Format-List | Out-String", 40)
+
+    out = {}
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        futures = {k: pool.submit(ps, script, timeout) for k, (script, timeout) in jobs.items()}
+        for k, f in futures.items():
+            out[k] = _redact(f.result())
+
+    out["probes"] = [probe("http://127.0.0.1:8000/api/healthz", tries=2),
+                     probe("https://nas.actorix.in/api/healthz", tries=5),
+                     probe("https://pucktrace-api-8u5i.onrender.com/api/healthz", tries=1)]
+    return dict(server=SERVER, label=SERVER_LABEL, at=_time.strftime("%Y-%m-%dT%H:%M:%S"),
+                version=_os.environ.get("APP_VERSION"), **out)
+
+
+
 async def _game_list_loop():
     import asyncio
     await asyncio.sleep(5)
