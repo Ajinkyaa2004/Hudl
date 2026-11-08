@@ -840,11 +840,224 @@ def admin_diag(deep: int = 0):
         for k, f in futures.items():
             out[k] = _redact(f.result())
 
+    # which link actually carries traffic: connect to the internet from each adapter's own address.
+    # Windows picks one default route, so this is the only way to know whether the wired link works.
+    def via(ip):
+        import socket
+        s = socket.socket()
+        s.settimeout(6)
+        t0 = _t.time()
+        try:
+            s.bind((ip, 0))
+            s.connect(("1.1.1.1", 443))
+            return dict(ip=ip, ok=True, ms=round((_t.time() - t0) * 1000))
+        except Exception as e:
+            return dict(ip=ip, ok=False, ms=round((_t.time() - t0) * 1000),
+                        error=f"{type(e).__name__}: {e}")
+        finally:
+            s.close()
+
+    ifs = []
+    for line in (_win_ps("Get-NetIPConfiguration | Where-Object { $_.IPv4DefaultGateway } | ForEach-Object {"
+                         " '{0}|{1}' -f $_.InterfaceAlias, (@($_.IPv4Address.IPAddress) -join ',') }") or "").splitlines():
+        if "|" in line:
+            alias, addrs = line.split("|", 1)
+            for ip in addrs.split(","):
+                if ip.strip():
+                    ifs.append(dict(alias=alias.strip(), **via(ip.strip())))
+    out["interfaces"] = ifs
+
     out["probes"] = [probe("http://127.0.0.1:8000/api/healthz", tries=2),
                      probe("https://nas.actorix.in/api/healthz", tries=5),
                      probe("https://pucktrace-api-8u5i.onrender.com/api/healthz", tries=1)]
     return dict(server=SERVER, label=SERVER_LABEL, at=_time.strftime("%Y-%m-%dT%H:%M:%S"),
                 version=_os.environ.get("APP_VERSION"), **out)
+
+
+# ---------------------------------------------------------------- reversible fixes (admin only)
+# One action, one change, then check that the site still answers through the tunnel; undo it if not.
+# What was changed is kept in data/net_revert.json so `revert_network` works even after a restart.
+_NET_STATE = ROOT / "data" / "net_revert.json"
+_CF_KEY = "HKLM:\\SYSTEM\\CurrentControlSet\\Services\\Cloudflared"
+_BROWSER_UA = {"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                             "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"}
+
+
+def _win_ps(script, timeout=45):
+    import shutil, subprocess
+    try:
+        p = subprocess.run([shutil.which("powershell") or "powershell", "-NoProfile", "-NonInteractive",
+                            "-Command", script], capture_output=True, timeout=timeout,
+                           creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        return ((p.stdout or b"") + (b"\n" + p.stderr if p.stderr else b"")).decode("utf-8", "replace").strip()[:4000]
+    except Exception as e:
+        return f"{type(e).__name__}: {e}"
+
+
+def _site_ok(tries=5):
+    """Does the public name answer through the tunnel right now? Every change is judged by this."""
+    import urllib.request
+    ok = fails = 0
+    last = None
+    for _ in range(tries):
+        try:
+            with urllib.request.urlopen(urllib.request.Request(
+                    "https://nas.actorix.in/api/healthz", headers=_BROWSER_UA), timeout=8) as r:
+                r.read()
+                ok += 1
+        except Exception as e:
+            fails += 1
+            last = f"{type(e).__name__}: {e}"
+        _time.sleep(0.3)
+    return dict(ok=ok, fails=fails, last=last)
+
+
+def _net_state():
+    import json as _j
+    try:
+        return _j.loads(_NET_STATE.read_text())
+    except Exception:
+        return {}
+
+
+def _net_save(state):
+    import json as _j
+    _NET_STATE.parent.mkdir(parents=True, exist_ok=True)
+    _NET_STATE.write_text(_j.dumps(state, indent=1))
+
+
+def _links():
+    """Every adapter that has a default gateway, plus whether the internet is reachable from its own
+    address. Binding the socket is the only way to test a link Windows is not routing through."""
+    import socket
+    out = []
+    for line in (_win_ps("Get-NetIPConfiguration | Where-Object { $_.IPv4DefaultGateway } | ForEach-Object {"
+                         " '{0}|{1}' -f $_.InterfaceAlias, (@($_.IPv4Address.IPAddress) -join ',') }") or "").splitlines():
+        if "|" not in line:
+            continue
+        alias, addrs = line.split("|", 1)
+        for ip in [a.strip() for a in addrs.split(",") if a.strip()]:
+            s = socket.socket()
+            s.settimeout(6)
+            try:
+                s.bind((ip, 0))
+                s.connect(("1.1.1.1", 443))
+                out.append(dict(alias=alias.strip(), ip=ip, ok=True))
+            except Exception as e:
+                out.append(dict(alias=alias.strip(), ip=ip, ok=False, error=f"{type(e).__name__}: {e}"))
+            finally:
+                s.close()
+    return out
+
+
+def _revert(state):
+    """Put the previous settings back. Safe to call when nothing was changed."""
+    notes = []
+    if state.get("cloudflared_imagepath"):
+        old = state["cloudflared_imagepath"]
+        notes.append(_win_ps(f"Set-ItemProperty -Path '{_CF_KEY}' -Name ImagePath -Value '{old}';"
+                             "Restart-Service Cloudflared -Force; Start-Sleep -Seconds 8; (Get-Service Cloudflared).Status"))
+        state.pop("cloudflared_imagepath", None)
+    if state.get("metrics"):
+        parts = [f"Set-NetIPInterface -InterfaceAlias '{a}' -AddressFamily IPv4 -InterfaceMetric {int(v)}"
+                 for a, v in state["metrics"].items() if str(v).strip().isdigit()]
+        if parts:
+            notes.append(_win_ps(";".join(parts)))
+        state.pop("metrics", None)
+    _net_save(state)
+    return notes
+
+
+class FixIn(BaseModel):
+    action: str
+
+
+@app.post("/api/admin/diag/fix")
+def admin_diag_fix(inp: FixIn):
+    """Admin only. One small, reversible change to the office PC, verified through the tunnel."""
+    if _os.name != "nt":
+        raise HTTPException(400, "only the office PC can apply these")
+    action = (inp.action or "").strip().lower()
+    state = _net_state()
+    out = dict(action=action)
+
+    if action == "state":
+        out["links"] = _links()
+        out["metrics"] = _win_ps("Get-NetIPInterface -AddressFamily IPv4 | Where-Object { $_.InterfaceAlias -in 'Ethernet','Wi-Fi' } |"
+                                 " ForEach-Object { $_.InterfaceAlias + '=' + $_.InterfaceMetric }")
+        out["cloudflared_image_path"] = _win_ps(f"(Get-ItemProperty '{_CF_KEY}').ImagePath").strip().strip('"')
+        out["saved"] = state
+        return out
+
+    if action == "revert_network":
+        out["reverted"] = _revert(state)
+        out["after"] = _site_ok(3)
+        return out
+
+    out["before"] = _site_ok(3)
+
+    if action == "prefer_ethernet":
+        out["links"] = _links()
+        if not [l for l in out["links"] if l["alias"].lower() == "ethernet" and l["ok"]]:
+            out["result"] = "Ethernet has no internet from its own address; nothing changed"
+            return out
+        if "metrics" not in state:
+            saved = {}
+            for alias in ("Ethernet", "Wi-Fi"):
+                v = _win_ps(f"(Get-NetIPInterface -InterfaceAlias '{alias}' -AddressFamily IPv4).InterfaceMetric").strip()
+                if v.isdigit():
+                    saved[alias] = int(v)
+            state["metrics"] = saved
+            _net_save(state)
+        out["changed"] = _win_ps("Set-NetIPInterface -InterfaceAlias Ethernet -AddressFamily IPv4 -InterfaceMetric 10;"
+                                 "Set-NetIPInterface -InterfaceAlias Wi-Fi -AddressFamily IPv4 -InterfaceMetric 60;"
+                                 "(Get-NetIPInterface -InterfaceAlias Ethernet -AddressFamily IPv4).InterfaceMetric;"
+                                 "(Get-NetIPInterface -InterfaceAlias Wi-Fi -AddressFamily IPv4).InterfaceMetric")
+        _time.sleep(3)
+
+    elif action == "wifi_performance":
+        out["changed"] = _win_ps(
+            "Set-NetAdapterPowerManagement -Name 'Wi-Fi' -AllowComputerToTurnOffDevice Disabled -ErrorAction SilentlyContinue;"
+            "Set-NetAdapterPowerManagement -Name 'Ethernet' -AllowComputerToTurnOffDevice Disabled -ErrorAction SilentlyContinue;"
+            "powercfg /setacvalueindex SCHEME_CURRENT 19cbb8fa-5279-450e-9fac-8a3d5fedd0c1 12bbebe6-58d6-4636-95bb-3217ef867c1a 0;"
+            "powercfg /setdcvalueindex SCHEME_CURRENT 19cbb8fa-5279-450e-9fac-8a3d5fedd0c1 12bbebe6-58d6-4636-95bb-3217ef867c1a 0;"
+            "powercfg /setactive SCHEME_CURRENT;"
+            "powercfg /change standby-timeout-ac 0; powercfg /change hibernate-timeout-ac 0;"
+            "Get-NetAdapterPowerManagement -Name 'Wi-Fi','Ethernet' | ForEach-Object { $_.Name + ' turn-off=' + $_.AllowComputerToTurnOffDevice }")
+        state["wifi_performance"] = True
+        _net_save(state)
+
+    elif action in ("cloudflared_log", "cloudflared_http2"):
+        image = _win_ps(f"(Get-ItemProperty '{_CF_KEY}').ImagePath").strip().strip('"')
+        out["image_path_before"] = image
+        if "cloudflared_imagepath" not in state:
+            state["cloudflared_imagepath"] = image
+            _net_save(state)
+        log = "C:\\ProgramData\\cloudflared\\cloudflared.log"
+        new = image
+        if "--logfile" not in new:
+            new += f' --logfile "{log}" --loglevel info'
+        if action == "cloudflared_http2" and "--protocol" not in new:
+            new += " --protocol http2"
+        if new == image:
+            out["changed"] = "nothing to change; already set"
+        else:
+            _win_ps("New-Item -ItemType Directory -Force 'C:\\ProgramData\\cloudflared' | Out-Null")
+            out["changed"] = _win_ps(f"Set-ItemProperty -Path '{_CF_KEY}' -Name ImagePath -Value '{new}';"
+                                     "Restart-Service Cloudflared -Force; Start-Sleep -Seconds 10; (Get-Service Cloudflared).Status")
+        # a service restart needs longer than a route change before the tunnel answers again
+        _time.sleep(4)
+
+    else:
+        raise HTTPException(400, f"unknown action {action!r}")
+
+    after = _site_ok(5)
+    out["after"] = after
+    if after["fails"] and action in ("prefer_ethernet", "cloudflared_log", "cloudflared_http2"):
+        out["reverted"] = _revert(state)
+        out["after_revert"] = _site_ok(3)
+    return out
+
 
 
 
