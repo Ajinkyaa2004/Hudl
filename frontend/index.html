@@ -12,8 +12,10 @@
 <meta name="author" content="Actorix (Ajinkya Dhumal)">
 <meta name="copyright" content="© 2026 Actorix">
 <meta name="description" content="PuckTrace by Actorix: finds ice hockey match reports and team rosters.">
+<meta name="robots" content="noindex,nofollow">   <!-- an internal team tool: keep it out of search engines -->
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Cellipse cx=%2716%27 cy=%2720%27 rx=%2712%27 ry=%275%27 fill=%27%23f2610d%27/%3E%3Cellipse cx=%2716%27 cy=%2715%27 rx=%2712%27 ry=%275%27 fill=%27%23ff8a3d%27/%3E%3Crect x=%274%27 y=%2715%27 width=%2724%27 height=%275%27 fill=%27%23f2610d%27/%3E%3C/svg%3E">
 <style>
+[hidden]{display:none!important}
 /* ===================== tokens ===================== */
 :root{
   --bg:#f5f5f7;--s1:#ffffff;--s2:#f4f4f6;--s3:#ebebef;--line:#e7e7ec;--line2:#d7d7de;
@@ -548,7 +550,7 @@ html.theme-vt::view-transition-new(root){animation:theme-reveal .38s var(--ease-
     </nav>
     <div class="foot">
       <div class="kpis-mini" id="sidestats"></div>
-      <div class="by" style="display:flex;align-items:center;gap:7px"><a href="https://actorix.in" target="_blank" rel="noopener" title="Actorix website" style="display:inline-flex"><span class="axlogo" role="img" aria-label="Actorix logo" style="width:18px;height:18px"></span></a><span>Built by <a href="https://actorix.in" target="_blank" rel="noopener">Actorix</a> · Ajinkya Dhumal</span></div>
+      <div class="by" style="display:flex;align-items:center;gap:7px"><a href="https://actorix.in" target="_blank" rel="noopener" title="Actorix website" style="display:inline-flex"><span class="axlogo" role="img" aria-label="Actorix logo" style="width:18px;height:18px"></span></a><span>Built by <a href="https://actorix.in" target="_blank" rel="noopener">Actorix</a> · Ajinkya Dhumal</span><span id="switchname" hidden style="margin-left:auto">· <a href="#" id="switchlink">Switch name</a></span></div>
       <button class="theme" id="theme" data-theme-toggle aria-label="Switch light or dark mode"><svg class="ic sm moon"><use href="#i-moon"/></svg><svg class="ic sm sun"><use href="#i-sun"/></svg><span class="tlabel">Theme</span></button>
     </div>
   </aside>
@@ -744,7 +746,8 @@ html.theme-vt::view-transition-new(root){animation:theme-reveal .38s var(--ease-
 <div class="login" id="login"><form class="lcard" id="lform">
   <div class="brand" style="justify-content:center;padding:0 0 6px;font-size:22px"><svg width="34" height="34"><use href="#i-puck"/></svg><span>Puck<b>Trace</b></span></div>
   <div class="mu small" style="text-align:center;margin-bottom:20px">Match reports and rosters for RTT</div>
-  <input class="f" id="lname" type="text" placeholder="Username" autocomplete="username" maxlength="40" style="margin-bottom:8px">
+  <input class="f" id="lname" type="text" placeholder="Your name" autocomplete="name" maxlength="40" style="margin-bottom:8px">
+  <div class="mu small" id="lopennote" hidden style="text-align:center;margin:-2px 0 10px">No password. Type your name to start.</div>
   <input class="f" id="lpw" type="password" placeholder="Password" autocomplete="current-password">
   <button class="btn" type="submit" style="width:100%;margin-top:12px">Sign in</button>
   <div class="msg err" id="lmsg" style="margin-top:10px;text-align:center"></div>
@@ -757,6 +760,9 @@ const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const ic=(n,c='sm')=>`<svg class="ic ${c}"><use href="#i-${n}"/></svg>`;
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+/* the Admin screen lives on its own address (admin.pucktrace.actorix.in); the team's address never
+   shows it, and the server only gives an admin-session to the admin address */
+const ADMIN_SITE=/^admin\./.test(location.hostname);
 /* the server sleeps on the free plan and can be briefly unreachable while it wakes or restarts:
    502/503/504 and network errors are retried with a "waking up" banner instead of failing */
 function wake(on){$('#wake').classList.toggle('on',!!on)}
@@ -774,10 +780,13 @@ function apiBase(){if(!onNas(API_BASE)&&Date.now()>API_BACKUP_UNTIL){API_BASE=NA
 function useBackup(){if(onNas(API_BASE)){API_BASE=BACKUP;API_BACKUP_UNTIL=Date.now()+300000;noteSwitch('a search or request to the NAS failed');setTimeout(()=>checkServers(),500);return true}return false}
 function otherNasWay(){}   // one way in to the NAS (it had a second one through Vercel)
 /* the sign-in travels as a header (a cookie of this site doesn't reach the NAS's own address) */
-/* the sign-in lives in this tab only (sessionStorage): a reload keeps it, closing the tab or the
-   browser ends it, and a new tab asks for the password again */
-let TOKEN=null;try{localStorage.removeItem('pt-token');TOKEN=sessionStorage.getItem('pt-token')||null}catch(e){}
-function setToken(t){if(!t)return;TOKEN=t;try{sessionStorage.setItem('pt-token',t)}catch(e){}}
+/* the team's name-session stays in this browser (localStorage): a refresh, or coming back tomorrow,
+   keeps the same person; the admin address keeps its session in this tab only */
+let TOKEN=null;try{TOKEN=(ADMIN_SITE?sessionStorage:localStorage).getItem('pt-token')||null}catch(e){}
+function setToken(t){if(!t)return;TOKEN=t;try{(ADMIN_SITE?sessionStorage:localStorage).setItem('pt-token',t)}catch(e){}}
+function clearToken(){TOKEN=null;try{localStorage.removeItem('pt-token');sessionStorage.removeItem('pt-token')}catch(e){}}
+/* a random id for this browser: the server remembers where a name is used, so the admin can see it */
+function deviceId(){try{let d=localStorage.getItem('pt-device');if(!d){d=String(crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random().toString(36).slice(2));localStorage.setItem('pt-device',d)}return d}catch(e){return ''}}
 function hdrs(json=true){const h={};if(json)h['content-type']='application/json';if(TOKEN)h['x-pt-session']=TOKEN;return h}
 /* why the page left the NAS: the last failure on each way in is noted; a move to the backup is kept
    in this browser and reported to the NAS once it answers again (Status > Moves to the backup) */
@@ -916,26 +925,39 @@ function showAnn(a){ANN=a||null;let hid='';try{hid=localStorage.getItem('pt-ann-
   ANN_SHOWN=key;clearTimeout(ANN_T);b.className='annbar'+(a.level==='warn'?' warn':'');$('#anntext').textContent=a.text;b.hidden=false;
   requestAnimationFrame(()=>b.classList.add('on'))}
 $('#annx').onclick=()=>{if(ANN)try{localStorage.setItem('pt-ann-hidden',ANN.id)}catch(e){}hideAnn()};
-/* each person signs in with their own name and password; the server says whose session it is */
-function showLogin(){$('#lname').value=MY_NAME||'';$('#login').classList.add('on');setTimeout(()=>(MY_NAME?$('#lpw'):$('#lname')).focus(),50)}
-/* the Admin screen lives on its own address (admin.pucktrace.actorix.in): there it opens first and is
-   only for admin accounts; the team's address never shows it */
-const ADMIN_SITE=/^admin\./.test(location.hostname);
+/* the team's site asks only for a name; the admin address asks for the admin password */
+let OPEN_ACCESS=false;
+function showLogin(){
+  const open=OPEN_ACCESS&&!ADMIN_SITE;
+  $('#lname').value=MY_NAME||'';
+  $('#lpw').hidden=open;$('#lopennote').hidden=!open;
+  const b=$('#lform button[type=submit]');if(b)b.textContent=open?'Start':'Sign in';
+  $('#login').classList.add('on');
+  setTimeout(()=>(open||!MY_NAME?$('#lname'):$('#lpw')).focus(),50)
+}
 /* screens the team must not see: Saved, Sources, VPN sites and Status show everyone's answers,
    learned sources and server internals, so they are the admin's alone */
 const ADMIN_ONLY=new Set(['saved','sources','vpn','status']);let IS_ADMIN=false;
 if(ADMIN_SITE){document.title='PuckTrace Admin';const t=$('#lform .mu.small');if(t)t.textContent='Admin sign-in'}
 function setMe(n,admin){if(n){MY_NAME=n;try{localStorage.setItem('pt-name',n)}catch(e){}}IS_ADMIN=!!admin;$$('.admopt').forEach(b=>b.hidden=!admin);$$('.adm').forEach(b=>b.hidden=!(admin&&ADMIN_SITE));
+  const sw=$('#switchname');if(sw)sw.hidden=!(n&&!ADMIN_SITE&&OPEN_ACCESS);
   if(!ADMIN_SITE)return;
   if(admin){show('admin');return}
   $('#lmsg').textContent='This address is for admins only. The team uses pucktrace.actorix.in';$('#login').classList.add('on')}
+function afterLogin(j,name){$('#login').classList.remove('on');setMe(j.name||name,j.admin);stats();heartbeat();if(q.value.trim()&&!CUR)find()}
 $('#lform').onsubmit=async e=>{e.preventDefault();$('#lmsg').textContent='';
-  const name=$('#lname').value.trim().replace(/\s+/g,' ').slice(0,40);if(!name){$('#lmsg').textContent='Please enter your username';$('#lname').focus();return}
-  if(!$('#lpw').value){$('#lmsg').textContent='Please enter your password';$('#lpw').focus();return}
-  try{const j=await post('/login',{password:$('#lpw').value,name});$('#lpw').value='';
+  const open=OPEN_ACCESS&&!ADMIN_SITE;
+  const name=$('#lname').value.trim().replace(/\s+/g,' ').slice(0,40);
+  if(!name){$('#lmsg').textContent=open?'Please type your name':'Please enter your username';$('#lname').focus();return}
+  if(!open&&!$('#lpw').value){$('#lmsg').textContent='Please enter your password';$('#lpw').focus();return}
+  try{const body=open?{name,device:deviceId()}:{name,password:$('#lpw').value,device:deviceId()};
+    if(ADMIN_SITE)body.admin=true;
+    const j=await post('/login',body);$('#lpw').value='';
     if(ADMIN_SITE&&!j.admin){setMe(j.name||name,false);return}   // the admin address stays closed to the team
-    $('#login').classList.remove('on');setMe(j.name||name,j.admin);stats();heartbeat();if(q.value.trim()&&!CUR)find()}
+    if(!ADMIN_SITE)OPEN_ACCESS=true;afterLogin(j,name)}
   catch(err){$('#lmsg').textContent=err.message||'Wrong password'}};
+/* "not you?" on a shared PC: forget this browser's name and start again */
+const _switchLink=$('#switchlink');if(_switchLink)_switchLink.onclick=e=>{e.preventDefault();clearToken();try{localStorage.removeItem('pt-name')}catch(_){}location.reload()};
 // a refresh starts clean: no header is restored or searched again
 try{if(location.search){history.replaceState(null,'',location.pathname)}}catch(e){}
 const Q0=null;
@@ -943,7 +965,11 @@ const _wt=setTimeout(()=>wake(1),2500);   // a slow first answer: say so
 /* before anything else, a quick look at the home NAS: when it is off, the page starts on the backup
    instead of waiting on it; the full status (both servers) follows in the footer */
 const tokenOnce=Promise.resolve();
-Promise.all([pingNas(15000),tokenOnce]).then(([n])=>{if(!(n&&n.ok&&n.knowledge_base)){API_BASE=BACKUP;API_BACKUP_UNTIL=Date.now()+300000;noteSwitch('the page opened and found no NAS')}checkServers(n);return api('/session')}).then(s=>{clearTimeout(_wt);wake(0);if(s.required&&!s.ok)showLogin();else{setMe(s.name,s.admin);heartbeat();if(Q0){q.value=Q0;chips(Q0);find()}}}).catch(()=>{clearTimeout(_wt);wake(0)});
+Promise.all([pingNas(15000),tokenOnce]).then(([n])=>{if(!(n&&n.ok&&n.knowledge_base)){API_BASE=BACKUP;API_BACKUP_UNTIL=Date.now()+300000;noteSwitch('the page opened and found no NAS')}checkServers(n);return api('/session')}).then(s=>{clearTimeout(_wt);wake(0);OPEN_ACCESS=!!s.open;
+  if(s.ok){setMe(s.name,s.admin);heartbeat();if(Q0){q.value=Q0;chips(Q0);find()}}
+  /* the team site remembers this browser's name: coming back starts at once, no typing */
+  else if(OPEN_ACCESS&&!ADMIN_SITE&&MY_NAME){post('/login',{name:MY_NAME,device:deviceId()}).then(j=>afterLogin(j,MY_NAME)).catch(err=>{if(err&&err.message)$('#lmsg').textContent=err.message;showLogin()})}
+  else showLogin()}).catch(()=>{clearTimeout(_wt);wake(0)});
 
 /* ---------- theme ---------- */
 const reduceMotion=()=>matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -1173,7 +1199,7 @@ const VPN_PROBE={'hokej.cz':'https://www.hokej.cz/data/photo/20240413/100805_2b5
 function blockedNote(c,k){
   const num=c.pdf?`<div class="pdfnum" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px"><input class="f mono pdfn" inputmode="numeric" placeholder="Game number, e.g. 912048" style="flex:1 1 100%;min-width:0">
     <a class="btn2 pdfo" target="_blank" rel="noopener" aria-disabled="true">${ic('ext')}Open match sheet</a><button class="btn2 pdfc" data-copy="">${ic('copy')}Copy link</button>
-    <button class="btn2 pick" data-url="" data-k="${k}" disabled>${ic('check')}This one</button></div>`:'';
+    ${IS_ADMIN?`<button class="btn2 pick" data-url="" data-k="${k}" disabled>${ic('check')}This one</button>`:''}</div>`:'';
   return `<div class="note">${ic('alert')}<div><b>This league's site blocks automatic reading.</b> Open its schedule, find <b>${esc(c.home)}</b> vs <b>${esc(c.away)}</b>${c.when?` (${esc(c.when)})`:` on ${esc(c.date)}`} and open the game.${c.pdf?' The match sheet is <span class="mono">pdf.play.spordle.com/game/</span> + the number at the end of the game\'s page address (…/schedule/912048): type it here.':''}${num}</div></div>`}
 function wirePdf(root){root.querySelectorAll('.pdfnum').forEach(w=>{const q=s=>w.querySelector(s),i=q('.pdfn'),o=q('.pdfo'),cp=q('.pdfc'),p=q('.pick');
   const set=()=>{const n=(i.value.match(/\d{4,}/)||[''])[0],u=n?'https://pdf.play.spordle.com/game/'+n:'';
@@ -1258,7 +1284,7 @@ function render(r,header){
       const i=item({title:`${c.home} vs ${c.away}`,url:c.url,sub:`${c.date} · ${c.site}`,facts:`<div class="facts">${reportFacts(c)}</div>`});
       return `<div class="cand" data-k="${k}"><div data-p="${i}">${shotHtml(c.url)}</div><div class="c"><div class="t">${esc(c.home)} <span class="mu2" style="font-weight:400">vs</span> ${esc(c.away)}</div>
         <div class="m">${esc(c.when||c.date)}${c.score?' · '+esc(c.score):''} · ${esc(c.site)}${c.league?' · '+esc(c.league):''}</div>${c.via==='index'?`<div><span class="badge ok">${ic('bolt','xs')}Remembered</span></div>`:''}${c.blocked?blockedNote(c,k):confBar(c.confidence)}${vpnNote(c)}
-        <div class="acts">${c.kind==='schedule'?'':`<button class="btn2 pick" data-url="${esc(c.url)}" data-k="${k}" data-ch="${esc(c.ch_id||'')}" data-cid="${esc(c.comp_id||'')}">${ic('check')}This one</button>`}<a class="btn2" href="${esc(c.url)}" target="_blank" rel="noopener">${ic('ext')}${c.kind==='schedule'?'Open schedule':'Open'}</a></div></div></div>`}).join('')}</div>`;
+        <div class="acts">${c.kind==='schedule'||!IS_ADMIN?'':`<button class="btn2 pick" data-url="${esc(c.url)}" data-k="${k}" data-ch="${esc(c.ch_id||'')}" data-cid="${esc(c.comp_id||'')}">${ic('check')}This one</button>`}<a class="btn2" href="${esc(c.url)}" target="_blank" rel="noopener">${ic('ext')}${c.kind==='schedule'?'Open schedule':'Open'}</a></div></div></div>`}).join('')}</div>`;
   }else{
     const srcs=auto.adapters.filter(a=>a.name!=='index'),ok=srcs.filter(a=>a.ok).map(a=>a.site),bad=srcs.filter(a=>!a.ok);
     rep=`<div class="note">${ic('alert')}<div><b>No report found automatically.</b><div style="margin-top:3px">${srcs.length?`Checked memory and ${srcs.length} site${srcs.length>1?'s':''} in ${auto.seconds}s: ${esc(ok.join(', '))}${bad.length?` · did not respond: ${esc(bad.map(a=>a.site).join(', '))}`:''}.`:'No automatic source covers these teams yet.'} Use the rosters below, or search by hand from the links further down.</div>${bad.length?`<button class="btn2" style="margin-top:10px" onclick="find()">${ic('refresh')}Search again</button>`:''}</div></div>`;
@@ -1274,7 +1300,8 @@ function render(r,header){
   h+=`<div class="sec fold stagger ${state==='none'?'open':''}">${secHead('globe','','Search by hand',`${groups.reduce((a,s)=>a+s.links.length,0)} links, in search order`,1)}<div class="bd">${groups.map(s=>
     `<div class="grp">${esc(s.step)}${s.manual?' · manual':''}</div><div class="rows">${s.links.map(l=>rowHtml({title:l.label,url:l.url,sub:l.note,icon:l.kind==='search'?'search':l.kind==='manual'?'bookmark':'globe',badge:(l.vpn?'<span class="badge vi">VPN</span>':'')},esc(l.domain)+(l.note?' · '+esc(l.note):''))).join('')}</div>`).join('')}</div></div>`;
 
-  /* save section */
+  /* save section: shared knowledge is written by the admin only (a name-session is refused server-side) */
+  if(IS_ADMIN){
   const rc=r.roster_check;
   const pick=l=>((l||[]).find(x=>x.status==='verified'||x.status==='probable')||{}).url||'';
   h+=`<div class="sec fold stagger">${secHead('save','','Save for next time','optional · the next search for these teams is faster',1)}<div class="bd">
@@ -1283,6 +1310,7 @@ function render(r,header){
     <label for="sv_2" title="${esc(p.t2)}">${esc(p.t2)} roster</label><input class="f mono" id="sv_2" value="${esc(pick(rc&&rc.t2)||(r.teams.t2n.best||{}).roster||'')}" placeholder="https://…">
     <label for="sv_c">Competition site</label><input class="f mono" id="sv_c" placeholder="Schedule page, if new"></div>
     <div class="factions"><button class="btn2 pri" id="savebtn">${ic('save')}Save</button><span class="msg" id="savemsg"></span></div></div></div>`;
+  }
 
   $('#out').innerHTML=h;
   wireShots($('#out'));wireVpn($('#out'));wirePdf($('#out'));
@@ -1295,7 +1323,7 @@ function render(r,header){
   /* a hokej.cz link saved by hand teaches the hokej.cz numbering when the search showed exactly one Czech game */
   const czIds=[...new Map([...(auto.best?[auto.best]:[]),...(auto.candidates||[])].filter(c=>c.ch_id).map(c=>[c.ch_id,c])).values()];
   const czOne=czIds.length===1?czIds[0]:null;
-  $('#savebtn').onclick=async()=>{try{const pv=$('#sv_p').value,cz=czOne&&/hokej\.cz\/zapas\/\d+/.test(pv)&&!/ceskyhokej/.test(pv);
+  const _sb=$('#savebtn');if(_sb)_sb.onclick=async()=>{try{const pv=$('#sv_p').value,cz=czOne&&/hokej\.cz\/zapas\/\d+/.test(pv)&&!/ceskyhokej/.test(pv);
     const s=await post('/save',{header,protocol:pv,t1link:$('#sv_1').value,t2link:$('#sv_2').value,comp_site:$('#sv_c').value,ch_id:cz?czOne.ch_id:'',comp_id:cz?(czOne.comp_id||''):''});$('#savemsg').className='msg ok';$('#savemsg').textContent=`Saved · next time this game is answered at once`+(s.learned&&s.learned.length?` · learned: ${s.learned.join('; ')}`:'');stats();toast('Saved')}
     catch(e){$('#savemsg').className='msg err';$('#savemsg').textContent=e.message}};
 }

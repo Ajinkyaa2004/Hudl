@@ -13,12 +13,13 @@ new password or a removed account signs that person out everywhere at once.
     .venv/bin/python -m backend.users list
 then upload data/users.json to the main server (POST /api/admin/upload?name=users.json)."""
 from __future__ import annotations
-import base64, hashlib, hmac, json, os, re, secrets, sys
+import base64, hashlib, hmac, json, os, re, secrets, sys, threading
 from pathlib import Path
 
 FILE = Path(__file__).resolve().parent.parent / "data" / "users.json"
 ROUNDS = 200_000
 _cache: dict = {"mtime": None, "users": {}}
+_LOCK = threading.Lock()     # one read-modify-write at a time (400 people arriving at 09:00)
 
 
 def _key(name: str) -> str:
@@ -55,25 +56,71 @@ def _sig(secret: bytes, u: dict) -> str:
     return hmac.new(secret, f"pucktrace-user:{_key(u['name'])}:{u['hash']}:{u.get('v', 1)}".encode(), hashlib.sha256).hexdigest()
 
 
+def _name_sig(secret: bytes, u: dict) -> str:
+    return hmac.new(secret, f"pucktrace-name:{_key(u['name'])}:{int(u.get('v', 1))}".encode(), hashlib.sha256).hexdigest()
+
+
+def _admin_sig(secret: bytes, u: dict) -> str:
+    return hmac.new(secret, f"pucktrace-admin:{_key(u['name'])}:{u.get('hash', '')}:{int(u.get('v', 1))}".encode(), hashlib.sha256).hexdigest()
+
+
+def _pack(tag: str, u: dict, sig: str) -> str:
+    return tag + "." + base64.urlsafe_b64encode(u["name"].encode()).decode().rstrip("=") + "." + sig
+
+
 def token_for(secret: bytes, u: dict) -> str:
-    return "u1." + base64.urlsafe_b64encode(u["name"].encode()).decode().rstrip("=") + "." + _sig(secret, u)
+    """Old-style token (u1), kept so a session opened before this deploy keeps working."""
+    return _pack("u1", u, _sig(secret, u))
 
 
-def user_of(secret: bytes, token: str) -> dict | None:
-    """The account a token belongs to, or None (unknown, removed, or its password changed)."""
+def token_name(secret: bytes, u: dict) -> str:
+    """A name-session: the public site, no password. It can search, never administer."""
+    return _pack("n1", u, _name_sig(secret, u))
+
+
+def token_admin(secret: bytes, u: dict) -> str:
+    """An admin-session: only the admin address with the admin's password can make one."""
+    return _pack("a1", u, _admin_sig(secret, u))
+
+
+def session_of(secret: bytes, token: str) -> dict | None:
+    """The account and the kind of session a token is, or None.
+    `_session` is "name" (public, name only) or "admin" (the admin address). A name-session
+    of an admin account is still only a name-session."""
     try:
         tag, b64, sig = (token or "").split(".")
-        if tag != "u1":
-            return None
         name = base64.urlsafe_b64decode(b64 + "=" * (-len(b64) % 4)).decode()
     except Exception:
         return None
     u = users().get(_key(name))
-    return u if u and not u.get("blocked") and hmac.compare_digest(sig, _sig(secret, u)) else None
+    if not u or u.get("blocked"):
+        return None
+    if tag == "n1":
+        kind, ok = "name", hmac.compare_digest(sig, _name_sig(secret, u))
+    elif tag == "a1":
+        kind, ok = "admin", bool(u.get("hash")) and hmac.compare_digest(sig, _admin_sig(secret, u))
+    elif tag == "u1":
+        kind, ok = "name", bool(u.get("hash")) and hmac.compare_digest(sig, _sig(secret, u))
+    else:
+        return None
+    return dict(u, _session=kind) if ok else None
+
+
+def user_of(secret: bytes, token: str) -> dict | None:
+    """The account a token belongs to, or None (unknown, removed, blocked, or out of date)."""
+    return session_of(secret, token)
 
 
 def _save(d: dict):
-    FILE.write_text(json.dumps({"users": d}, indent=1, ensure_ascii=False))
+    # write a new file and swap it in: a crash (or the updater reading it) never sees half a file
+    text = json.dumps({"users": d}, indent=1, ensure_ascii=False)
+    tmp = FILE.with_name(FILE.name + ".tmp")
+    try:
+        tmp.write_text(text)
+        os.replace(tmp, FILE)
+    except OSError:
+        FILE.write_text(text)
+        tmp.unlink(missing_ok=True)
 
 
 # ---------------------------------------------------------------- admin actions (the Admin screen)
@@ -93,13 +140,44 @@ def clean_name(name: str) -> str:
 
 
 def public(u: dict) -> dict:
-    return {k: u.get(k) for k in ("name", "admin", "blocked", "created", "last_login", "signed_out")}
+    return {k: u.get(k) for k in ("name", "admin", "blocked", "created", "last_login", "signed_out")} | dict(
+        name_only=not bool(u.get("hash")), devices=len(u.get("devices") or []))
 
 
 def _now() -> str:
     """India time, whatever the server's own clock zone is."""
     import datetime
     return (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=5, minutes=30)).strftime("%Y-%m-%d %H:%M")
+
+
+def ensure(name: str, device: str = "") -> tuple[dict, bool]:
+    """A name-only account: made on first entry, no password. Returns (record, created).
+    The name is the account; `device` is remembered so the admin can see where it is used."""
+    name = clean_name(name)
+    if len(name) < 2:
+        raise ValueError("Please type your name")
+    if len(name) > 40:
+        name = name[:40]
+    with _LOCK:
+        d = dict(users())
+        k = _key(name)
+        u = d.get(k)
+        if u:
+            if u.get("blocked"):
+                raise PermissionError("This name is blocked. Ask the admin.")
+            if device and device not in (u.get("devices") or []):
+                devs = ((u.get("devices") or [])[-4:] + [device])
+                d[k] = dict(u, devices=devs, last_device=device)
+                _save(d)
+                u = d[k]
+            return u, False
+        if len(d) >= 2000:
+            raise ValueError("This server has reached its user limit")
+        u = dict(name=name, admin=False, v=1, created=_now(), name_only=True,
+                 devices=[device] if device else [], last_device=device or None)
+        d[k] = u
+        _save(d)
+        return u, True
 
 
 def _get(d: dict, name: str) -> dict:
@@ -113,70 +191,77 @@ def add(name: str, password: str | None = None) -> str:
     name = clean_name(name)
     if not name:
         raise ValueError("Give the user a name")
-    d = dict(users())
-    if _key(name) in d:
-        raise ValueError(f"{d[_key(name)]['name']} already exists")
     pw = password or gen_password()
     if len(pw) < 6:
         raise ValueError("The password needs at least 6 characters")
-    salt = secrets.token_hex(16)
-    d[_key(name)] = dict(name=name, salt=salt, hash=_hash(pw, salt), admin=False, v=1, created=_now())
-    _save(d)
+    with _LOCK:
+        d = dict(users())
+        if _key(name) in d:
+            raise ValueError(f"{d[_key(name)]['name']} already exists")
+        salt = secrets.token_hex(16)
+        d[_key(name)] = dict(name=name, salt=salt, hash=_hash(pw, salt), admin=False, v=1, created=_now())
+        _save(d)
     return pw
 
 
 def new_password(name: str, password: str | None = None) -> str:
-    d = dict(users())
-    u = dict(_get(d, name))
     pw = password or gen_password()
     if len(pw) < 6:
         raise ValueError("The password needs at least 6 characters")
-    u["salt"] = secrets.token_hex(16)
-    u["hash"] = _hash(pw, u["salt"])
-    u["v"] = int(u.get("v", 1)) + 1
-    u["signed_out"] = _now()
-    d[_key(name)] = u
-    _save(d)
+    with _LOCK:
+        d = dict(users())
+        u = dict(_get(d, name))
+        u["salt"] = secrets.token_hex(16)
+        u["hash"] = _hash(pw, u["salt"])
+        u["v"] = int(u.get("v", 1)) + 1
+        u["signed_out"] = _now()
+        d[_key(name)] = u
+        _save(d)
     return pw
 
 
 def sign_out(name: str):
-    d = dict(users())
-    u = dict(_get(d, name))
-    u["v"] = int(u.get("v", 1)) + 1
-    u["signed_out"] = _now()
-    d[_key(name)] = u
-    _save(d)
+    with _LOCK:
+        d = dict(users())
+        u = dict(_get(d, name))
+        u["v"] = int(u.get("v", 1)) + 1
+        u["signed_out"] = _now()
+        d[_key(name)] = u
+        _save(d)
 
 
 def set_blocked(name: str, blocked: bool, me: str = ""):
-    d = dict(users())
-    u = dict(_get(d, name))
-    if blocked and (_key(name) == _key(me) or u.get("admin")):
-        raise ValueError("An admin account can't be blocked")
-    u["blocked"] = bool(blocked)
-    if blocked:
-        u["v"] = int(u.get("v", 1)) + 1
-        u["signed_out"] = _now()
-    d[_key(name)] = u
-    _save(d)
+    with _LOCK:
+        d = dict(users())
+        u = dict(_get(d, name))
+        if blocked and (_key(name) == _key(me) or u.get("admin")):
+            raise ValueError("An admin account can't be blocked")
+        u["blocked"] = bool(blocked)
+        if blocked:
+            u["v"] = int(u.get("v", 1)) + 1
+            u["signed_out"] = _now()
+        d[_key(name)] = u
+        _save(d)
 
 
 def delete(name: str, me: str = ""):
-    d = dict(users())
-    u = _get(d, name)
-    if _key(name) == _key(me) or u.get("admin"):
-        raise ValueError("An admin account can't be deleted here")
-    d.pop(_key(name))
-    _save(d)
+    with _LOCK:
+        d = dict(users())
+        u = _get(d, name)
+        if _key(name) == _key(me) or u.get("admin"):
+            raise ValueError("An admin account can't be deleted here")
+        d.pop(_key(name))
+        _save(d)
 
 
 def note_login(name: str):
-    d = dict(users())
-    u = d.get(_key(name))
-    if u:
-        d[_key(name)] = dict(u, last_login=_now())
-        _save(d)
+    with _LOCK:
+        d = dict(users())
+        u = d.get(_key(name))
+        now = _now()
+        if u and u.get("last_login") != now:      # minute granularity: no file write on every heartbeat
+            d[_key(name)] = dict(u, last_login=now)
+            _save(d)
 
 
 def main():

@@ -40,3 +40,5 @@ data/*.export-tmp.db*
 PUCKTRACE_CONTEXT.md
 CLAUDE.md
 AGENTS.md
+
+data/*.tmp

@@ -25,7 +25,20 @@ from fastapi.responses import JSONResponse
 
 PASSWORD = _os.environ.get("APP_PASSWORD") or ""
 _SECRET = (_os.environ.get("APP_SECRET") or PASSWORD or "local").encode()
-OPEN = {"/api/login", "/api/session", "/api/healthz"}
+
+# Two kinds of session, and they cannot cross:
+#   name  (n1) - the public site. Anyone may type a name; it can search and nothing else.
+#   admin (a1) - the admin address. Only an admin account, with its password (TOTP later), can get one.
+# PT_OPEN_ACCESS=0 turns name-only entry off and goes back to the shared password.
+OPEN_ACCESS = (_os.environ.get("PT_OPEN_ACCESS", "1").strip().lower() not in ("0", "false", "no", "off"))
+
+PUBLIC = {"/api/login", "/api/session", "/api/healthz"}
+# what a name-session may call: searching, previews, presence and the page's own telemetry. Every
+# write to shared data (save, sources, VPN, knowledge, sheet, upload, announce, admin) is not here.
+TEAM = {"/api/presence", "/api/logout", "/api/announce", "/api/config",
+        "/api/search", "/api/rosters", "/api/search/start", "/api/rosters/start",
+        "/api/shot", "/api/switches"}
+TEAM_PREFIX = ("/api/job/",)
 
 
 def _token() -> str:
@@ -38,17 +51,39 @@ def _given(request: Request) -> str:
 
 
 def _user(request: Request) -> "dict | None":
-    """The person signed in: their session comes only in the x-pt-session header, from the page's
-    own tab storage, so closing the tab signs them out (no cookie keeps them signed in)."""
+    """The person signed in, with `_session` = "name" or "admin". The token travels in the
+    x-pt-session header from the page's own storage, not in a cookie."""
     from . import users as _users
-    return _users.user_of(_SECRET, request.headers.get("x-pt-session", ""))
+    return _users.session_of(_SECRET, request.headers.get("x-pt-session", ""))
 
 
-def _signed_in(request: Request) -> bool:
-    """A person's session (header), or the service session (header or cookie: the servers' sync)."""
-    if not PASSWORD:
-        return True
-    return _hm.compare_digest(_given(request), _token()) or _user(request) is not None
+def _is_service(request: Request) -> bool:
+    return bool(PASSWORD) and _hm.compare_digest(_given(request), _token())
+
+
+# a light guard on an open door: a script must not be able to create thousands of names or searches
+_RL: dict = {}
+
+
+def _rate(key: str, limit: int, window: float) -> bool:
+    now = _time.time()
+    if len(_RL) > 5000:                       # forget sessions nobody has used for an hour
+        for k in [k for k, v in _RL.items() if not v or now - v[-1] > 3600]:
+            _RL.pop(k, None)
+    b = [t for t in _RL.get(key, ()) if now - t < window]
+    if len(b) >= limit:
+        _RL[key] = b
+        return False
+    b.append(now)
+    _RL[key] = b
+    return True
+
+
+def _ip(request: Request) -> str:
+    # Cloudflare (the tunnel) and Render each name the real visitor; the socket peer is the proxy
+    return (request.headers.get("cf-connecting-ip") or
+            (request.headers.get("x-forwarded-for") or "").split(",")[0].strip() or
+            (request.client.host if request.client else "") or "-")
 
 
 # the page may call this server straight from the browser (not only through Vercel), so Vercel's
@@ -71,16 +106,30 @@ SERVER_LABEL = _os.environ.get("SERVER_LABEL") or ("pc" if _os.name == "nt" else
 async def _guard(request: Request, call_next):
     origin = request.headers.get("origin", "")
     allowed = bool(origin) and bool(CORS_ORIGIN.fullmatch(origin))
+    path = request.url.path
+    team = path in TEAM or path.startswith(TEAM_PREFIX)
     if request.method == "OPTIONS" and allowed:                  # the browser asking before a cross-site call
         from fastapi.responses import Response as _R
         r = _R(status_code=204)
-    elif PASSWORD and request.url.path.startswith("/api/") and request.url.path not in OPEN and not _signed_in(request):
-        r = JSONResponse({"detail": "Sign in required"}, status_code=401)
-    elif PASSWORD and request.url.path.startswith("/api/admin/") and not (
-            _hm.compare_digest(_given(request), _token()) or (_user(request) or {}).get("admin")):
-        r = JSONResponse({"detail": "Only an admin can do this"}, status_code=403)
-    else:
+    elif not PASSWORD or not path.startswith("/api/") or path in PUBLIC or _is_service(request):
         r = await call_next(request)
+    else:
+        s = _user(request)
+        kind = (s or {}).get("_session")
+        if team:
+            # searching is open to any signed-in name
+            if kind:
+                r = await call_next(request)
+            else:
+                r = JSONResponse({"detail": "Enter your name to start"}, status_code=401)
+        elif kind == "admin":
+            # shared data and the Admin screen: an admin-session only (a name-session of an admin
+            # account is still only a name-session; the admin address mints the admin one)
+            r = await call_next(request)
+        elif kind:
+            r = JSONResponse({"detail": "Only an admin can do this"}, status_code=403)
+        else:
+            r = JSONResponse({"detail": "Sign in required"}, status_code=401)
     r.headers["x-pt-server"] = SERVER
     r.headers["access-control-expose-headers"] = "x-pt-server"
     if allowed:
@@ -91,8 +140,10 @@ async def _guard(request: Request, call_next):
 
 
 class LoginIn(BaseModel):
-    password: str
-    name: str = ""           # who is signing in (the team shares one password)
+    password: str = ""
+    name: str = ""           # the person's name (the team site needs nothing else)
+    admin: bool = False      # the admin address asks for this; only an admin account + password gets a1
+    device: str = ""         # a random id this browser keeps, so the admin can see where a name is used
 
 
 # who is using the site right now: name -> last time their page said hello (kept in memory only)
@@ -132,17 +183,43 @@ def login(inp: LoginIn, request: Request):
     if not PASSWORD:
         return dict(ok=True)
     from . import users as _users
-    if not inp.name.strip():
+    name = _users.clean_name(inp.name)
+    ip = _ip(request)
+    if not name:
         # no name: the service sign-in (servers, the backup job, uploads); the page always sends a name
         if not _hm.compare_digest(inp.password.encode(), PASSWORD.encode()):
             raise HTTPException(401, "Wrong password")
-        return dict(ok=True, token=_token())
-    u = _users.verify(inp.name, inp.password)
-    if not u:
-        raise HTTPException(401, "Wrong username or password")
+        return JSONResponse(dict(ok=True, token=_token()))
+    if not _rate("login:" + ip, 1000, 60):
+        raise HTTPException(429, "Too many sign-ins from this network. Wait a minute and try again.")
+    if inp.admin:
+        # the admin address: an admin account and its password (TOTP is added on top later).
+        # Few tries per minute: this is the only password door left on a public site.
+        if not _rate("admin:" + ip, 10, 60):
+            raise HTTPException(429, "Too many attempts. Wait a minute and try again.")
+        u = _users.verify(name, inp.password)
+        if not u or not u.get("admin"):
+            raise HTTPException(401, "Wrong username or password")
+        _users.note_login(u["name"])
+        return JSONResponse(dict(ok=True, token=_users.token_admin(_SECRET, u), name=u["name"], admin=True))
+    if OPEN_ACCESS:
+        # the team site: the name is the sign-in; the account is made on first entry
+        try:
+            u, created = _users.ensure(name, inp.device)
+        except PermissionError as e:
+            raise HTTPException(403, str(e))
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+        if created:
+            if not _rate("new:" + ip, 600, 3600):
+                raise HTTPException(429, "Too many new names from this network. Ask the admin.")
+            _push_users_soon()
+    else:
+        u = _users.verify(name, inp.password)
+        if not u:
+            raise HTTPException(401, "Wrong username or password")
     _users.note_login(u["name"])
-    tok = _users.token_for(_SECRET, u)
-    r = JSONResponse(dict(ok=True, token=tok, name=u["name"], admin=bool(u.get("admin"))))
+    r = JSONResponse(dict(ok=True, token=_users.token_name(_SECRET, u), name=u["name"], admin=False))
     r.delete_cookie("pt_session")         # a cookie from before (30 days) no longer signs anyone in
     return r
 
@@ -173,6 +250,20 @@ def _push_file(name: str):
             print(f"[push] {name} could not reach the other server:", e, flush=True)
     import threading
     threading.Thread(target=push, daemon=True).start()
+
+
+_PUSH_USERS_AT = 0.0
+
+
+def _push_users_soon():
+    """New name-only accounts: send users.json to the other server, at most every 30 s (a morning
+    arrival of 400 people must not start 400 uploads)."""
+    global _PUSH_USERS_AT
+    now = _time.time()
+    if now - _PUSH_USERS_AT < 30:
+        return
+    _PUSH_USERS_AT = now
+    _push_file("users.json")
 
 
 def _users_changed(kicked: str = ""):
@@ -455,8 +546,9 @@ def logout():
 def session(request: Request):
     u = _user(request) if PASSWORD else None
     # a signed-in page gets its token too, to call the NAS directly with it; only a person's session counts here
-    return dict(required=bool(PASSWORD), ok=bool(u) or not PASSWORD,
-                **({"token": request.headers.get("x-pt-session", ""), "name": u["name"], "admin": bool(u.get("admin"))} if u else {}))
+    return dict(required=bool(PASSWORD), open=bool(PASSWORD and OPEN_ACCESS), ok=bool(u) or not PASSWORD,
+                **({"token": request.headers.get("x-pt-session", ""), "name": u["name"],
+                    "admin": u.get("_session") == "admin"} if u else {}))
 
 
 # private data files the servers receive by upload and keep in step with each other; the GameSheet
@@ -1393,7 +1485,9 @@ def config():
 
 
 @app.post("/api/search")
-async def search(inp: SearchIn, auto: bool = True, rosters: bool = True):
+async def search(inp: SearchIn, request: Request, auto: bool = True, rosters: bool = True):
+    if PASSWORD and not _rate("search:" + (request.headers.get("x-pt-session", "") or _ip(request))[:80], 30, 60):
+        raise HTTPException(429, "Too many searches at once. Wait a moment and try again.")
     r = await lookup.search_full(inp.header, KB, rosters=rosters) if auto else lookup.search(inp.header, KB)
     if not r["ok"]:
         raise HTTPException(400, r["error"])
@@ -1630,6 +1724,8 @@ async def _search_with_retry(header: str, rosters: bool) -> dict:
 
 @app.post("/api/search/start")
 async def search_start(inp: SearchIn, request: Request, rosters: bool = False):
+    if PASSWORD and not _rate("search:" + (request.headers.get("x-pt-session", "") or _ip(request))[:80], 30, 60):
+        raise HTTPException(429, "Too many searches at once. Wait a moment and try again.")
     if not lookup.parse_header(inp.header):
         raise HTTPException(400, "Could not read this header. Use: Team 1 vs Team 2 | Competition | YYYY-MM-DD")
     h = inp.header.strip()
@@ -1653,7 +1749,9 @@ async def _after_search(who: str, h: str, res: dict, secs: float):
 
 
 @app.post("/api/rosters/start")
-async def rosters_start(inp: RostersIn):
+async def rosters_start(inp: RostersIn, request: Request):
+    if PASSWORD and not _rate("search:" + (request.headers.get("x-pt-session", "") or _ip(request))[:80], 30, 60):
+        raise HTTPException(429, "Too many searches at once. Wait a moment and try again.")
     h = inp.header.strip()
     return _job_start(f"rosters|{(inp.game or {}).get('url', '')}|{h}", lambda: rosters(RostersIn(header=h, game=inp.game)))
 
