@@ -166,6 +166,7 @@ def ensure(name: str, device: str = "") -> tuple[dict, bool]:
     name = clean_name(name)
     if len(name) < 2:
         raise ValueError("Please type your name")
+    device = (device or "").strip()[:100]       # a browser id, never a file-sized string
     with _LOCK:
         d = dict(users())
         k = _key(name)

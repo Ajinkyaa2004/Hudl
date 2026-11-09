@@ -1412,7 +1412,7 @@ async function loadAdmin(){
     <td data-l="Status">${st(u)}${u.signed_out?`<div class="mu small">last kicked ${esc(u.signed_out)}</div>`:''}</td>
     <td data-l="Last sign-in" class="mu small mono">${esc(u.last_login||'never')}</td>
     <td>${u.admin?'':`<div class="acts" style="flex-wrap:wrap"><button class="btn2" data-a="signout">Sign out</button><button class="btn2" data-a="password">New password</button>
-      ${u.name_only?`<button class="btn2" data-a="newdevice" title="The real person changed laptop or phone">Allow new device</button>`:''}<button class="btn2" data-a="block">${u.blocked?'Unblock':'Block'}</button><button class="btn2 danger" data-a="delete">Delete</button></div>`}</td></tr>`).join('')||'<tr><td colspan=4 class="mu">No users yet.</td></tr>';
+      <button class="btn2" data-a="newdevice" title="The real person changed laptop or phone">Allow new device</button><button class="btn2" data-a="block">${u.blocked?'Unblock':'Block'}</button><button class="btn2 danger" data-a="delete">Delete</button></div>`}</td></tr>`).join('')||'<tr><td colspan=4 class="mu">No users yet.</td></tr>';
   $$('#atable button[data-a]').forEach(b=>b.onclick=async()=>{const n=b.closest('tr').dataset.n,a=b.dataset.a,p='/admin/users/'+encodeURIComponent(n);
     const ask={signout:`Sign ${n} out of PuckTrace now? They can sign in again with their password.`,
       password:`Make a new password for ${n}? They are signed out at once and the old password stops working.`,
