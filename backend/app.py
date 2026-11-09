@@ -206,6 +206,9 @@ def login(inp: LoginIn, request: Request):
         # the team site: the name is the sign-in; the account is made on first entry
         try:
             u, created = _users.ensure(name, inp.device)
+        except _users.NameTaken:
+            raise HTTPException(409, f'The name “{name}” is already on PuckTrace. Please use a different '
+                                     f'combination — for example your first name and surname, like “Rahul Sharma”.')
         except PermissionError as e:
             raise HTTPException(403, str(e))
         except ValueError as e:
@@ -316,6 +319,14 @@ def admin_user_signout(name: str):
     from . import users as _users
     _admin_call(_users.sign_out, name, kicked=name)
     return dict(ok=True)
+
+
+@app.post("/api/admin/users/{name}/new-device")
+def admin_user_new_device(name: str):
+    """The real person changed laptop or phone: let this name add one new browser, once."""
+    from . import users as _users
+    until = _admin_call(_users.allow_new_device, name)
+    return dict(ok=True, name=name, until=until)
 
 
 @app.post("/api/admin/users/{name}/block")

@@ -1,12 +1,13 @@
-"""Accounts: each person signs in with their own name and password.
+"""Accounts: the team signs in with a name alone; the admin with a password.
 
 data/users.json (private: git-ignored, uploaded to the servers, kept in step between them and in the
-locked backup like the knowledge base) holds, per person, a salted PBKDF2 hash of the password,
-never the password itself:
+locked backup like the knowledge base) holds, per person, a salted PBKDF2 hash of the admin password
+(never the password itself), the browsers that have used a name, and the admin flag:
     {"users": {"actorix": {"name": "Actorix", "salt": "...", "hash": "...", "admin": true, "v": 1}}}
 
-A session token names its user and is signed with APP_SECRET over the user's password hash, so a
-new password or a removed account signs that person out everywhere at once.
+A name is unique: a new browser must choose a different combination unless the admin has just allowed
+that one device. A session token names its user and is signed with APP_SECRET over the user's password
+hash, so a new password or a removed account signs that person out everywhere at once.
 
     .venv/bin/python -m backend.users add "Name" "password" [--admin]   # add, or set a new password
     .venv/bin/python -m backend.users remove "Name"
@@ -141,23 +142,30 @@ def clean_name(name: str) -> str:
 
 def public(u: dict) -> dict:
     return {k: u.get(k) for k in ("name", "admin", "blocked", "created", "last_login", "signed_out")} | dict(
-        name_only=not bool(u.get("hash")), devices=len(u.get("devices") or []))
+        name_only=not bool(u.get("hash")), devices=len(u.get("devices") or []),
+        new_device_open=bool(u.get("allow_device_until") and u.get("allow_device_until") >= _now()))
 
 
-def _now() -> str:
+def _now(plus_minutes: int = 0) -> str:
     """India time, whatever the server's own clock zone is."""
     import datetime
-    return (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=5, minutes=30)).strftime("%Y-%m-%d %H:%M")
+    return (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=5, minutes=30 + plus_minutes)).strftime("%Y-%m-%d %H:%M")
+
+
+class NameTaken(Exception):
+    """The name is already in use and this browser has never signed in with it."""
 
 
 def ensure(name: str, device: str = "") -> tuple[dict, bool]:
     """A name-only account: made on first entry, no password. Returns (record, created).
-    The name is the account; `device` is remembered so the admin can see where it is used."""
+
+    A name is unique: once it is on PuckTrace, a different browser is told to choose another
+    combination (e.g. first name + surname) rather than silently sharing the account. The one
+    exception is the admin's "allow a new device" reset, so the real person can return on a new
+    laptop or phone: that opens the door once, for a few minutes."""
     name = clean_name(name)
     if len(name) < 2:
         raise ValueError("Please type your name")
-    if len(name) > 40:
-        name = name[:40]
     with _LOCK:
         d = dict(users())
         k = _key(name)
@@ -165,12 +173,21 @@ def ensure(name: str, device: str = "") -> tuple[dict, bool]:
         if u:
             if u.get("blocked"):
                 raise PermissionError("This name is blocked. Ask the admin.")
-            if device and device not in (u.get("devices") or []):
-                devs = ((u.get("devices") or [])[-4:] + [device])
-                d[k] = dict(u, devices=devs, last_device=device)
+            devs = list(u.get("devices") or [])
+            if device and device in devs:
+                return u, False
+            if device and not devs and not u.get("admin"):
+                # an account from before devices were recorded: the first browser to use it claims it
+                d[k] = dict(u, devices=[device], last_device=device)
                 _save(d)
-                u = d[k]
-            return u, False
+                return d[k], False
+            until = u.get("allow_device_until") or ""
+            if device and until and until >= _now():
+                d[k] = dict(u, devices=(devs[-8:] + [device]), last_device=device,
+                            allow_device_until=None)
+                _save(d)
+                return d[k], False
+            raise NameTaken(name)
         if len(d) >= 2000:
             raise ValueError("This server has reached its user limit")
         u = dict(name=name, admin=False, v=1, created=_now(), name_only=True,
@@ -178,6 +195,21 @@ def ensure(name: str, device: str = "") -> tuple[dict, bool]:
         d[k] = u
         _save(d)
         return u, True
+
+
+def allow_new_device(name: str) -> str:
+    """The admin lets the real person add one new browser (a new laptop or phone).
+    Open for 15 minutes, then the next new device is accepted and the door closes again."""
+    until = _now(15)
+    with _LOCK:
+        d = dict(users())
+        u = dict(_get(d, name))
+        if u.get("blocked"):
+            raise ValueError("This name is blocked. Unblock it first.")
+        u["allow_device_until"] = until
+        d[_key(name)] = u
+        _save(d)
+    return until
 
 
 def _get(d: dict, name: str) -> dict:

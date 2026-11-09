@@ -1408,19 +1408,21 @@ async function loadAdmin(){
   let d;try{d=await api('/admin/users')}catch(e){$('#atable tbody').innerHTML=`<tr><td colspan=4 class="mu">${esc(e.message)}</td></tr>`;return}
   const st=u=>u.blocked?'<span class="badge no">Blocked</span>':u.online?'<span class="badge ok">Online now</span>':'<span class="badge mu">Not online</span>';
   $('#acnt').textContent=`${d.users.length} · ${d.users.filter(u=>u.online).length} online`;
-  $('#atable tbody').innerHTML=d.users.map(u=>`<tr data-n="${esc(u.name)}"><td><b style="font-weight:600">${esc(u.name)}</b>${u.me?' <span class="mu small">(you)</span>':''}${u.admin?' <span class="badge vi">Admin</span>':''}<div class="mu small">added ${esc(u.created||'—')}</div></td>
+  $('#atable tbody').innerHTML=d.users.map(u=>`<tr data-n="${esc(u.name)}"><td><b style="font-weight:600">${esc(u.name)}</b>${u.me?' <span class="mu small">(you)</span>':''}${u.admin?' <span class="badge vi">Admin</span>':''}<div class="mu small">added ${esc(u.created||'—')} · ${u.devices||0} ${u.devices===1?'device':'devices'}${u.new_device_open?' · <b>new device allowed</b>':''}</div></td>
     <td data-l="Status">${st(u)}${u.signed_out?`<div class="mu small">last kicked ${esc(u.signed_out)}</div>`:''}</td>
     <td data-l="Last sign-in" class="mu small mono">${esc(u.last_login||'never')}</td>
     <td>${u.admin?'':`<div class="acts" style="flex-wrap:wrap"><button class="btn2" data-a="signout">Sign out</button><button class="btn2" data-a="password">New password</button>
-      <button class="btn2" data-a="block">${u.blocked?'Unblock':'Block'}</button><button class="btn2 danger" data-a="delete">Delete</button></div>`}</td></tr>`).join('')||'<tr><td colspan=4 class="mu">No users yet.</td></tr>';
+      ${u.name_only?`<button class="btn2" data-a="newdevice" title="The real person changed laptop or phone">Allow new device</button>`:''}<button class="btn2" data-a="block">${u.blocked?'Unblock':'Block'}</button><button class="btn2 danger" data-a="delete">Delete</button></div>`}</td></tr>`).join('')||'<tr><td colspan=4 class="mu">No users yet.</td></tr>';
   $$('#atable button[data-a]').forEach(b=>b.onclick=async()=>{const n=b.closest('tr').dataset.n,a=b.dataset.a,p='/admin/users/'+encodeURIComponent(n);
     const ask={signout:`Sign ${n} out of PuckTrace now? They can sign in again with their password.`,
       password:`Make a new password for ${n}? They are signed out at once and the old password stops working.`,
+      newdevice:`Allow ${n} to sign in from ONE new browser? Use this only when the real person changed laptop or phone. It stays open for 15 minutes, then closes again.`,
       block:b.textContent==='Block'?`Block ${n}? They are signed out at once and can't sign in until you unblock them.`:`Unblock ${n}? They can sign in again with their password.`,
       delete:`Delete ${n}'s account? They are signed out at once and can't sign in.`}[a];
     if(!confirm(ask))return;
     try{if(a==='signout'){await post(p+'/signout',{});toast(`${n} signed out`,'ok')}
       else if(a==='password'){const r=await post(p+'/password',{});showPw(n,r.password,'New password');window.scrollTo({top:0,behavior:'smooth'})}
+      else if(a==='newdevice'){const r=await post(p+'/new-device',{});toast(`New device allowed for ${n} until ${r.until}`,'ok')}
       else if(a==='block'){await post(p+'/block',{blocked:b.textContent==='Block'});toast(b.textContent==='Block'?`${n} blocked`:`${n} unblocked`,'ok')}
       else{await api(p,{method:'DELETE'});toast(`${n} deleted`,'ok')}
       loadAdmin()}catch(e){toast(e.message,'err')}})
