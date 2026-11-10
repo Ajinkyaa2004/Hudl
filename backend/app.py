@@ -87,7 +87,7 @@ def _ip(request: Request) -> str:
 
 
 # the page may call this server straight from the browser (not only through Vercel), so Vercel's
-# own name lookup of the NAS, which fails for hours at a time, is not in the way
+# own name lookup of the Hudl server, which fails for hours at a time, is not in the way
 import re as _re_cors
 CORS_ORIGIN = _re_cors.compile(r"https://(admin\.)?pucktrace\.actorix\.in|https://[a-z0-9-]+\.vercel\.app|http://(localhost|127\.0\.0\.1)(:\d+)?")
 CORS_HEADERS = {"access-control-allow-methods": "GET, POST, DELETE, OPTIONS",
@@ -95,10 +95,11 @@ CORS_HEADERS = {"access-control-allow-methods": "GET, POST, DELETE, OPTIONS",
                 "access-control-max-age": "7200", "access-control-allow-private-network": "true"}
 
 
-# which server answered, shown on the page: the home NAS (the Docker image sets APP_VERSION) or the Render backup
+# which server answered, shown on the page: the Hudl server (the office PC; the Docker image sets
+# APP_VERSION) or the Render backup
 SERVER = "render" if _os.environ.get("RENDER") else ("nas" if _os.environ.get("APP_VERSION") else "local")
-# the name the page shows. The office PC runs the same code as the NAS (APP_VERSION is set), so it
-# is named by SERVER_LABEL when given, else by the OS: a Windows host is the office PC.
+# the name the page shows. The office PC runs the same code as the old NAS (APP_VERSION is set), so
+# it is named by SERVER_LABEL when given, else by the OS: a Windows host is the office PC.
 SERVER_LABEL = _os.environ.get("SERVER_LABEL") or ("pc" if _os.name == "nt" else SERVER)
 
 
@@ -558,7 +559,7 @@ def logout():
 @app.get("/api/session")
 def session(request: Request):
     u = _user(request) if PASSWORD else None
-    # a signed-in page gets its token too, to call the NAS directly with it; only a person's session counts here
+    # a signed-in page gets its token too, to call the Hudl server directly with it; only a person's session counts here
     return dict(required=bool(PASSWORD), open=bool(PASSWORD and OPEN_ACCESS), ok=bool(u) or not PASSWORD,
                 **({"token": request.headers.get("x-pt-session", ""), "name": u["name"],
                     "admin": u.get("_session") == "admin"} if u else {}))
@@ -615,9 +616,9 @@ def _kb_size(d: dict) -> int:
 
 
 # the two servers keep the same knowledge base and learned spellings: each checks the other every
-# 5 minutes and takes its copy when it is newer (a save on the NAS reaches Render; an update loaded
-# on Render while the NAS is off reaches the NAS when it starts)
-NAS_URL, RENDER_URL = "https://nas.actorix.in", "https://pucktrace-api-8u5i.onrender.com"   # the NAS by its Cloudflare Tunnel: Render often fails to look up the Tailscale name
+# 5 minutes and takes its copy when it is newer (a save on the Hudl server reaches Render; an update
+# loaded on Render while the Hudl server is off reaches it when it starts)
+NAS_URL, RENDER_URL = "https://nas.actorix.in", "https://pucktrace-api-8u5i.onrender.com"   # the Hudl server by its Cloudflare Tunnel (the old NAS address): Render often fails to look up the Tailscale name
 DATA_FROM = _os.environ.get("DATA_FROM") or (NAS_URL if SERVER == "render" else RENDER_URL if SERVER == "nas" else "")
 
 
@@ -673,7 +674,7 @@ async def _data_sync_loop():
             SYNC.update(at=_t.strftime("%Y-%m-%dT%H:%M:%S"), ok=False, error=str(e)[:160])
             print("[data sync] failed:", e, flush=True)
         if not KB.get("teams") and _os.environ.get("KB_KEY"):
-            # still empty (a restart while the NAS is off): open the locked copy kept on GitHub
+            # still empty (a restart while the Hudl server is off): open the locked copy kept on GitHub
             try:
                 from . import kbvault
                 done = await asyncio.to_thread(kbvault.restore, ROOT / "data", _os.environ["KB_KEY"])
@@ -1308,10 +1309,10 @@ async def _daily_harvest():
 
 
 # ---------------------------------------------------------------- switches to the backup
-# When a page moves to the backup it notes why (each way to the NAS: no answer, HTTP error...) and
-# reports it to the NAS once it is back. The NAS compares the time with its own record of when it
-# was running (runs.json, updated every minute), so the Status page can tell "the NAS was off" from
-# "the NAS was running, the way to it failed".
+# When a page moves to the backup it notes why (each way to the Hudl server: no answer, HTTP error...)
+# and reports it to the Hudl server once it is back. The server compares the time with its own record
+# of when it was running (runs.json, updated every minute), so the Status page can tell "the Hudl
+# server was off" from "the Hudl server was running, the way to it failed".
 RUNS = ROOT / "data" / "runs.json"
 SWITCHES = ROOT / "data" / "switches.jsonl"
 
@@ -1393,7 +1394,7 @@ def switches_list(limit: int = 50):
         except Exception:
             e["nas_running"] = None
         out.append(e)
-    return dict(server=SERVER, switches=out)
+    return dict(server=SERVER, server_label=SERVER_LABEL, switches=out)
 
 
 async def _heartbeat_loop():
@@ -1812,9 +1813,17 @@ async def save(inp: SaveIn):
 def health_status():
     import json as _j
     try:
-        return _j.loads((ROOT / "data" / "health.json").read_text())
+        out = _j.loads((ROOT / "data" / "health.json").read_text())
     except Exception:
-        return dict(at=None, checks=[])
+        out = dict(at=None, checks=[])
+    # The page says whether the automatic daily check can run on this server. It is off on the
+    # Render backup; the office PC sets HEALTH_DAILY=0; and a server that already has the published
+    # game list does not run the daily harvest that carries the check (HARVEST_WITH_LIST=1 overrides).
+    gl = globals().get("GAME_LIST") or {}
+    out["daily"] = (SERVER != "render" and _os.environ.get("HEALTH_DAILY", "1") != "0"
+                    and not (gl.get("at") and _os.environ.get("HARVEST_WITH_LIST", "0") != "1"))
+    out["server_label"] = SERVER_LABEL
+    return out
 
 
 _HEALTH_RUNNING = False
@@ -1823,17 +1832,17 @@ _HEALTH_RUNNING = False
 @app.post("/api/health/run")
 async def health_run():
     """Check every source once with a known game. Heavy (about 30 live sites): refused on the Render
-    backup, whose 512 MB it can exhaust while it carries everyone's searches, and run one at a time."""
+    backup, whose memory it can exhaust while it carries everyone's searches, and run one at a time."""
     global _HEALTH_RUNNING
     from . import health
     if SERVER == "render":
-        raise HTTPException(409, "The source check runs on the home NAS only. Try again when the footer says Running on Home NAS.")
+        raise HTTPException(409, "The source check runs on the Hudl server only. Try again when the footer says Running on Hudl server.")
     if _HEALTH_RUNNING:
         raise HTTPException(409, "A source check is already running. The results appear in about two minutes.")
     _HEALTH_RUNNING = True
     try:
         # on its own thread and event loop: its page parsing never holds up searches and the
-        # health pings the page uses to decide whether the NAS is up
+        # health pings the page uses to decide whether the Hudl server is up
         return await _aio.to_thread(lambda: _aio.run(health.run(gentle=True)))
     finally:
         _HEALTH_RUNNING = False

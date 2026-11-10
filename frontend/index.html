@@ -616,12 +616,14 @@ html.theme-vt::view-transition-new(root){animation:theme-reveal .38s var(--ease-
 
       <section class="view" id="v-status">
         <div class="ph"><div><h1>Status</h1><p id="stwhen">Loading…</p></div><button class="btn2" id="strun"><svg class="ic sm"><use href="#i-refresh"/></svg><span>Check sources now</span></button></div>
+        <div class="sec"><div class="hd"><span class="hic"><svg class="ic sm"><use href="#i-pulse"/></svg></span><h3>This server</h3><span class="cnt" id="stselfwhen"></span></div>
+          <div class="bd"><div class="kpis" id="stself"></div></div></div>
         <div id="stknow"></div>
         <div class="sec"><div class="hd"><span class="hic"><svg class="ic sm"><use href="#i-pulse"/></svg></span><h3>Moves to the backup</h3><span class="cnt" id="swcnt"></span></div>
-          <div class="bd" style="padding-bottom:0"><div class="note" style="margin-bottom:14px"><svg class="ic sm"><use href="#i-help"/></svg><span>Each time a page moved from the main server to the backup (Render), with the reason it saw. The same name within 10 minutes is folded into one row. <b>5-min limit reached</b> means the page simply tried the main server again after five minutes: it is not a recovery. <b>Main server was up, the way in was not</b> means the app was running and the tunnel or internet failed, which is the only kind of outage the team feels.</span></div>
-          <div class="scroll"><table class="tbl cards" id="swtable"><thead><tr><th>When</th><th>Who</th><th>Back after</th><th>NAS server</th><th>Why</th></tr></thead><tbody></tbody></table></div></div></div>
+          <div class="bd" style="padding-bottom:0"><div class="note" style="margin-bottom:14px"><svg class="ic sm"><use href="#i-help"/></svg><span>Each time a page moved from the Hudl server to the backup (Render), with the reason it saw. The same name within 10 minutes is folded into one row. <b>5-min limit reached</b> means the page simply tried the Hudl server again after five minutes: it is not a recovery. <b>Hudl server was up, the way in was not</b> means the app was running and the tunnel or internet failed, which is the only kind of outage the team feels.</span></div>
+          <div class="scroll"><table class="tbl cards" id="swtable"><thead><tr><th>When</th><th>Who</th><th>Back after</th><th>Hudl server</th><th>Why</th></tr></thead><tbody></tbody></table></div></div></div>
         <div class="sec"><div class="hd"><span class="hic"><svg class="ic sm"><use href="#i-pulse"/></svg></span><h3>Source checks</h3><span class="cnt" id="stcnt"></span></div>
-          <div class="bd" style="padding-bottom:0"><div class="note" style="margin-bottom:14px"><svg class="ic sm"><use href="#i-help"/></svg><span>Each source is asked for one known game every day. A failed check means the site changed or is down, so its games may be missed until it's fixed.</span></div></div>
+          <div class="bd" style="padding-bottom:0"><div class="note" style="margin-bottom:14px"><svg class="ic sm"><use href="#i-help"/></svg><span id="stsrcnote">Each source is asked for one known game when you press Check sources now. A failed check means the site changed or is down, so its games may be missed until it's fixed.</span></div></div>
           <div class="scroll"><table class="tbl cards" id="sttable"><thead><tr><th>Source</th><th>Result</th><th>How</th><th>Time</th></tr></thead><tbody></tbody></table></div></div>
       </section>
 
@@ -781,20 +783,20 @@ const ADMIN_SITE=/^admin\./.test(location.hostname);
 /* the server sleeps on the free plan and can be briefly unreachable while it wakes or restarts:
    502/503/504 and network errors are retried with a "waking up" banner instead of failing */
 function wake(on){$('#wake').classList.toggle('on',!!on)}
-/* two servers: the main one (the office PC) and a backup (Render). On pucktrace.actorix.in the page
-   calls both by their own addresses (the NAS through its Cloudflare Tunnel), so it works from any
-   static host (Cloudflare Pages) with no forwarding. Elsewhere (a vercel.app address, a local test)
-   it uses the host's forwards: /api for the NAS and /api-backup for Render. When the NAS doesn't
-   answer, the page switches to the backup for 5 minutes, then tries the NAS again */
+/* two servers: the main one (the Hudl server, the office PC) and a backup (Render). On pucktrace.actorix.in
+   the page calls both by their own addresses (the Hudl server through its Cloudflare Tunnel), so it works
+   from any static host (Cloudflare Pages) with no forwarding. Elsewhere (a vercel.app address, a local test)
+   it uses the host's forwards: /api for the Hudl server and /api-backup for Render. When the Hudl server
+   doesn't answer, the page switches to the backup for 5 minutes, then tries the Hudl server again */
 const DIRECT=location.hostname.endsWith('actorix.in');
 const NAS_DIRECT=DIRECT?'https://nas.actorix.in/api':'/api';
 const BACKUP=DIRECT?'https://pucktrace-api-8u5i.onrender.com/api':'/api-backup';
 let NAS=NAS_DIRECT,API_BASE=NAS,API_BACKUP_UNTIL=0;
 const onNas=b=>b!==BACKUP;
 function apiBase(){if(!onNas(API_BASE)&&Date.now()>API_BACKUP_UNTIL){API_BASE=NAS;setTimeout(()=>noteBack('expired'),0)}return API_BASE}
-function useBackup(){if(onNas(API_BASE)){API_BASE=BACKUP;API_BACKUP_UNTIL=Date.now()+300000;noteSwitch('a search or request to the NAS failed');setTimeout(()=>checkServers(),500);return true}return false}
-function otherNasWay(){}   // one way in to the NAS (it had a second one through Vercel)
-/* the sign-in travels as a header (a cookie of this site doesn't reach the NAS's own address) */
+function useBackup(){if(onNas(API_BASE)){API_BASE=BACKUP;API_BACKUP_UNTIL=Date.now()+300000;noteSwitch('a search or request to the Hudl server failed');setTimeout(()=>checkServers(),500);return true}return false}
+function otherNasWay(){}   // one way in to the Hudl server (it had a second one through Vercel)
+/* the sign-in travels as a header (a cookie of this site doesn't reach the Hudl server's own address) */
 /* the team's name-session stays in this browser (localStorage): a refresh, or coming back tomorrow,
    keeps the same person; the admin address keeps its session in this tab only */
 let TOKEN=null;try{TOKEN=(ADMIN_SITE?sessionStorage:localStorage).getItem('pt-token')||null}catch(e){}
@@ -803,8 +805,8 @@ function clearToken(){TOKEN=null;try{localStorage.removeItem('pt-token');session
 /* a random id for this browser: the server remembers where a name is used, so the admin can see it */
 function deviceId(){try{let d=localStorage.getItem('pt-device');if(!d){d=String(crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random().toString(36).slice(2));localStorage.setItem('pt-device',d)}return d}catch(e){return ''}}
 function hdrs(json=true){const h={};if(json)h['content-type']='application/json';if(TOKEN)h['x-pt-session']=TOKEN;return h}
-/* why the page left the NAS: the last failure on each way in is noted; a move to the backup is kept
-   in this browser and reported to the NAS once it answers again (Status > Moves to the backup) */
+/* why the page left the Hudl server: the last failure on each way in is noted; a move to the backup
+   is kept in this browser and reported to the Hudl server once it answers again (Status > Moves to the backup) */
 const LASTFAIL={};
 /* did the backup answer the last time we asked? A switch with the backup answering but the main
    server silent is a path problem (tunnel, uplink), not a dead server, and the Status page says so */
@@ -834,24 +836,28 @@ async function ping1(base,ms){
 async function ping(base,ms){for(let i=0;i<3;i++){const r=await ping1(base,ms);if(r)return r;await sleep(400)}return null
 }
 async function pingNas(ms){return ping(NAS_DIRECT,ms)}
-/* the name the footer shows for whichever server answered: the office PC ("Hudl PC"), the home
-   NAS or Render. Each health answer carries server_label; when a server is silent the last name
-   it gave is kept, so the footer never guesses */
+/* the name the footer shows for whichever server answered: the Hudl server (the office PC; the
+   old NAS ran the same code) or Render. Each health answer carries server_label; when a server
+   is silent the last name it gave is kept, so the footer never guesses */
 let MAIN_NAME='the main server',BK_NAME='Render';
+function labelFor(l){
+  if(l==='pc'||l==='nas'||l==='hudl'||l==='hudl server')return 'Hudl server';
+  if(l==='render')return 'Render';
+  if(l==='local')return 'this PC';
+  return null;
+}
 function srvName(h,isBackup){
-  const l=h&&(h.server_label||h.server);
-  let n=null;
-  if(l==='pc')n='Hudl PC';else if(l==='render')n='Render';else if(l==='nas')n='Home NAS';else if(l==='local')n='this PC';
+  const n=labelFor(h&&(h.server_label||h.server));
   if(n){if(isBackup)BK_NAME=n;else MAIN_NAME=n}
   return isBackup?BK_NAME:MAIN_NAME}
 async function checkServers(nasKnown){
   const [nas,bk]=await Promise.all([nasKnown!==undefined?nasKnown:pingNas(30000),ping(BACKUP,45000)]);
   const nasOk=!!(nas&&nas.ok),nasReady=nasOk&&nas.knowledge_base,bkOk=!!(bk&&bk.ok),bkFull=bkOk&&bk.knowledge_base;
   LAST_BK_OK=bkOk;
-  if(nasOk&&!nasReady)noteFail(NAS,'the NAS answered but was still loading its data');
+  if(nasOk&&!nasReady)noteFail(NAS,'the Hudl server answered but was still loading its data');
   if(nasReady)nasOkNow();
-  if(nasReady&&!onNas(API_BASE)){API_BASE=NAS;API_BACKUP_UNTIL=0;noteBack('recovered')}   // the NAS is back: use it straight away
-  else if(!nasReady&&bkOk&&onNas(API_BASE)&&nasFailing()){API_BASE=BACKUP;API_BACKUP_UNTIL=Date.now()+300000;noteSwitch('the status check every minute found no NAS')}   // NAS down: no search waits on it
+  if(nasReady&&!onNas(API_BASE)){API_BASE=NAS;API_BACKUP_UNTIL=0;noteBack('recovered')}   // the Hudl server is back: use it straight away
+  else if(!nasReady&&bkOk&&onNas(API_BASE)&&nasFailing()){API_BASE=BACKUP;API_BACKUP_UNTIL=Date.now()+300000;noteSwitch('the status check every minute found no Hudl server')}   // Hudl server down: no search waits on it
   if(nasReady)flushSw();
   let s,hl,sub;
   const nm=srvName(nas),bn=srvName(bk,true);
@@ -866,8 +872,8 @@ async function checkServers(nasKnown){
   $('#sst-det').textContent=`${nm}: ${nasReady?'online':nasOk?'starting':'offline'} · Backup: ${bkFull?'ready':bkOk?'loading knowledge':'not answering'} · checked ${tm}`;
 }
 setInterval(()=>{checkServers();heartbeat()},60000);
-/* the NAS stays the server through short gaps (a restart, a network blip): the page keeps retrying
-   it, and turns to the backup only after it has failed for 45 s */
+/* the Hudl server stays the server through short gaps (a restart, a network blip): the page keeps
+   retrying it, and turns to the backup only after it has failed for 45 s */
 const NAS_GRACE=45000;let NAS_FAIL_SINCE=0;
 function nasFailing(){if(!NAS_FAIL_SINCE)NAS_FAIL_SINCE=Date.now();return Date.now()-NAS_FAIL_SINCE>NAS_GRACE}
 function nasOkNow(){NAS_FAIL_SINCE=0}
@@ -882,7 +888,7 @@ async function api(p,o={},tries=5){
     try{r=await fetch(apiBase()+p,{headers:hdrs(),credentials:'same-origin',cache:'no-store',signal:ctl.signal,...opts})}
     catch(e){clearTimeout(tm);noteFail(apiBase(),e.name==='AbortError'?`no answer within ${ms/1000} s (${p.split('?')[0]})`:`could not connect (${e.message})`);if(onNas(apiBase())&&!nasFailing()){wake(1);otherNasWay();await sleep(2000);continue}if(useBackup())continue;if(i<tries-1){wake(1);await sleep(Math.min(2000*2**i,10000));continue}wake(0);throw new Error("Can't reach the server. Check the internet connection and try again.")}
     clearTimeout(tm);
-    /* our server always answers in JSON; any other error page comes from the way there (the NAS is off or starting) */
+    /* our server always answers in JSON; any other error page comes from the way there (the Hudl server is off or starting) */
     const down=[502,503,504].includes(r.status)||(r.status>=400&&!(r.headers.get('content-type')||'').includes('json'));
     if(down)noteFail(apiBase(),`HTTP ${r.status}${r.headers.get('x-vercel-error')?' '+r.headers.get('x-vercel-error'):''} (${p.split('?')[0]})`);
     if(down&&onNas(apiBase())&&!nasFailing()){wake(1);otherNasWay();await sleep(2000);continue}
@@ -977,10 +983,10 @@ const _switchLink=$('#switchlink');if(_switchLink)_switchLink.onclick=e=>{e.prev
 try{if(location.search){history.replaceState(null,'',location.pathname)}}catch(e){}
 const Q0=null;
 const _wt=setTimeout(()=>wake(1),2500);   // a slow first answer: say so
-/* before anything else, a quick look at the home NAS: when it is off, the page starts on the backup
+/* before anything else, a quick look at the Hudl server: when it is off, the page starts on the backup
    instead of waiting on it; the full status (both servers) follows in the footer */
 const tokenOnce=Promise.resolve();
-Promise.all([pingNas(15000),tokenOnce]).then(([n])=>{if(!(n&&n.ok&&n.knowledge_base)){API_BASE=BACKUP;API_BACKUP_UNTIL=Date.now()+300000;noteSwitch('the page opened and found no NAS')}checkServers(n);return api('/session')}).then(s=>{clearTimeout(_wt);wake(0);OPEN_ACCESS=!!s.open;
+Promise.all([pingNas(15000),tokenOnce]).then(([n])=>{if(!(n&&n.ok&&n.knowledge_base)){API_BASE=BACKUP;API_BACKUP_UNTIL=Date.now()+300000;noteSwitch('the page opened and found no Hudl server')}checkServers(n);return api('/session')}).then(s=>{clearTimeout(_wt);wake(0);OPEN_ACCESS=!!s.open;
   if(s.ok){setMe(s.name,s.admin);heartbeat();if(Q0){q.value=Q0;chips(Q0);find()}}
   /* the team site remembers this browser's name: coming back starts at once, no typing */
   else if(OPEN_ACCESS&&!ADMIN_SITE&&MY_NAME){post('/login',{name:MY_NAME,device:deviceId()}).then(j=>afterLogin(j,MY_NAME)).catch(err=>{if(err&&err.message)$('#lmsg').textContent=err.message;showLogin()})}
@@ -1034,7 +1040,7 @@ async function loadSwitches(){
     const dur=s=>s==null?'—':s<90?`${s} s`:s<5400?`${Math.round(s/60)} min`:`${(s/3600).toFixed(1)} h`;
     const nas=v=>v===true?'<span class="badge ok">Running</span>':v===false?'<span class="badge no">Off or restarting</span>':'<span class="badge">Unknown</span>';
     /* the way in, not the process: what the page could reach at that moment */
-    const path=e=>e.backup_ok===true&&e.nas_running!==false?'<div><b style="color:var(--wa)">Main server was up, the way in was not</b> <span class="mu small">tunnel or office internet</span></div>':e.backup_ok===false?'<div><b style="color:var(--no)">No internet at that moment</b> <span class="mu small">the backup did not answer either</span></div>':'';
+    const path=e=>e.backup_ok===true&&e.nas_running!==false?'<div><b style="color:var(--wa)">Hudl server was up, the way in was not</b> <span class="mu small">tunnel or office internet</span></div>':e.backup_ok===false?'<div><b style="color:var(--no)">No internet at that moment</b> <span class="mu small">the backup did not answer either</span></div>':'';
     /* one flapping browser used to fill this table with the same event every 6 minutes: fold the
        same name within 10 minutes into one row and keep a count */
     const groups=[];
@@ -1047,27 +1053,52 @@ async function loadSwitches(){
       if(p&&p.t-t<=300000){p.t=t;p.people.add(e.name||'-')}
       else cl.push({t,people:new Set([e.name||'-'])})}
     const shared=cl.filter(c=>c.people.size>=2).length;
-    $('#swcnt').textContent=d.server==='nas'?(sw.length?`${shared} incident${shared===1?'':'s'} hit more than one person · ${groups.length} browser events`:'none recorded'):'shown when the site runs on the NAS';
-    $('#swtable tbody').innerHTML=groups.map(g=>{const e=g.e;return `<tr><td data-l="When">${esc(new Date(g.t).toLocaleString([], {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}))}</td><td data-l="Who">${esc(g.name)}${g.n>1?` <span class="mu small">×${g.n}</span>`:''}</td><td data-l="Back after">${e.kind==='expired'?'<span class="mu small">5-min limit reached</span>':dur(e.away_s)}</td><td data-l="NAS server">${nas(e.nas_running)}</td><td data-l="Why">${path(e)}${esc(e.trigger||'')}${Object.entries(e.reasons||{}).map(([k,v])=>`<br><span class="mu small">${esc(k)}: ${esc(v)}</span>`).join('')}</td></tr>`}).join('')||'<tr><td colspan="5" class="mu small">No moves to the backup recorded yet.</td></tr>'}
+    /* this history lives on the Hudl server; the backup does not have the full list, so do not
+       present its short local file as the record of what happened */
+    if(d.server_label==='render'){
+      $('#swcnt').textContent='kept on the Hudl server';
+      $('#swtable tbody').innerHTML='<tr><td colspan="5" class="mu small">This history is kept on the Hudl server. Open Status there to see it.</td></tr>';
+      return;
+    }
+    $('#swcnt').textContent=sw.length?`${shared} incident${shared===1?'':'s'} hit more than one person · ${groups.length} browser events`:'none recorded';
+    /* older rows were written when the main server was the NAS: show them with today's name */
+    const why=s=>esc(String(s||'').replace(/the NAS/gi,'the Hudl server').replace(/\bNAS\b/g,'Hudl server'));
+    $('#swtable tbody').innerHTML=groups.map(g=>{const e=g.e;return `<tr><td data-l="When">${esc(new Date(g.t).toLocaleString([], {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}))}</td><td data-l="Who">${esc(g.name)}${g.n>1?` <span class="mu small">×${g.n}</span>`:''}</td><td data-l="Back after">${e.kind==='expired'?'<span class="mu small">5-min limit reached</span>':dur(e.away_s)}</td><td data-l="Hudl server">${nas(e.nas_running)}</td><td data-l="Why">${path(e)}${why(e.trigger)}${Object.entries(e.reasons||{}).map(([k,v])=>`<br><span class="mu small">${esc(k)}: ${why(v)}</span>`).join('')}</td></tr>`}).join('')||'<tr><td colspan="5" class="mu small">No moves to the backup recorded yet.</td></tr>'}
   catch(e){}}
 async function loadStatus(){
   loadSwitches();
   try{
-    const [h,l]=await Promise.all([api('/health'),api('/learning')]);
+    const [h,l,z]=await Promise.all([api('/health'),api('/learning'),api('/healthz').catch(()=>null)]);
     const ix=l.index||{},le=l.learning||{},hv=l.harvest||{};
     const src=Object.entries(ix.by_source||{}).sort((a,b)=>b[1]-a[1]);
     const k=(i,v,t)=>`<div class="kpi"><span class="i">${ic(i)}</span><div class="v">${(v||0).toLocaleString()}</div><div class="l">${t}</div></div>`;
+    /* which server answered this page, and how healthy that process is (healthz is public) */
+    const self=z?(labelFor(z.server_label||z.server)||'Hudl server'):null;
+    if(z){
+      const up=z.uptime_s||0,ud=Math.floor(up/86400),uh=Math.floor(up%86400/3600),um=Math.floor(up%3600/60);
+      const upTxt=ud?`${ud} d ${uh} h`:uh?`${uh} h ${um} min`:`${um} min`;
+      const fromTxt=({'github':'published list','github spare':'published list (spare)','the other server':'the other server'})[z.game_list_from]||z.game_list_from||'';
+      $('#stself').innerHTML=`${k('pulse',self,'server answering')}${k('doc',z.version||'—','version')}${k('refresh',upTxt,'up time')}${k('db',z.rss_mb?`${z.rss_mb} MB`:'—','memory in use')}${k('search',`${z.searches||0} / ${z.max_searches||0}`,'searches now / limit')}${k('db',z.game_list||0,'games in the list')}`;
+      $('#stselfwhen').textContent='checked '+new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})+(fromTxt?' · list from '+fromTxt:'');
+    }else{
+      $('#stself').innerHTML='<div class="mu small">The server did not answer its health check.</div>';
+      $('#stselfwhen').textContent='';
+    }
+    const glNote=hv.source==='published game list'?' · published list, updated every 3 hours':hv.source?' · '+esc(hv.source):'';
     $('#stknow').innerHTML=`<div class="kpis">${k('db',ix.total,'games this season in the game list')}${k('bookmark',le.confirmed,'games you saved, answered at once')}${k('bolt',le.results,'answers remembered')}${k('users',le.aliases,'team spellings learned')}</div>
-      <div class="sec"><div class="hd"><span class="hic">${ic('db')}</span><h3>Game list by source</h3><span class="cnt">refreshed ${hv.at?esc(hv.at.replace('T',' ')):'never'} · every day while the app runs</span></div>
+      <div class="sec"><div class="hd"><span class="hic">${ic('db')}</span><h3>Game list by source</h3><span class="cnt">${hv.at?esc(hv.at.replace('T',' ')):'never'}${glNote}</span></div>
       <div class="bd"><div class="chips">${src.map(([s,v])=>`<span class="chip"><span>${esc(s)}</span><b>${v.toLocaleString()}</b></span>`).join('')||'<span class="mu small">Nothing collected yet.</span>'}</div></div></div>`;
     const cs=h.checks||[],ok=cs.filter(c=>c.ok).length;
-    $('#stwhen').textContent=h.at?`Last source check ${h.at.replace('T',' ')}`:'No source check yet';
+    $('#stwhen').textContent=(h.at?`Last source check ${h.at.replace('T',' ')}`:'No source check yet')+(self?` · ${self}`:'');
     $('#stcnt').textContent=cs.length?`${ok} of ${cs.length} working`:'';
+    $('#stsrcnote').textContent=h.daily===false
+      ? 'Each source is asked for one known game when you press Check sources now. The daily check is off on this server; a failed check means the site changed or is down, so its games may be missed until it is fixed.'
+      : 'Each source is asked for one known game every day while the app runs. A failed check means the site changed or is down, so its games may be missed until it is fixed.';
     $('#sttable tbody').innerHTML=cs.map(c=>`<tr><td data-l="Source"><b style="font-weight:600">${esc(c.source)}</b></td><td data-l="Result"><span class="badge ${c.ok?'ok':'no'}">${c.ok?ic('check','xs')+'Working':ic('alert','xs')+'Failing'}</span>${c.ok?'':` <span class="mu small">${esc(c.error||'')}</span>`}</td><td data-l="How" class="mu small">${c.how==='live'?'site read live':c.how==='game list'?'from the daily game list':''}</td><td data-l="Time" class="mu small mono">${c.seconds}s</td></tr>`).join('')||'<tr><td colspan=4 class="mu">No checks yet. Press "Check sources now".</td></tr>';
   }catch(e){$('#stwhen').textContent='Could not load status: '+e.message}
 }
 $('#strun').onclick=async()=>{const b=$('#strun'),t=b.querySelector('span');
-  if(!onNas(apiBase())){toast('The source check runs on the main server only. Try again when the footer says the server is online.','warn');return}
+  if(!onNas(apiBase())){toast('The source check runs on the Hudl server only. Try again when the footer says Running on Hudl server.','warn');return}
   b.disabled=true;t.textContent='Checking… about two minutes';
   try{await post('/health/run',{},{timeout:0})}catch(e){if(e.status===409)toast(e.message,'warn')}
   b.disabled=false;t.textContent='Check sources now';loadStatus()};

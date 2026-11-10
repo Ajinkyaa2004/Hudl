@@ -1,6 +1,8 @@
 // PuckTrace search log + dashboard. Paste over everything in Extensions > Apps Script, Save,
 // then Deploy > Manage deployments > edit (pencil) > Version: New version > Deploy (same URL).
 // Once: choose the function "setup" in the toolbar and press Run (it asks for permission once).
+// "setup" also rewrites the old Server values (nas/local -> hudl), so the log and the dashboard
+// read "Hudl server" and "Render"; menu PuckTrace > Normalise server labels runs that again by hand.
 var KEY = 'SEE data/sheet_log.json (key)';
 var HEAD = ['Time (IST)', 'Name', 'Header', 'Found', 'Report link', 'Server',
             'Search time (s)', 'Result', 'Found on', 'Competition', 'Match ID'];
@@ -12,6 +14,36 @@ function logSheet_(ss) {
     if (String(all[i].getRange(1, 1).getValue()) === HEAD[0]) return all[i];
   }
   return all[0];
+}
+
+// ---------------------------------------------------------------- servers
+// Which server answered is kept as one short value in the sheet and shown with one name:
+//   nas / local / pc -> hudl  ->  "Hudl server"   (the office PC; the old NAS ran the same code)
+//   render           -> render -> "Render"         (the backup)
+var SERVER_KEY = {nas: 'hudl', local: 'hudl', pc: 'hudl', hudl: 'hudl', 'hudl server': 'hudl', render: 'render'};
+function serverKey_(v) {
+  var k = String(v == null ? '' : v).trim().toLowerCase();
+  return SERVER_KEY[k] || (k || 'unknown');
+}
+function serverLabel_(v) {
+  var k = serverKey_(v);
+  return k === 'hudl' ? 'Hudl server' : k === 'render' ? 'Render' : k === 'unknown' ? 'Unknown' : String(v).trim();
+}
+
+function migrateServers() {                            // old rows: nas/local -> hudl, render -> render
+  var s = logSheet_(SpreadsheetApp.getActiveSpreadsheet());
+  var last = s.getLastRow();
+  if (last < 2) return 0;
+  var range = s.getRange(2, 6, last - 1, 1);
+  var vals = range.getValues(), changed = 0;
+  for (var i = 0; i < vals.length; i++) {
+    var cur = String(vals[i][0] == null ? '' : vals[i][0]).trim();
+    if (!cur) continue;
+    var key = serverKey_(cur);
+    if (cur !== key) { vals[i][0] = key; changed++; }
+  }
+  if (changed) range.setValues(vals);
+  return changed;
 }
 
 function doPost(e) {
@@ -29,27 +61,60 @@ function doPost(e) {
   }
   var s = logSheet_(ss);
   s.getRange(1, 1, 1, HEAD.length).setValues([HEAD]);
-  s.appendRow([d.time, d.name, d.header, d.found, d.link, d.server,
+  s.appendRow([d.time, d.name, d.header, d.found, d.link, serverKey_(d.server),
                d.seconds, d.result, d.found_on, d.competition, d.match_id]);
   return ContentService.createTextOutput('ok');
 }
 
 function onOpen() {
-  SpreadsheetApp.getUi().createMenu('PuckTrace').addItem('Refresh dashboard', 'buildDashboard').addToUi();
+  SpreadsheetApp.getUi().createMenu('PuckTrace')
+    .addItem('Refresh dashboard', 'buildDashboard')
+    .addSeparator()
+    .addItem('Normalise server labels (old rows)', 'migrateServers')
+    .addToUi();
 }
 
-function setup() {                                    // once: hourly refresh + first build
+function setup() {                                    // once: server labels, hourly refresh + first build
   ScriptApp.getProjectTriggers().forEach(function (t) {
     if (t.getHandlerFunction() === 'buildDashboard') ScriptApp.deleteTrigger(t);
   });
   ScriptApp.newTrigger('buildDashboard').timeBased().everyHours(1).create();
+  migrateServers();
   buildDashboard();
 }
 
-// ---------------------------------------------------------------- dashboard
-var T = {navy: '#14213d', ink: '#1f2a44', sub: '#6b7280', line: '#e5e7eb', bg: '#f4f6fb', card: '#ffffff', orange: '#f26a1b',
-         found: '#22a06b', pick: '#f5a524', none: '#e5484d', wrong: '#9f1239', blue: '#3b82f6', teal: '#0ea5a4',
-         purple: '#7c3aed', grey: '#9ca3af', sky: '#7aa6d9', font: 'Roboto'};
+// ---------------------------------------------------------------- people
+// One row per person. Before accounts (to 28 Oct) the team typed any name, so old spellings are
+// folded with the explicit alias list below. Never fold by first word: Vishal Doiphode and Vishal
+// (Jethva), Raj Kadam and Raj, Karan Sonawane and Karan Sharma are different people. A name that is
+// not in this list is shown exactly as typed; since 29 Oct a name is an account, so nothing is
+// guessed or silently merged.
+var PEOPLE = ['Actorix', 'Aditya', 'Ajat', 'Aqib', 'Atharva', 'Avinash Pandit', 'Bhavya', 'Chaitanya', 'Dipesh',
+              'Dmitrii', 'Harsh', 'Hitesh', 'Imran', 'Isha', 'Karan Sharma', 'Karan Sonawane', 'Kunal', 'Kushal', 'Kusum',
+              'Maaz', 'Navya', 'Neha', 'Ninad', 'Pravin', 'Punit', 'Rahul', 'Raj', 'Raj Kadam', 'Ram', 'Roshan', 'Saloni',
+              'Sarvesh', 'Shivkumar', 'Vaibhav', 'Vishal', 'Vishal Doiphode', 'Vivek', 'Yash'];
+var ALIASES = {
+  'ajinkya': 'Actorix', 'ajinkyaa': 'Actorix',
+  'rahul rajbhar': 'Rahul', 'neha gole': 'Neha', 'kushal vaja': 'Kushal',
+  'atharva nalawade': 'Atharva', 'shivkumar ujeli': 'Shivkumar', 'vivek gupta': 'Vivek',
+  'saloni wadkar': 'Saloni', 'kusum seeravi': 'Kusum', 'maaz shaikh': 'Maaz',
+  'punit vishwakarma': 'Punit', 'bhavya solanki': 'Bhavya', 'dipesh singh': 'Dipesh',
+  'pravin halde': 'Pravin', 'sarvesh indulkar': 'Sarvesh', 'yash nair': 'Yash',
+  'ajat dinesh': 'Ajat', 'kunal vaidya': 'Kunal', 'hitesh patil': 'Hitesh',
+  'navya yellela': 'Navya', 'vaibhav kamble': 'Vaibhav',
+  'rosh': 'Roshan', 'ra': 'Raj', 'r': 'Raj', 'ninal': 'Ninad',
+  'vishal.jethva': 'Vishal', 'vishal jethva': 'Vishal', 'harsh sawant': 'Harsh'
+};
+var NONAME = {'': 1, '-': 1, 'abc': 1, 'noname': 1, 'test (delete me)': 1, '(no name)': 1};
+var BY_LOWER = {};
+PEOPLE.forEach(function (n) { BY_LOWER[n.toLowerCase()] = n; });
+function person_(name) {
+  var n = String(name || '').trim().replace(/\s+/g, ' '), k = n.toLowerCase();
+  if (NONAME[k]) return '(no name)';
+  if (ALIASES[k]) return ALIASES[k];
+  if (BY_LOWER[k]) return BY_LOWER[k];
+  return n;
+}
 
 function when_(v) {
   if (v instanceof Date) return v;
@@ -57,26 +122,6 @@ function when_(v) {
   return m ? new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]) : null;
 }
 function fmt_(t, f) { return Utilities.formatDate(t, 'Asia/Kolkata', f); }
-// Account names (admin screen). Before accounts (to 28 Oct) people typed any name, so "Navya Yellela",
-// "Navya" and "navya" are one person: a logged name is folded onto the account whose name it starts
-// with (first word), plus the few spellings below. Add a line to ACCOUNTS when a new account is made.
-var ACCOUNTS = ['Actorix', 'Aditya', 'Ajat', 'Aqib', 'Atharva', 'Avinash Pandit', 'Bhavya', 'Chaitanya', 'Dipesh', 'Dmitrii',
-                'Harsh', 'Hitesh', 'Imran', 'Isha', 'Karan Sonawane', 'Karan sharma', 'Kunal', 'Kushal', 'Kusum', 'Maaz', 'Navya',
-                'Neha', 'Ninad', 'Pravin', 'Punit', 'Rahul', 'Raj', 'Raj Kadam', 'Ram', 'Roshan', 'Saloni', 'Shivkumar', 'Vaibhav',
-                'Vishal', 'Vivek', 'Yash'];
-var ALSO = {'ajinkya': 'Actorix', 'rosh': 'Roshan', 'ra': 'Raj', 'r': 'Raj', 'ninal': 'Ninad', 'vishal.jethva': 'Vishal',
-            'vishal jethva': 'Vishal', 'karan sharma': 'Karan sharma', 'karan': 'Karan sharma'};
-var NONAME = {'': 1, '-': 1, 'abc': 1, 'noname': 1, 'test (delete me)': 1, '(no name)': 1};
-function person_(name) {
-  var n = String(name || '').trim(), k = n.toLowerCase();
-  if (NONAME[k]) return '(no name)';
-  if (ALSO[k]) return ALSO[k];
-  for (var i = 0; i < ACCOUNTS.length; i++) if (ACCOUNTS[i].toLowerCase() === k) return ACCOUNTS[i];
-  var first = k.split(/\s+/)[0];
-  for (var j = 0; j < ACCOUNTS.length; j++) if (ACCOUNTS[j].toLowerCase() === first) return ACCOUNTS[j];
-  return n;
-}
-
 function res_(r) {
   var x = String(r[7] || '').trim();
   if (x === 'Found' || (!x && String(r[3]).trim() === 'Yes')) return 'Found';
@@ -84,12 +129,17 @@ function res_(r) {
   return 'Not found';
 }
 
+// ---------------------------------------------------------------- dashboard
+var T = {navy: '#14213d', ink: '#1f2a44', sub: '#6b7280', line: '#e5e7eb', bg: '#f4f6fb', card: '#ffffff', orange: '#f26a1b',
+         found: '#22a06b', pick: '#f5a524', none: '#e5484d', wrong: '#9f1239', blue: '#3b82f6', teal: '#0ea5a4',
+         purple: '#7c3aed', grey: '#9ca3af', sky: '#7aa6d9', font: 'Roboto'};
+
 function buildDashboard() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var log = logSheet_(ss);
   var rows = log.getDataRange().getValues().slice(1).filter(function (r) { return r[2]; }).map(function (r) {
     return {t: when_(r[0]), name: person_(r[1]), header: String(r[2]), res: res_(r),
-            secs: parseFloat(r[6]), server: String(r[5] || '') || 'unknown', site: String(r[8] || ''), id: String(r[10] || '')};
+            secs: parseFloat(r[6]), server: serverKey_(r[5]), site: String(r[8] || ''), id: String(r[10] || '')};
   }).filter(function (r) { return r.t; });
 
   // ---- numbers
@@ -292,7 +342,9 @@ function buildDashboard() {
               .map(function (x) { return [hdr(x.header), x.secs, x.res, x.name, fmt_(x.t, 'dd MMM HH:mm')]; }));
   var srv = {};
   rows.forEach(function (x) { srv[x.server] = (srv[x.server] || 0) + 1; });
-  sh.getRange(r + 1, 1, 1, 12).merge().setValue('Servers: ' + Object.keys(srv).map(function (k) { return (k === 'nas' ? 'main (NAS) ' : k === 'render' ? 'backup (Render) ' : k + ' ') + Math.round(100 * srv[k] / n) + '%'; }).join('  ·  '))
+  var srvOrder = Object.keys(srv).sort(function (a, b) { return (a === 'hudl' ? -1 : b === 'hudl' ? 1 : a === 'render' ? -1 : b === 'render' ? 1 : 0); });
+  sh.getRange(r + 1, 1, 1, 12).merge().setValue('Servers: ' + srvOrder.map(function (k) {
+    return serverLabel_(k) + ' ' + (n ? Math.round(100 * srv[k] / n) : 0) + '%'; }).join('  ·  '))
     .setFontSize(10).setFontColor(T.sub);
   sh.setFrozenRows(3);
   ss.setActiveSheet(sh);
