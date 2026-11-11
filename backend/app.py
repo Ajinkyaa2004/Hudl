@@ -207,11 +207,6 @@ def login(inp: LoginIn, request: Request):
         # the team site: the name is the sign-in; the account is made on first entry
         try:
             u, created = _users.ensure(name, inp.device)
-        except _users.NameTaken:
-            hint = ('your full name, like “Rahul Sharma”' if ' ' not in name else
-                    'a middle name, initial or branch, like “Rahul K Sharma” or “Rahul Sharma (Mumbai)”')
-            raise HTTPException(409, f'The name “{name}” is already on PuckTrace. Please use a different '
-                                     f'combination — for example {hint}.')
         except PermissionError as e:
             raise HTTPException(403, str(e))
         except ValueError as e:

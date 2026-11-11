@@ -5,9 +5,10 @@ locked backup like the knowledge base) holds, per person, a salted PBKDF2 hash o
 (never the password itself), the browsers that have used a name, and the admin flag:
     {"users": {"actorix": {"name": "Actorix", "salt": "...", "hash": "...", "admin": true, "v": 1}}}
 
-A name is unique: a new browser must choose a different combination unless the admin has just allowed
-that one device. A session token names its user and is signed with APP_SECRET over the user's password
-hash, so a new password or a removed account signs that person out everywhere at once.
+A name is not unique: anyone may enter any name from any browser, and two people may share a name.
+The browsers seen for a name are kept for the admin's view only; they never block a sign-in. A session
+token names its user and is signed with APP_SECRET over the user's password hash, so a new password or
+a removed account signs that person out everywhere at once.
 
     .venv/bin/python -m backend.users add "Name" "password" [--admin]   # add, or set a new password
     .venv/bin/python -m backend.users remove "Name"
@@ -152,17 +153,12 @@ def _now(plus_minutes: int = 0) -> str:
     return (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=5, minutes=30 + plus_minutes)).strftime("%Y-%m-%d %H:%M")
 
 
-class NameTaken(Exception):
-    """The name is already in use and this browser has never signed in with it."""
-
-
 def ensure(name: str, device: str = "") -> tuple[dict, bool]:
     """A name-only account: made on first entry, no password. Returns (record, created).
 
-    A name is unique: once it is on PuckTrace, a different browser is told to choose another
-    combination (e.g. first name + surname) rather than silently sharing the account. The one
-    exception is the admin's "allow a new device" reset, so the real person can return on a new
-    laptop or phone: that opens the door once, for a few minutes."""
+    Anyone may enter any name from any browser: two people may share a name, and the same person
+    may return on a new laptop or phone without asking the admin. The browsers seen are recorded
+    for the admin's view (the last few only), never used to refuse a sign-in."""
     name = clean_name(name)
     if len(name) < 2:
         raise ValueError("Please type your name")
@@ -175,20 +171,12 @@ def ensure(name: str, device: str = "") -> tuple[dict, bool]:
             if u.get("blocked"):
                 raise PermissionError("This name is blocked. Ask the admin.")
             devs = list(u.get("devices") or [])
-            if device and device in devs:
+            if not device or device in devs:
                 return u, False
-            if device and not devs and not u.get("admin"):
-                # an account from before devices were recorded: the first browser to use it claims it
-                d[k] = dict(u, devices=[device], last_device=device)
-                _save(d)
-                return d[k], False
-            until = u.get("allow_device_until") or ""
-            if device and until and until >= _now():
-                d[k] = dict(u, devices=(devs[-8:] + [device]), last_device=device,
-                            allow_device_until=None)
-                _save(d)
-                return d[k], False
-            raise NameTaken(name)
+            d[k] = dict(u, devices=(devs[-8:] + [device]), last_device=device,
+                        allow_device_until=None)
+            _save(d)
+            return d[k], False
         if len(d) >= 2000:
             raise ValueError("This server has reached its user limit")
         u = dict(name=name, admin=False, v=1, created=_now(), name_only=True,

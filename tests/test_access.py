@@ -64,34 +64,34 @@ A = {"x-pt-session": admin}
 check("an admin-session may enter the Admin screen", c.get("/api/admin/users", headers=A).status_code == 200)
 check("an admin-session may write", c.post("/api/save", json={"header": "x"}, headers=A).status_code == 400)  # parsed -> 400, not 403
 
-# a name is unique: a browser that has never used it is told to pick another combination
+# a name is not unique: the same name works from any browser, even while someone else has it
 r = c.post("/api/login", json={"name": "rahul sharma", "device": "dev2"})
-check("a taken name from a new browser is refused", r.status_code == 409, r.text)
-check("the refusal suggests another combination", "already on PuckTrace" in r.json().get("detail", ""), r.text)
+check("the same name from a new browser is accepted", r.status_code == 200, r.text)
+check("it is still a name-session", token(r.json()).startswith("n1.") and r.json()["admin"] is False, r.text)
 check("the same browser returns to its name",
       c.post("/api/login", json={"name": "Rahul Sharma", "device": "dev1"}).status_code == 200)
-check("a different combination is a new person",
+check("a different combination is still a separate account",
       c.post("/api/login", json={"name": "Rahul Sharma (Pune)", "device": "dev2"}).status_code == 200)
 check("a name-session may not open a new device",
       c.post("/api/admin/users/Rahul Sharma/new-device", json={}, headers=H).status_code == 403)
 r = c.post("/api/admin/users/Rahul Sharma/new-device", json={}, headers=A)
-check("the admin can open one new device", r.status_code == 200, r.text)
-check("the new browser is let in once",
+check("the admin can still mark a new device", r.status_code == 200, r.text)
+check("another browser can use the name too",
       c.post("/api/login", json={"name": "Rahul Sharma", "device": "dev9"}).status_code == 200)
-check("the door closes again after that one device",
-      c.post("/api/login", json={"name": "Rahul Sharma", "device": "dev10"}).status_code == 409)
+check("and one more",
+      c.post("/api/login", json={"name": "Rahul Sharma", "device": "dev10"}).status_code == 200)
 
-# an account made before devices were recorded (an older password account) is claimed by its first browser
+# an account made before devices were recorded (an older password account) is open to any browser
 U.add("Legacy Analyst", "oldpass")
-check("an old account's first browser claims it",
+check("an old account's first browser signs in",
       c.post("/api/login", json={"name": "Legacy Analyst", "device": "legacy1"}).status_code == 200)
-check("after claiming, a second browser is refused",
-      c.post("/api/login", json={"name": "Legacy Analyst", "device": "legacy2"}).status_code == 409)
+check("a second browser signs in too",
+      c.post("/api/login", json={"name": "Legacy Analyst", "device": "legacy2"}).status_code == 200)
 
-# an admin account on the team site is only a name (and also obeys the unique-name rule)
-check("an admin's name from a new browser is refused",
-      c.post("/api/login", json={"name": "Ajinkya", "device": "devA"}).status_code == 409)
-check("the admin can allow its own new device",
+# an admin account on the team site is only a name, and anyone may enter that name
+check("an admin's name from a new browser is accepted",
+      c.post("/api/login", json={"name": "Ajinkya", "device": "devA"}).status_code == 200)
+check("the admin can still mark its own new device",
       c.post("/api/admin/users/Ajinkya/new-device", json={}, headers=A).status_code == 200)
 r = c.post("/api/login", json={"name": "Ajinkya", "device": "devA"})
 check("an admin's name login is not admin", r.status_code == 200 and r.json()["admin"] is False and token(r.json()).startswith("n1."), r.text)
