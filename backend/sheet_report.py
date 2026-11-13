@@ -40,6 +40,13 @@ def _comparable(a: str, b: str) -> bool:
 
 
 def log_rows() -> list[dict]:
+    from . import gsheet
+    sa = gsheet.account()
+    if sa:                                   # read with the service account (works for a private sheet too)
+        try:
+            return gsheet.read_log(sa)
+        except Exception as e:
+            print(f"[sheet log] reading through the API failed, using the CSV export: {str(e)[:160]}", flush=True)
     import httpx
     r = httpx.get(f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid=0", follow_redirects=True, timeout=90)
     r.raise_for_status()
@@ -83,8 +90,19 @@ def verdicts(log: list[dict], progress: Path = PROGRESS) -> list[list]:
 
 
 def send(rows: list[list]) -> str:
+    """Fill the Accuracy tab: with the service account when there is one (the sheet's script then
+    redraws the Dashboard at its hourly refresh), else through the old web app."""
     import httpx
-    cfg = json.loads(CFG.read_text())
+    from . import gsheet
+    cfg = json.loads(CFG.read_text(encoding="utf-8"))
+    sa = gsheet.account(cfg)
+    if sa:
+        try:
+            return gsheet.write_accuracy(sa, rows)
+        except Exception as e:
+            if not cfg.get("url"):
+                raise
+            print(f"[sheet log] Accuracy through the API failed, using the web app: {str(e)[:160]}", flush=True)
     r = httpx.post(cfg["url"], json=dict(key=cfg["key"], type="accuracy", rows=rows), follow_redirects=True, timeout=180)
     return r.text[:200]
 

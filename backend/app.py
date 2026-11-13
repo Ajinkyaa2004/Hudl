@@ -585,6 +585,53 @@ async def admin_upload(name: str, request: Request):
     return dict(ok=True, bytes=len(body))
 
 
+# ---------------------------------------------------------------- the search log's key (Admin)
+@app.get("/api/admin/logkey")
+def admin_logkey():
+    """How the search log reaches the Google Sheet: 'api' (service account), 'script' (the old web
+    app) or 'off'. Never the key itself."""
+    from . import gsheet
+    return gsheet.status()
+
+
+@app.post("/api/admin/logkey")
+async def admin_logkey_set(request: Request):
+    """Store the service account key file Google downloaded (JSON). It is tried against the sheet
+    first, so a key that cannot write is refused with the reason; then kept in sheet_log.json and
+    sent to the other server."""
+    import json as _j, asyncio
+    from . import gsheet
+    try:
+        raw = _j.loads(await request.body())
+    except Exception:
+        raise HTTPException(400, "Choose the .json key file Google downloaded")
+    try:
+        sa = gsheet.clean_key(raw)
+        tab = await asyncio.to_thread(gsheet.check, sa)
+    except gsheet.SheetError as e:
+        raise HTTPException(400, str(e)[:300])
+    except Exception as e:
+        raise HTTPException(502, f"Google could not be reached from this server ({str(e)[:160]})")
+    cfg = gsheet.config()
+    cfg["sa"] = sa
+    gsheet.CFG.write_text(_j.dumps(cfg), encoding="utf-8")
+    gsheet.start()
+    _push_file("sheet_log.json")
+    return dict(gsheet.status(), ok=True, tab=tab)
+
+
+@app.delete("/api/admin/logkey")
+def admin_logkey_clear():
+    """Forget the key: the log goes through the old web app again (if its address is still there)."""
+    import json as _j
+    from . import gsheet
+    cfg = gsheet.config()
+    if cfg.pop("sa", None) is not None:
+        gsheet.CFG.write_text(_j.dumps(cfg), encoding="utf-8")
+        _push_file("sheet_log.json")
+    return dict(gsheet.status(), ok=True)
+
+
 @app.get("/api/admin/data")
 def admin_data(name: str, since: float = 0):
     """The private data files, for the other server to copy (signed in: both servers share
@@ -1438,6 +1485,12 @@ async def _start_harvest():
     asyncio.create_task(_daily_harvest())
     asyncio.create_task(_cache_cleanup_loop())
     asyncio.create_task(_heartbeat_loop())
+    try:                                        # search-log rows that were waiting when the server stopped
+        from . import gsheet
+        if gsheet.QUEUE.exists() and gsheet.account():
+            gsheet.start()
+    except Exception:
+        pass
     if SERVER != "render":
         asyncio.create_task(_recheck_loop())
     if DATA_FROM:
@@ -1588,6 +1641,9 @@ def app_busy() -> bool:
 # time (IST), name, header, found Yes/No, report link, server. The address and its key are in
 # data/sheet_log.json ({"url": ..., "key": ...}), uploaded like the knowledge base and never in the
 # public repository. Sent in the background; nothing changes for the person searching.
+# With a Google service account key in that file ("sa", set in Admin > RTT sheet > Search log), the
+# rows are written straight into the sheet instead (backend/gsheet.py) and the web app is only the
+# spare way: nothing has to be deployed in the sheet's script again.
 # ---------------------------------------------------------------- re-checking not-found searches
 # Reports often go online hours after a game. Every search that ended without a report is kept in
 # data/recheck.json and searched again later in the day while the server is quiet; a report found
@@ -1652,8 +1708,8 @@ async def _recheck_loop():
 async def _sheet_log(name: str, header: str, result: dict, seconds: float = None):
     import json as _j, datetime as _dt
     try:
-        cfg = _j.loads((ROOT / "data" / "sheet_log.json").read_text())
-        if not cfg.get("url"):
+        cfg = _j.loads((ROOT / "data" / "sheet_log.json").read_text(encoding="utf-8"))
+        if not cfg.get("url") and not cfg.get("sa"):
             return
         a = (result or {}).get("auto") or {}
         found = a.get("verdict") == "found"
@@ -1672,6 +1728,11 @@ async def _sheet_log(name: str, header: str, result: dict, seconds: float = None
                    found_on=lookup.domain(link) if link else "",
                    competition=(p.get("comp") or "")[:120],
                    match_id=p.get("match_id") or "")
+        from . import gsheet
+        if gsheet.account(cfg):                 # straight into the sheet (Google Sheets API), a few rows at a time
+            row.pop("key", None)
+            gsheet.add(row)
+            return
         import httpx
         async with httpx.AsyncClient(timeout=30, follow_redirects=True) as c:
             await c.post(cfg["url"], content=_j.dumps(row), headers={"content-type": "text/plain"})

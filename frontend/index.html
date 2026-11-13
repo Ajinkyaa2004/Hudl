@@ -669,6 +669,11 @@ html.theme-vt::view-transition-new(root){animation:theme-reveal .38s var(--ease-
             <div class="factions" style="flex-wrap:wrap;margin-top:0"><input type="file" id="shfile" accept=".xlsx"><button class="btn2 pri" id="shup"><svg class="ic sm"><use href="#i-plus"/></svg>Upload and read</button><span class="msg" id="shmsg"></span></div>
             <div id="shstate" style="margin-top:12px"></div>
           </div></div>
+          <div class="sec"><div class="hd"><span class="hic"><svg class="ic sm"><use href="#i-doc"/></svg></span><h3>Search log sheet</h3></div><div class="bd">
+            <div class="note" style="margin-bottom:12px"><svg class="ic sm"><use href="#i-help"/></svg><span>Every search is written to the Google Sheet. With a Google service account key, PuckTrace writes the rows itself and nothing has to be deployed in the sheet's script again. Share the sheet with the service account's e-mail as Editor, then choose its .json key file here. The key is tried against the sheet before it is kept.</span></div>
+            <div id="lkstate" class="small" style="margin-bottom:10px"></div>
+            <div class="factions" style="flex-wrap:wrap;margin-top:0"><input type="file" id="lkfile" accept=".json,application/json"><button class="btn2 pri" id="lkup"><svg class="ic sm"><use href="#i-check"/></svg>Check and save key</button><button class="btn2" id="lkdel" hidden>Remove key</button><span class="msg" id="lkmsg"></span></div>
+          </div></div>
         </div>
       </section>
 
@@ -1395,7 +1400,7 @@ $('#aform').onsubmit=async e=>{e.preventDefault();$('#amsg').className='msg';$('
 let APANE='users',LVT=0;
 function adminPane(p){APANE=p;$$('#aseg button').forEach(b=>b.classList.toggle('on',b.dataset.p===p));$$('.apane').forEach(x=>x.hidden=x.id!=='ap-'+p);
   clearInterval(LVT);if(p==='users')loadAdmin();if(p==='live'){loadLive();LVT=setInterval(()=>{if($('#v-admin').classList.contains('on')&&APANE==='live')loadLive();else clearInterval(LVT)},10000)}
-  if(p==='usage')loadUsage();if(p==='ann')loadAnn();if(p==='sheet')loadSheet()}
+  if(p==='usage')loadUsage();if(p==='ann')loadAnn();if(p==='sheet'){loadSheet();loadLogKey()}}
 $$('#aseg button').forEach(b=>b.onclick=()=>adminPane(b.dataset.p));
 $('#arefresh').onclick=()=>adminPane(APANE);
 const ago=s=>s<60?`${s}s ago`:s<3600?`${Math.round(s/60)} min ago`:`${Math.round(s/3600)} h ago`;
@@ -1429,6 +1434,23 @@ $('#annclr').onclick=async()=>{try{await post('/admin/announce',{text:''});showA
 /* the sheet goes straight to the main server (it is too big for the way through Vercel) */
 async function nasCall(path,opts={}){const r=await fetch(NAS_DIRECT+path,{credentials:'same-origin',cache:'no-store',...opts,headers:{...hdrs(!(opts.body instanceof Blob)),...(opts.headers||{})}});
   let j={};try{j=await r.json()}catch(e){}if(!r.ok)throw new Error(j.detail||('Server error '+r.status));return j}
+/* the search log: how its rows reach the Google Sheet (a service account key, or the old web app) */
+async function loadLogKey(){let d;try{d=await nasCall('/admin/logkey')}catch(e){$('#lkstate').textContent=e.message;return}
+  const now=Date.now()/1000,t=x=>ago(Math.max(0,Math.round(now-x)));
+  let h=d.mode==='api'?`<span class="badge ok">Automatic</span> writing as <b>${esc(d.email)}</b>`:d.mode==='script'?'<span class="badge mu">Old way</span> through the script attached to the sheet (web app). Add a key to make it automatic.':'<span class="badge no">Off</span> no search log is set up on this server.';
+  if(d.mode==='api'){h+=d.last_ok?` · last row written ${t(d.last_ok)}`:' · no row written since the server started';
+    if(d.waiting)h+=` · ${d.waiting} waiting`;
+    if(d.last_error&&(!d.last_ok||d.last_error.at>d.last_ok))h+=`<div class="note" style="margin-top:8px">${ic('alert')}<span>Google refused ${t(d.last_error.at)}: ${esc(d.last_error.error)}${d.spare?' The rows went through the old web app instead.':''}</span></div>`}
+  $('#lkstate').innerHTML=h;$('#lkdel').hidden=d.mode!=='api'}
+$('#lkup').onclick=async()=>{const f=$('#lkfile').files[0],m=$('#lkmsg');m.className='msg';m.textContent='';
+  if(!f){m.className='msg err';m.textContent='Choose the .json key file first';return}
+  if(f.size>20000){m.className='msg err';m.textContent='That file is too big to be a key';return}
+  m.textContent='Checking the key against the sheet…';$('#lkup').disabled=true;
+  try{const d=await nasCall('/admin/logkey',{method:'POST',body:await f.text()});m.className='msg ok';m.textContent=`Saved. Writing to the tab “${d.tab}”.`;$('#lkfile').value='';loadLogKey()}
+  catch(e){m.className='msg err';m.textContent=e.message}
+  $('#lkup').disabled=false};
+$('#lkdel').onclick=async()=>{if(!confirm('Remove the key? The log goes through the old web app again.'))return;
+  try{await nasCall('/admin/logkey',{method:'DELETE'});$('#lkmsg').className='msg ok';$('#lkmsg').textContent='Removed';loadLogKey()}catch(e){$('#lkmsg').className='msg err';$('#lkmsg').textContent=e.message}};
 let SHT=0;
 async function loadSheet(){clearTimeout(SHT);let d;try{d=await nasCall('/admin/sheet')}catch(e){$('#shstate').innerHTML=`<div class="note">${ic('alert')}<span>${esc(e.message)} (the sheet is read on the main server)</span></div>`;return}
   const busy=d.status==='planning'||d.status==='applying';
