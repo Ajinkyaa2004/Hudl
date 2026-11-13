@@ -249,7 +249,13 @@ def check(sa: dict, sid: str = None) -> str:
 
 
 # ---------------------------------------------------------------- the queue of rows
+SERVER_KEY = {"nas": "hudl", "local": "hudl", "pc": "hudl", "hudl": "hudl", "render": "render"}
+
+
 def row_of(d: dict) -> list:
+    """One sheet row. The server is written as the sheet's script wrote it: 'hudl' for the main
+    server (the office PC; the app calls itself 'nas'), 'render' for the backup."""
+    d = dict(d, server=SERVER_KEY.get(str(d.get("server") or "").strip().lower(), d.get("server") or "unknown"))
     sec = d.get("seconds")
     mid = str(d.get("match_id") or "")
     return [d.get("time", ""), d.get("name", ""), d.get("header", ""), d.get("found", ""), d.get("link", ""),

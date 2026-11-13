@@ -126,7 +126,9 @@ time.sleep(1.2)
 ap = [c for c in CALLS if ":append" in c[1]]
 body = ap[0][2]["json"]["values"] if ap else []
 check("two searches go to the sheet in one call", len(ap) == 1 and len(body) == 2, str(len(ap)))
-check("the row has the sheet's eleven columns in order", bool(body) and len(body[0]) == 11 and body[0][0] == row["time"] and body[0][2] == row["header"] and body[0][5] == "nas")
+check("the row has the sheet's eleven columns in order", bool(body) and len(body[0]) == 11 and body[0][0] == row["time"] and body[0][2] == row["header"])
+check("the main server is written as 'hudl' and the backup as 'render', as the sheet's script did",
+      bool(body) and body[0][5] == "hudl" and G.row_of(dict(server="render"))[5] == "render" and G.row_of(dict(server="local"))[5] == "hudl")
 check("a name that looks like a formula is written as text", bool(body) and body[0][1].startswith("'="))
 check("seconds and the match id are numbers; an empty time is empty", bool(body) and body[0][6] == 4.2 and body[0][10] == 2286907 and body[1][6] == "")
 check("the append is 'as typed' on the log tab", bool(ap) and ap[0][2]["params"]["valueInputOption"] == "USER_ENTERED" and "Search%20log" in ap[0][1])
